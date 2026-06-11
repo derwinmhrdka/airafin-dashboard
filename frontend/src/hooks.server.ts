@@ -1,7 +1,7 @@
 import { env } from '$env/dynamic/private';
 import type { Handle } from '@sveltejs/kit';
 
-const BACKEND_URL = env.API_URL ?? 'http://localhost:3001';
+const BACKEND_URL = env.API_URL ?? 'http://localhost:3081';
 
 export const handle: Handle = async ({ event, resolve }) => {
   if (!event.url.pathname.startsWith('/api/')) {

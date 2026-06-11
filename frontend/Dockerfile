@@ -19,6 +19,6 @@ RUN npm ci --omit=dev
 
 COPY --from=builder /app/build ./build
 
-EXPOSE 3000
+EXPOSE 3080
 
 CMD ["node", "build"]

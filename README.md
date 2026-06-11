@@ -21,8 +21,8 @@ cp .env.example .env
 docker compose up --build
 ```
 
-- Dashboard: http://localhost:3000
-- API: http://localhost:3001
+- Dashboard: http://localhost:3080
+- API: http://localhost:3081
 - PostgreSQL: localhost:5432
 
 ## Local development without Docker (2 terminals)
@@ -66,7 +66,7 @@ cd backend
 npm run dev
 ```
 
-API → http://localhost:3001
+API → http://localhost:3081
 
 ### Terminal 2 — Frontend
 
@@ -95,7 +95,7 @@ SvelteKit `hooks.server.ts` proxies `/api/*` to the backend and injects `X-API-T
 ### POST /api/transactions (Phase 2 bot)
 
 ```bash
-curl -X POST http://localhost:3001/api/transactions \
+curl -X POST http://localhost:3081/api/transactions \
   -H "Content-Type: application/json" \
   -H "X-API-Token: $API_SECRET_TOKEN" \
   -d '{

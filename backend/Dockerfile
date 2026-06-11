@@ -24,6 +24,6 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/drizzle ./drizzle
 COPY drizzle.config.ts ./
 
-EXPOSE 3001
+EXPOSE 3081
 
 CMD ["sh", "-c", "node dist/db/migrate.js && node dist/db/seed.js && node dist/index.js"]

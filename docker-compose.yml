@@ -25,10 +25,10 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-airafin}:${POSTGRES_PASSWORD:-airafin}@db:5432/${POSTGRES_DB:-airafin}
       API_SECRET_TOKEN: ${API_SECRET_TOKEN:-change-me-in-production}
-      PORT: 3001
+      PORT: 3081
       HOST: 0.0.0.0
     ports:
-      - '3001:3001'
+      - '3081:3081'
 
   frontend:
     build: ./frontend
@@ -36,13 +36,13 @@ services:
     depends_on:
       - backend
     environment:
-      API_URL: http://backend:3001
+      API_URL: http://backend:3081
       API_SECRET_TOKEN: ${API_SECRET_TOKEN:-change-me-in-production}
-      PORT: 3000
+      PORT: 3080
       HOST: 0.0.0.0
-      ORIGIN: ${ORIGIN:-http://localhost:3000}
+      ORIGIN: ${ORIGIN:-http://localhost:3080}
     ports:
-      - '3000:3000'
+      - '3080:3080'
 
 volumes:
   pgdata:
