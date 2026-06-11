@@ -116,12 +116,23 @@ While migrating from your spreadsheet, each `POST /api/transactions` also append
 1. Create a [Google Cloud service account](https://console.cloud.google.com/) with **Google Sheets API** enabled.
 2. Download the JSON key file.
 3. Share your spreadsheet with the service account email (Editor access).
-4. Add to `backend/.env`:
+4. Configure env vars:
+
+**Local dev** (`backend/.env`):
 
 ```env
 GOOGLE_SHEETS_SPREADSHEET_ID=your-id-from-sheet-url
-GOOGLE_SERVICE_ACCOUNT_FILE=C:/path/to/service-account.json
+GOOGLE_SERVICE_ACCOUNT_FILE=./secrets/service-account.json
 ```
+
+**Docker / VPS** (root `.env` + copy JSON to `backend/secrets/` on the server):
+
+```env
+GOOGLE_SHEETS_SPREADSHEET_ID=your-id-from-sheet-url
+GOOGLE_SERVICE_ACCOUNT_FILE=/app/secrets/service-account.json
+```
+
+Then `docker compose up -d backend`.
 
 Rows append to the **DETAIL** tab: `A Date | B Category | C Detail | D Cost | E Month (e.g. June) | F (skipped) | G Initial (D/A)`.
 

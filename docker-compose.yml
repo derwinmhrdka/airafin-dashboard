@@ -24,8 +24,12 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-airafin}:${POSTGRES_PASSWORD:-airafin}@db:5432/${POSTGRES_DB:-airafin}
       API_SECRET_TOKEN: ${API_SECRET_TOKEN:-change-me-in-production}
+      GOOGLE_SHEETS_SPREADSHEET_ID: ${GOOGLE_SHEETS_SPREADSHEET_ID:-}
+      GOOGLE_SERVICE_ACCOUNT_FILE: ${GOOGLE_SERVICE_ACCOUNT_FILE:-}
       PORT: 3081
       HOST: 0.0.0.0
+    volumes:
+      - ./backend/secrets:/app/secrets:ro
     ports:
       - '3081:3081'
 
