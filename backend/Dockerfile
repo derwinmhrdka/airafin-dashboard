@@ -2,6 +2,9 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
+# Low-memory VPS: build one service at a time; esbuild uses far less RAM than tsc.
+ENV NODE_OPTIONS=--max-old-space-size=512
+
 COPY package.json package-lock.json* ./
 RUN npm ci
 
