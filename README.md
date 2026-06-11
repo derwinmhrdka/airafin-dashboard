@@ -23,7 +23,7 @@ docker compose up --build
 
 - Dashboard: http://localhost:3080
 - API: http://localhost:3081
-- PostgreSQL: localhost:5432
+- PostgreSQL: internal only (not exposed on host in Docker)
 
 ## Local development without Docker (2 terminals)
 

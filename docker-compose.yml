@@ -8,8 +8,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-airafin}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - '5432:5432'
+    # No host port — backend reaches db via Docker network (avoids 5432 conflicts on VPS)
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-airafin}']
       interval: 5s
