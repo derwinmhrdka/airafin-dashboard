@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { formatAmountInput } from '$lib/format';
+  import { formatAmountInput, toAmountNumber } from '$lib/format';
 
   interface Props {
     value?: string;
@@ -21,7 +21,7 @@
 
   function onInput(e: Event) {
     const raw = (e.target as HTMLInputElement).value.replace(/\D/g, '');
-    value = raw ? formatAmountInput(Number.parseInt(raw, 10)) : '';
+    value = raw ? formatAmountInput(toAmountNumber(raw)) : '';
   }
 </script>
 

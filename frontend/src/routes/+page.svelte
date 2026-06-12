@@ -1,10 +1,13 @@
 <script lang="ts">
   import { page } from '$app/state';
+  import { categoryChartFill } from '$lib/chart-colors';
   import CategoryProgress from '$lib/components/CategoryProgress.svelte';
+  import PieChart from '$lib/components/PieChart.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
   import StatCard from '$lib/components/StatCard.svelte';
   import { getReimbursements, getSummary, markReimbursementPaid } from '$lib/api';
   import { formatCurrency } from '$lib/format';
+  import { planVsExpenseSlices } from '$lib/plan-vs-expense';
   import { periodFromUrl } from '$lib/period';
   import { picInitial } from '$lib/pics';
   import type { DashboardSummary, ReimbursementItem } from '$lib/types';
@@ -16,6 +19,46 @@
   let loading = $state(true);
   let error = $state('');
   let payingId = $state<number | null>(null);
+  /** 'general' or categoryId string */
+  let planVsScope = $state('general');
+
+  const chartCategories = $derived(
+    summary?.categories.filter((c) => c.allocated > 0 || c.spent > 0) ?? [],
+  );
+
+  const planVsNumbers = $derived.by(() => {
+    if (!summary) return { plan: 0, spent: 0, title: 'General' };
+    if (planVsScope === 'general') {
+      return {
+        plan: summary.totalBudgetAllocated,
+        spent: summary.totalSpent,
+        title: 'General',
+      };
+    }
+    const cat = summary.categories.find((c) => String(c.categoryId) === planVsScope);
+    if (!cat) {
+      return {
+        plan: summary.totalBudgetAllocated,
+        spent: summary.totalSpent,
+        title: 'General',
+      };
+    }
+    return { plan: cat.allocated, spent: cat.spent, title: cat.categoryName };
+  });
+
+  const planVsSlices = $derived(
+    planVsExpenseSlices(planVsNumbers.plan, planVsNumbers.spent),
+  );
+
+  const allocationSlices = $derived(
+    (summary?.categories ?? [])
+      .filter((c) => c.allocated > 0)
+      .map((c) => ({
+        label: c.categoryName,
+        value: c.allocated,
+        color: categoryChartFill(c.categoryName),
+      })),
+  );
 
   async function loadData(activePeriod: string) {
     loading = true;
@@ -85,6 +128,41 @@
       <span class="stat-amount font-mono font-medium tabular-nums">
         {formatCurrency(summary.totalBudgetAllocated)}
       </span>
+    </div>
+
+    <div class="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
+      <article class="border border-zinc-200 p-3 dark:border-zinc-800">
+        <div class="mb-3 space-y-2">
+          <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Plan vs Expenses</h2>
+          <label class="block space-y-1">
+            <span class="text-[10px] text-zinc-500">Category</span>
+            <select
+              bind:value={planVsScope}
+              class="w-full border border-zinc-200 bg-white px-2 py-1.5 text-xs dark:border-zinc-800 dark:bg-black"
+            >
+              <option value="general">General (all categories)</option>
+              {#each chartCategories as cat (cat.categoryId)}
+                <option value={String(cat.categoryId)}>{cat.categoryName}</option>
+              {/each}
+            </select>
+          </label>
+          <p class="text-[10px] text-zinc-500">
+            {planVsNumbers.title}: Plan {formatCurrency(planVsNumbers.plan)} · Spent
+            {formatCurrency(planVsNumbers.spent)}
+          </p>
+        </div>
+        <PieChart slices={planVsSlices} emptyLabel="No plan data" />
+      </article>
+
+      <article class="border border-zinc-200 p-3 dark:border-zinc-800">
+        <div class="mb-3">
+          <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Plan Allocation</h2>
+          <p class="mt-1 text-[10px] text-zinc-500">
+            Share of total plan per category ({formatCurrency(summary.totalBudgetAllocated)}).
+          </p>
+        </div>
+        <PieChart slices={allocationSlices} emptyLabel="Set plan in Plan tab" />
+      </article>
     </div>
 
     <div class="space-y-2">

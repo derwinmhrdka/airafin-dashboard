@@ -1,6 +1,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import AmountInput from '$lib/components/AmountInput.svelte';
+  import DetailPreview from '$lib/components/DetailPreview.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
   import { categoryStyle } from '$lib/categories';
   import {
@@ -9,8 +10,6 @@
     getCategories,
     getPlan,
     getTransactions,
-    syncDbToSheet,
-    syncSheetToDb,
     updateTransaction,
   } from '$lib/api';
   import { formatAmountInput, formatCurrency, formatDate, parseAmountInput } from '$lib/format';
@@ -30,9 +29,6 @@
   let loadingMore = $state(false);
   let saving = $state(false);
   let deletingId = $state<number | null>(null);
-  let syncing = $state<'db-to-sheet' | 'sheet-to-db' | null>(null);
-  let syncMessage = $state('');
-  let syncError = $state('');
   let error = $state('');
   let success = $state('');
 
@@ -225,54 +221,6 @@
     }
   }
 
-  async function handleSyncDbToSheet() {
-    if (
-      !confirm(
-        `Sync to Spreadsheet for ${period}?\n\nThis replaces all ${period} rows in the DETAIL tab with data from the database. This cannot be undone.`,
-      )
-    ) {
-      return;
-    }
-
-    syncing = 'db-to-sheet';
-    syncMessage = '';
-    syncError = '';
-    try {
-      const result = await syncDbToSheet(period);
-      syncMessage = `Spreadsheet updated: ${result.written ?? 0} rows written (${result.deleted ?? 0} old rows replaced).`;
-    } catch (e) {
-      syncError = e instanceof Error ? e.message : 'Sync to spreadsheet failed';
-    } finally {
-      syncing = null;
-    }
-  }
-
-  async function handleSyncSheetToDb() {
-    if (
-      !confirm(
-        `Sync from Spreadsheet for ${period}?\n\nThis deletes all ${period} transactions in the database and replaces them with rows from the DETAIL tab. This cannot be undone.`,
-      )
-    ) {
-      return;
-    }
-
-    syncing = 'sheet-to-db';
-    syncMessage = '';
-    syncError = '';
-    try {
-      const result = await syncSheetToDb(period);
-      syncMessage = `Database updated: ${result.written ?? 0} rows imported (${result.deleted ?? 0} removed).`;
-      if (result.skipped) {
-        syncMessage += ` ${result.skipped} sheet rows skipped.`;
-      }
-      await loadData(period);
-    } catch (e) {
-      syncError = e instanceof Error ? e.message : 'Sync from spreadsheet failed';
-    } finally {
-      syncing = null;
-    }
-  }
-
   async function handleDelete(id: number, detail: string) {
     if (!confirm(`Delete "${detail}"?`)) return;
 
@@ -322,9 +270,24 @@
         <button
           type="button"
           onclick={cancelEdit}
-          class="text-[11px] text-zinc-500 underline-offset-2 hover:underline"
+          class="flex h-7 w-7 shrink-0 items-center justify-center border border-zinc-200 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300"
+          aria-label="Cancel edit"
         >
-          Cancel
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
+          </svg>
         </button>
       {/if}
     </div>
@@ -396,59 +359,6 @@
       {saving ? 'Saving…' : editingId != null ? 'Save Changes' : 'Add Transaction'}
     </button>
   </form>
-
-  <div class="space-y-2 border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-900/60 dark:bg-amber-950/25">
-    <h2 class="text-xs font-medium uppercase tracking-wider text-amber-900 dark:text-amber-200">
-      Spreadsheet Sync · {period}
-    </h2>
-    <div
-      class="rounded border border-amber-300/80 bg-amber-100/50 px-2.5 py-2 text-[11px] leading-relaxed text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
-      role="note"
-    >
-      <p class="font-medium">Caution — destructive sync</p>
-      <p class="mt-1 text-amber-900/90 dark:text-amber-200/90">
-        Only <strong>{period}</strong> is affected (from the header month/year). Each direction
-        <strong>replaces</strong> that month in the target — not a merge. Double-check the period
-        before continuing.
-      </p>
-      <ul class="mt-1.5 list-inside list-disc space-y-0.5 text-amber-900/80 dark:text-amber-200/80">
-        <li><strong>To Spreadsheet</strong> — overwrites DETAIL tab rows for this month.</li>
-        <li><strong>From Spreadsheet</strong> — deletes DB transactions for this month, then re-imports.</li>
-      </ul>
-    </div>
-    <div class="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
-      <button
-        type="button"
-        disabled={syncing != null || loading}
-        onclick={handleSyncDbToSheet}
-        class="border border-amber-300 bg-white px-3 py-2 text-left text-xs disabled:opacity-50 dark:border-amber-800 dark:bg-black"
-      >
-        <span class="block font-medium">Sync to Spreadsheet</span>
-        <span class="text-[10px] text-zinc-500">Database → DETAIL tab</span>
-        {#if syncing === 'db-to-sheet'}
-          <span class="mt-1 block text-[10px] text-zinc-500">Syncing…</span>
-        {/if}
-      </button>
-      <button
-        type="button"
-        disabled={syncing != null || loading}
-        onclick={handleSyncSheetToDb}
-        class="border border-amber-300 bg-white px-3 py-2 text-left text-xs disabled:opacity-50 dark:border-amber-800 dark:bg-black"
-      >
-        <span class="block font-medium">Sync from Spreadsheet</span>
-        <span class="text-[10px] text-zinc-500">DETAIL tab → Database</span>
-        {#if syncing === 'sheet-to-db'}
-          <span class="mt-1 block text-[10px] text-zinc-500">Syncing…</span>
-        {/if}
-      </button>
-    </div>
-    {#if syncError}
-      <p class="text-xs text-red-600 dark:text-red-400">{syncError}</p>
-    {/if}
-    {#if syncMessage}
-      <p class="text-xs text-emerald-600 dark:text-emerald-400">{syncMessage}</p>
-    {/if}
-  </div>
 
   <div class="space-y-2">
     <div class="flex items-center justify-between gap-2">
@@ -538,7 +448,9 @@
                     {tx.categoryName.slice(0, 8)}
                   </span>
                 </td>
-                <td class="max-w-[96px] truncate px-2 py-2" title={tx.detail}>{tx.detail}</td>
+                <td class="max-w-[96px] px-2 py-2">
+                  <DetailPreview text={tx.detail} />
+                </td>
                 <td class="px-2 py-2 text-right font-mono tabular-nums">
                   {formatCurrency(tx.cost)}
                 </td>
