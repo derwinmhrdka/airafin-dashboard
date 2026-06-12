@@ -1,17 +1,20 @@
 <script lang="ts">
   import { page } from '$app/stores';
+  import { periodFromUrl, withPeriodParam } from '$lib/period';
 
   const tabs = [
     { href: '/', label: 'Overview' },
     { href: '/detail', label: 'Detail' },
     { href: '/plan', label: 'Plan' },
   ];
+
+  const period = $derived(periodFromUrl($page.url.searchParams));
 </script>
 
 <nav class="grid grid-cols-3 border-b border-zinc-200 dark:border-zinc-800">
   {#each tabs as tab}
     <a
-      href={tab.href}
+      href={withPeriodParam(tab.href, period)}
       class="border-b-2 px-2 py-3 text-center text-xs font-medium transition-colors
         {$page.url.pathname === tab.href
         ? 'border-black text-black dark:border-white dark:text-white'

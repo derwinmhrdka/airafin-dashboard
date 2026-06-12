@@ -1,12 +1,13 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
   import { createCategory, getCategories, getPlan, savePlan } from '$lib/api';
   import { formatCurrency } from '$lib/format';
-  import { currentPeriod } from '$lib/period';
+  import { periodFromUrl } from '$lib/period';
   import type { Category } from '$lib/types';
 
-  const period = currentPeriod();
   const DEFAULT_INCOMES = ['Gaji Derwin', 'Gaji Anggita'] as const;
+
+  const period = $derived(periodFromUrl($page.url.searchParams));
 
   interface IncomeRow {
     key: string;
@@ -43,11 +44,12 @@
     incomeRows = incomeRows.filter((row) => row.key !== key);
   }
 
-  async function loadData() {
+  async function loadData(activePeriod: string) {
     loading = true;
     error = '';
+    success = '';
     try {
-      const [catRes, plan] = await Promise.all([getCategories(), getPlan(period)]);
+      const [catRes, plan] = await Promise.all([getCategories(), getPlan(activePeriod)]);
       categories = catRes.categories;
 
       incomeRows =
@@ -70,7 +72,9 @@
     }
   }
 
-  onMount(loadData);
+  $effect(() => {
+    void loadData(period);
+  });
 
   async function handleAddCategory() {
     const name = newCategoryName.trim();
@@ -113,7 +117,7 @@
 
     try {
       await savePlan({ period, incomes, budgets });
-      success = 'Plan saved for ' + period;
+      success = `Plan saved for ${period}`;
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to save plan';
     } finally {
@@ -133,6 +137,7 @@
   {#if loading}
     <div class="h-48 animate-pulse border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900"></div>
   {:else}
+    <p class="text-[11px] uppercase tracking-wider text-zinc-500">Plan · {period}</p>
     <form onsubmit={handleSubmit} class="space-y-4">
       <fieldset class="space-y-2 border border-zinc-200 p-3 dark:border-zinc-800">
         <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">

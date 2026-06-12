@@ -1,15 +1,16 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
   import CategoryProgress from '$lib/components/CategoryProgress.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
   import StatCard from '$lib/components/StatCard.svelte';
   import { getSummary, getTransactions, updateTransactionStatus } from '$lib/api';
   import { formatCurrency } from '$lib/format';
-  import { currentPeriod } from '$lib/period';
+  import { periodFromUrl } from '$lib/period';
   import type { DashboardSummary, Transaction } from '$lib/types';
 
-  const period = currentPeriod();
   const statuses = ['Done', 'On Going', 'Not Yet'] as const;
+
+  const period = $derived(periodFromUrl($page.url.searchParams));
 
   let summary = $state<DashboardSummary | null>(null);
   let transactions = $state<Transaction[]>([]);
@@ -24,13 +25,13 @@
       : transactions,
   );
 
-  async function loadData() {
+  async function loadData(activePeriod: string) {
     loading = true;
     error = '';
     try {
       const [summaryRes, txRes] = await Promise.all([
-        getSummary(period),
-        getTransactions(period),
+        getSummary(activePeriod),
+        getTransactions(activePeriod),
       ]);
       summary = summaryRes;
       transactions = txRes.transactions;
@@ -41,7 +42,9 @@
     }
   }
 
-  onMount(loadData);
+  $effect(() => {
+    void loadData(period);
+  });
 
   async function handleStatusChange(id: number, status: string) {
     updatingId = id;
@@ -73,6 +76,7 @@
   </p>
 {:else if summary}
   <section class="space-y-4">
+    <p class="text-[11px] uppercase tracking-wider text-zinc-500">Overview · {period}</p>
     <div class="grid grid-cols-3 gap-2">
       <StatCard label="Income" value={summary.totalIncome} accent="income" />
       <StatCard label="Spent" value={summary.totalSpent} accent="spent" />

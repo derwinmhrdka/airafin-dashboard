@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
   import PicBadge from '$lib/components/PicBadge.svelte';
   import { categoryStyle } from '$lib/categories';
   import {
@@ -10,10 +10,10 @@
     updateTransaction,
   } from '$lib/api';
   import { formatCurrency, formatDate } from '$lib/format';
-  import { currentPeriod } from '$lib/period';
+  import { periodFromUrl } from '$lib/period';
   import type { Category, Transaction } from '$lib/types';
 
-  const period = currentPeriod();
+  const period = $derived(periodFromUrl($page.url.searchParams));
   const pics = ['Derwin', 'Anggita'] as const;
   const PAGE_SIZE = 5;
 
@@ -73,7 +73,7 @@
     return '';
   }
 
-  async function loadTransactions(reset = false) {
+  async function loadTransactions(activePeriod: string, reset = false) {
     if (reset) {
       loading = true;
     } else {
@@ -83,7 +83,7 @@
 
     error = '';
     try {
-      const txRes = await getTransactions(period, {
+      const txRes = await getTransactions(activePeriod, {
         limit: PAGE_SIZE,
         offset: reset ? 0 : transactions.length,
       });
@@ -101,13 +101,14 @@
     }
   }
 
-  async function loadData() {
+  async function loadData(activePeriod: string) {
     error = '';
+    loading = true;
     try {
       const catRes = await getCategories();
       categories = catRes.categories;
       if (!categoryId && categories.length) categoryId = categories[0].id;
-      await loadTransactions(true);
+      await loadTransactions(activePeriod, true);
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load data';
       loading = false;
@@ -117,7 +118,7 @@
   function infiniteScroll(node: HTMLElement) {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting) void loadTransactions(false);
+        if (entries[0]?.isIntersecting) void loadTransactions(period, false);
       },
       { rootMargin: '120px' },
     );
@@ -125,7 +126,9 @@
     return { destroy: () => observer.disconnect() };
   }
 
-  onMount(loadData);
+  $effect(() => {
+    void loadData(period);
+  });
 
   function startEdit(tx: Transaction) {
     editingId = tx.id;
@@ -163,7 +166,7 @@
       if (result.sheetsSync?.status === 'failed') {
         error = result.sheetsSync.error ?? 'Spreadsheet sync failed';
       }
-      await loadTransactions(true);
+      await loadTransactions(period, true);
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to save';
     } finally {
@@ -192,7 +195,7 @@
         error = result.sheetsSync.error ?? 'Spreadsheet sync failed';
       }
       editingId = null;
-      await loadTransactions(true);
+      await loadTransactions(period, true);
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to update';
     } finally {

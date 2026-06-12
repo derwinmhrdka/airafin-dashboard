@@ -12,6 +12,45 @@ airafin-dashboard/
 └── tech-stack.md
 ```
 
+## Auto deploy (GitHub Actions)
+
+Pushes to `main` deploy to your VPS via SSH (same pattern as `bot-financial-tracker`).
+
+### One-time VPS setup
+
+```bash
+sudo mkdir -p /apps
+sudo git clone https://github.com/derwinmhrdka/airafin-dashboard.git /apps/airafin-dashboard
+cd /apps/airafin-dashboard
+cp .env.example .env
+# Edit .env (POSTGRES_PASSWORD, API_SECRET_TOKEN, ORIGIN, Google Sheets optional)
+mkdir -p backend/secrets
+# Copy service-account JSON into backend/secrets/ if using Sheets
+docker compose up -d --build
+```
+
+Ensure the deploy user can run Docker without `sudo` (in the `docker` group).
+
+### GitHub repository secrets
+
+| Secret | Example | Required |
+|--------|---------|----------|
+| `VPS_HOST` | `43.134.92.145` | Yes |
+| `VPS_USER` | `ubuntu` | Yes |
+| `VPS_SSH_KEY` | Private key (PEM) | Yes |
+| `VPS_PORT` | `22` | No |
+| `VPS_APP_DIR` | `/apps/airafin-dashboard` | No (default shown) |
+
+`.env` and `backend/secrets/` stay on the server only — they are not overwritten by deploy.
+
+Manual deploy on the VPS:
+
+```bash
+cd /apps/airafin-dashboard
+bash deploy/git-sync.sh
+bash deploy/docker-deploy.sh
+```
+
 ## Quick start (Docker)
 
 ```bash
