@@ -10,6 +10,8 @@
 
   // Keep ?period= in the URL so all tabs share the same month/year.
   $effect(() => {
+    if (page.url.pathname === '/login') return;
+
     const raw = page.url.searchParams.get('period')?.trim();
     if (raw && parsePeriodToDate(raw)) return;
 
@@ -28,6 +30,9 @@
   <meta name="description" content="Personal financial dashboard" />
 </svelte:head>
 
+{#if page.url.pathname === '/login'}
+  {@render children()}
+{:else}
 <div class="mx-auto min-h-dvh max-w-lg bg-white dark:bg-black">
   <header class="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
     <div class="mb-3 flex items-center justify-between gap-3">
@@ -45,3 +50,4 @@
     {@render children()}
   </main>
 </div>
+{/if}

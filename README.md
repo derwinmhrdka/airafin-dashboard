@@ -23,7 +23,7 @@ sudo mkdir -p /apps
 sudo git clone https://github.com/derwinmhrdka/airafin-dashboard.git /apps/airafin-dashboard
 cd /apps/airafin-dashboard
 cp .env.example .env
-# Edit .env (POSTGRES_PASSWORD, API_SECRET_TOKEN, ORIGIN, Google Sheets optional)
+# Edit .env (POSTGRES_PASSWORD, API_SECRET_TOKEN, DASHBOARD_PASSWORD, ORIGIN, Google Sheets optional)
 mkdir -p backend/secrets
 # Copy service-account JSON into backend/secrets/ if using Sheets
 docker compose up -d --build

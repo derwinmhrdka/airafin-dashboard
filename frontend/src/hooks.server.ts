@@ -1,18 +1,46 @@
 import { env } from '$env/dynamic/private';
-import type { Handle } from '@sveltejs/kit';
+import { redirect, type Handle } from '@sveltejs/kit';
+import { isAuthenticated } from '$lib/server/auth';
 
 const BACKEND_URL = env.API_URL ?? 'http://localhost:3081';
 
+function isPublicPath(path: string): boolean {
+  return (
+    path === '/login' ||
+    path.startsWith('/_app/') ||
+    path.startsWith('/fonts/') ||
+    path === '/favicon.ico' ||
+    path === '/robots.txt'
+  );
+}
+
 export const handle: Handle = async ({ event, resolve }) => {
-  if (!event.url.pathname.startsWith('/api/')) {
+  const path = event.url.pathname;
+  const authed = isAuthenticated(event.cookies);
+
+  if (authed && path === '/login') {
+    redirect(303, '/');
+  }
+
+  if (!authed && !isPublicPath(path)) {
+    if (path.startsWith('/api/')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    redirect(303, '/login');
+  }
+
+  if (!path.startsWith('/api/')) {
     return resolve(event);
   }
 
-  const target = `${BACKEND_URL}${event.url.pathname}${event.url.search}`;
+  const target = `${BACKEND_URL}${path}${event.url.search}`;
   const headers = new Headers(event.request.headers);
   headers.delete('host');
 
-  if (event.request.method === 'POST' && event.url.pathname === '/api/transactions') {
+  if (event.request.method === 'POST' && path === '/api/transactions') {
     const token = env.API_SECRET_TOKEN;
     if (token) headers.set('X-API-Token', token);
   }

@@ -45,6 +45,8 @@ services:
       PORT: 3080
       HOST: 0.0.0.0
       ORIGIN: ${ORIGIN:-http://localhost:3080}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD}
+      SESSION_SECRET: ${SESSION_SECRET:-change-me-in-production}
     ports:
       - '3080:3080'
 
