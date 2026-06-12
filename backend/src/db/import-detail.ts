@@ -131,14 +131,15 @@ function parseDate(raw: string): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-function normalizePic(raw: string): Pic {
-  const s = raw.trim().toLowerCase();
-  if (!s) return 'Derwin';
+/** Empty CSV PIC stays empty — not a reimbursement candidate. */
+function normalizePic(raw: string): Pic | '' {
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+  const s = trimmed.toLowerCase();
   if (s === 'a' || s.includes('anggita')) return 'Anggita';
   if (s === 'd' || s.includes('derwin')) return 'Derwin';
-  const trimmed = raw.trim();
   if (isValidPic(trimmed)) return trimmed;
-  return 'Derwin';
+  return '';
 }
 
 function periodLabel(date: Date, periodeCell: string): string {

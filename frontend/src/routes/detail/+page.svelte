@@ -493,7 +493,11 @@
                   {formatCurrency(tx.cost)}
                 </td>
                 <td class="px-2 py-2 text-center">
-                  <PicBadge name={tx.pic} />
+                  {#if tx.pic?.trim()}
+                    <PicBadge name={tx.pic} />
+                  {:else}
+                    <span class="text-[10px] text-zinc-400">—</span>
+                  {/if}
                 </td>
                 <td class="px-1 py-2">
                   <div class="flex justify-center gap-1">
