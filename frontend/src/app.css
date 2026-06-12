@@ -17,3 +17,10 @@ body {
 .font-mono {
   font-family: var(--font-mono);
 }
+
+/* Full IDR amounts that scale down on narrow screens (no abbreviation). */
+.stat-amount {
+  font-size: clamp(0.5rem, 2.35vw, 0.875rem);
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}

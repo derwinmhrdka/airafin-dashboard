@@ -51,7 +51,7 @@
       if (filterPic && tx.pic !== filterPic) return false;
       if (filterSearch.trim()) {
         const q = filterSearch.trim().toLowerCase();
-        if (!tx.detail.toLowerCase().includes(q) && !String(tx.id).includes(q)) return false;
+        if (!tx.detail.toLowerCase().includes(q)) return false;
       }
       return true;
     }),
@@ -203,8 +203,8 @@
     }
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm(`Delete transaction #${id}?`)) return;
+  async function handleDelete(id: number, detail: string) {
+    if (!confirm(`Delete "${detail}"?`)) return;
 
     deletingId = id;
     error = '';
@@ -213,7 +213,7 @@
     try {
       const result = await deleteTransaction(id);
       if (editingId === id) editingId = null;
-      success = `Transaction #${id} deleted${sheetsMessage(result.sheetsSync)}`;
+      success = `Deleted "${detail}"${sheetsMessage(result.sheetsSync)}`;
       if (result.sheetsSync?.status === 'failed') {
         error = result.sheetsSync.error ?? 'Spreadsheet sync failed';
       }
@@ -421,7 +421,7 @@
         <input
           type="search"
           bind:value={filterSearch}
-          placeholder="Search ID or detail…"
+          placeholder="Search detail…"
           class="w-full border border-zinc-200 bg-white px-2 py-1.5 text-xs dark:border-zinc-800 dark:bg-black"
         />
         <div class="grid grid-cols-2 gap-2">
@@ -462,10 +462,9 @@
       </p>
     {:else}
       <div class="overflow-x-auto border border-zinc-200 dark:border-zinc-800">
-        <table class="w-full min-w-[360px] text-left text-xs">
+        <table class="w-full text-left text-xs">
           <thead class="border-b border-zinc-200 bg-zinc-50 text-[10px] uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900">
             <tr>
-              <th class="px-2 py-2 font-medium">ID</th>
               <th class="px-2 py-2 font-medium">Date</th>
               <th class="px-2 py-2 font-medium">Cat</th>
               <th class="px-2 py-2 font-medium">Detail</th>
@@ -481,14 +480,13 @@
                 class="border-b border-zinc-100 last:border-0 dark:border-zinc-900
                   {editingId === tx.id ? 'bg-zinc-50 dark:bg-zinc-900' : ''}"
               >
-                <td class="px-2 py-2 font-mono text-[10px] tabular-nums text-zinc-400">#{tx.id}</td>
                 <td class="px-2 py-2 whitespace-nowrap text-zinc-500">{formatDate(tx.date)}</td>
                 <td class="px-2 py-2">
                   <span class="rounded px-1.5 py-0.5 text-[10px] {style.bg} {style.text}">
                     {tx.categoryName.slice(0, 8)}
                   </span>
                 </td>
-                <td class="max-w-[72px] truncate px-2 py-2" title={tx.detail}>{tx.detail}</td>
+                <td class="max-w-[96px] truncate px-2 py-2" title={tx.detail}>{tx.detail}</td>
                 <td class="px-2 py-2 text-right font-mono tabular-nums">
                   {formatCurrency(tx.cost)}
                 </td>
@@ -510,7 +508,7 @@
                     </button>
                     <button
                       type="button"
-                      onclick={() => handleDelete(tx.id)}
+                      onclick={() => handleDelete(tx.id, tx.detail)}
                       disabled={deletingId === tx.id}
                       class="flex h-7 w-7 items-center justify-center border border-red-200 text-red-600 disabled:opacity-50 dark:border-red-900 dark:text-red-400"
                       aria-label="Delete transaction"

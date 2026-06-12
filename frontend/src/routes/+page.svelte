@@ -77,15 +77,17 @@
 {:else if summary}
   <section class="space-y-4">
     <p class="text-[11px] uppercase tracking-wider text-zinc-500">Overview · {period}</p>
-    <div class="grid grid-cols-3 gap-2">
+    <div class="grid min-w-0 grid-cols-3 gap-1">
       <StatCard label="Income" value={summary.totalIncome} accent="income" />
       <StatCard label="Spent" value={summary.totalSpent} accent="spent" />
       <StatCard label="SISA" value={summary.totalSisa} accent="sisa" />
     </div>
 
-    <div class="flex items-center justify-between border border-zinc-200 px-3 py-2 text-xs dark:border-zinc-800">
-      <span class="text-zinc-500">Total Plan</span>
-      <span class="font-mono tabular-nums">{summary.totalBudgetAllocated.toLocaleString('id-ID')}</span>
+    <div class="flex min-w-0 items-center justify-between gap-2 border border-zinc-200 px-3 py-2 dark:border-zinc-800">
+      <span class="shrink-0 text-xs text-zinc-500">Total Plan</span>
+      <span class="stat-amount font-mono font-medium tabular-nums">
+        {formatCurrency(summary.totalBudgetAllocated)}
+      </span>
     </div>
 
     <div class="space-y-2">

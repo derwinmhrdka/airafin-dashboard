@@ -1,44 +1,81 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
-  import { listPeriodOptions, periodFromUrl, shiftPeriod } from '$lib/period';
+  import {
+    MONTH_NAMES,
+    listYearOptions,
+    periodFromParts,
+    periodFromUrl,
+    periodParts,
+  } from '$lib/period';
 
-  const options = listPeriodOptions();
+  const years = listYearOptions();
 
   const period = $derived(periodFromUrl($page.url.searchParams));
+  const parts = $derived(periodParts(period));
 
-  function setPeriod(next: string) {
+  const selectClass =
+    'w-full appearance-none border border-zinc-200 bg-white py-2 pl-2.5 pr-7 text-xs font-medium dark:border-zinc-800 dark:bg-black';
+
+  function setParts(month: number, year: number) {
     const url = new URL($page.url);
-    url.searchParams.set('period', next);
+    url.searchParams.set('period', periodFromParts(month, year));
     goto(`${url.pathname}${url.search}`, { replaceState: true, keepFocus: true, noScroll: true });
+  }
+
+  function onMonthChange(e: Event) {
+    const month = Number.parseInt((e.currentTarget as HTMLSelectElement).value, 10);
+    setParts(month, parts.year);
+  }
+
+  function onYearChange(e: Event) {
+    const year = Number.parseInt((e.currentTarget as HTMLSelectElement).value, 10);
+    setParts(parts.month, year);
   }
 </script>
 
-<div class="flex items-center gap-1">
-  <button
-    type="button"
-    onclick={() => setPeriod(shiftPeriod(period, -1))}
-    class="border border-zinc-200 px-2 py-1 text-xs text-zinc-600 dark:border-zinc-800 dark:text-zinc-400"
-    aria-label="Previous month"
-  >
-    ‹
-  </button>
-  <select
-    value={period}
-    onchange={(e) => setPeriod(e.currentTarget.value)}
-    class="min-w-0 flex-1 border border-zinc-200 bg-white px-2 py-1 text-xs font-medium dark:border-zinc-800 dark:bg-black"
-    aria-label="Select month"
-  >
-    {#each options as option}
-      <option value={option}>{option}</option>
-    {/each}
-  </select>
-  <button
-    type="button"
-    onclick={() => setPeriod(shiftPeriod(period, 1))}
-    class="border border-zinc-200 px-2 py-1 text-xs text-zinc-600 dark:border-zinc-800 dark:text-zinc-400"
-    aria-label="Next month"
-  >
-    ›
-  </button>
+<div class="grid grid-cols-2 gap-2">
+  <label class="block min-w-0">
+    <span class="mb-1 block text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+      Month
+    </span>
+    <div class="relative">
+      <select
+        value={parts.month}
+        onchange={onMonthChange}
+        class={selectClass}
+        aria-label="Select month"
+      >
+        {#each MONTH_NAMES as name, index}
+          <option value={index}>{name}</option>
+        {/each}
+      </select>
+      <span
+        class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-zinc-400"
+        aria-hidden="true"
+      >▼</span>
+    </div>
+  </label>
+
+  <label class="block min-w-0">
+    <span class="mb-1 block text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+      Year
+    </span>
+    <div class="relative">
+      <select
+        value={parts.year}
+        onchange={onYearChange}
+        class={selectClass}
+        aria-label="Select year"
+      >
+        {#each years as year}
+          <option value={year}>{year}</option>
+        {/each}
+      </select>
+      <span
+        class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-zinc-400"
+        aria-hidden="true"
+      >▼</span>
+    </div>
+  </label>
 </div>

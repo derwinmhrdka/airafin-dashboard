@@ -37,18 +37,18 @@
     ></div>
   </div>
 
-  <div class="grid grid-cols-3 gap-2 text-[11px]">
-    <div>
-      <p class="text-zinc-500">Spent</p>
-      <p class="font-mono tabular-nums">{formatCurrency(item.spent)}</p>
+  <div class="grid min-w-0 grid-cols-3 gap-1">
+    <div class="min-w-0">
+      <p class="text-[10px] text-zinc-500">Spent</p>
+      <p class="stat-amount font-mono tabular-nums">{formatCurrency(item.spent)}</p>
     </div>
-    <div>
-      <p class="text-zinc-500">Plan</p>
-      <p class="font-mono tabular-nums">{formatCurrency(item.allocated)}</p>
+    <div class="min-w-0">
+      <p class="text-[10px] text-zinc-500">Plan</p>
+      <p class="stat-amount font-mono tabular-nums">{formatCurrency(item.allocated)}</p>
     </div>
-    <div class="text-right">
-      <p class="text-zinc-500">SISA</p>
-      <p class="font-mono tabular-nums {overBudget ? 'text-red-600 dark:text-red-400' : ''}">
+    <div class="min-w-0 text-right">
+      <p class="text-[10px] text-zinc-500">SISA</p>
+      <p class="stat-amount font-mono tabular-nums {overBudget ? 'text-red-600 dark:text-red-400' : ''}">
         {formatCurrency(item.sisa)}
       </p>
     </div>

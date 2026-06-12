@@ -7,12 +7,40 @@ export function currentPeriod(date = new Date()): string {
   return dateToPeriod(date);
 }
 
+export const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+] as const;
+
 export function parsePeriodToDate(period: string): Date | null {
   const trimmed = period.trim();
   if (!trimmed) return null;
   const parsed = new Date(`${trimmed} 1`);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed;
+}
+
+export function periodParts(period: string): { month: number; year: number } {
+  const parsed = parsePeriodToDate(period);
+  if (!parsed) {
+    const now = new Date();
+    return { month: now.getMonth(), year: now.getFullYear() };
+  }
+  return { month: parsed.getMonth(), year: parsed.getFullYear() };
+}
+
+export function periodFromParts(month: number, year: number): string {
+  return dateToPeriod(new Date(year, month, 1));
 }
 
 export function periodFromUrl(searchParams: URLSearchParams): string {
@@ -33,15 +61,14 @@ export function shiftPeriod(period: string, deltaMonths: number): string {
   return dateToPeriod(new Date(parsed.getFullYear(), parsed.getMonth() + deltaMonths, 1));
 }
 
-/** Newest first — current month near the top of the list. */
-export function listPeriodOptions(
+export function listYearOptions(
   anchor = new Date(),
-  monthsBefore = 23,
-  monthsAfter = 6,
-): string[] {
-  const options: string[] = [];
-  for (let i = monthsAfter; i >= -monthsBefore; i--) {
-    options.push(dateToPeriod(new Date(anchor.getFullYear(), anchor.getMonth() + i, 1)));
-  }
-  return options;
+  yearsBefore = 3,
+  yearsAfter = 1,
+): number[] {
+  const years: number[] = [];
+  const start = anchor.getFullYear() - yearsBefore;
+  const end = anchor.getFullYear() + yearsAfter;
+  for (let y = end; y >= start; y--) years.push(y);
+  return years;
 }
