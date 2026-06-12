@@ -24,6 +24,10 @@ Expected columns (same as spreadsheet):
 
 Column **F** is ignored during import (PostgreSQL assigns new ids).
 
+**Empty PIC (column G):** treated as “already correct” — import uses the **Plan tab PIC** for that category and period (e.g. Transport → whoever is PIC on Plan for June 2026). Only rows with an explicit `A` / `D` / name that **differs** from Plan PIC appear under Reimbursements.
+
+Set up **Plan** budgets (with PIC) for each period **before** importing, or empty PIC falls back to `Derwin`.
+
 ## Run import
 
 **Local** (with `backend/.env` or `DATABASE_URL` set):

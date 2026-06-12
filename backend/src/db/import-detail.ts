@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sql } from 'drizzle-orm';
 import { db } from './index.js';
-import { categories, transactions } from './schema.js';
+import { budgets, categories, transactions } from './schema.js';
 import { isValidPic, type Pic } from '../lib/pic.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -131,15 +131,30 @@ function parseDate(raw: string): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-/** Empty CSV PIC stays empty — not a reimbursement candidate. */
-function normalizePic(raw: string): Pic | '' {
+/** Parse explicit PIC from CSV (A, D, Derwin, Anggita). Empty = use plan default later. */
+function parseExplicitPic(raw: string): Pic | null {
   const trimmed = raw.trim();
-  if (!trimmed) return '';
+  if (!trimmed) return null;
   const s = trimmed.toLowerCase();
   if (s === 'a' || s.includes('anggita')) return 'Anggita';
   if (s === 'd' || s.includes('derwin')) return 'Derwin';
   if (isValidPic(trimmed)) return trimmed;
-  return '';
+  return null;
+}
+
+function resolvePic(
+  csvPic: string,
+  categoryId: number,
+  period: string,
+  planPicByKey: Map<string, Pic>,
+): Pic {
+  const explicit = parseExplicitPic(csvPic);
+  if (explicit) return explicit;
+
+  const fromPlan = planPicByKey.get(`${categoryId}|${period}`);
+  if (fromPlan) return fromPlan;
+
+  return 'Derwin';
 }
 
 function periodLabel(date: Date, periodeCell: string): string {
@@ -172,17 +187,17 @@ function isHeaderRow(cells: string[]): boolean {
   return first === 'date' || first === 'tanggal';
 }
 
-interface DetailRow {
+interface ParsedCsvRow {
   date: string;
   categoryName: string;
   detail: string;
   cost: number;
   period: string;
-  pic: Pic;
+  picRaw: string;
   status: string;
 }
 
-function mapRow(cells: string[]): DetailRow | { error: string } {
+function mapRow(cells: string[]): ParsedCsvRow | { error: string } {
   const dateRaw = cells[0] ?? '';
   const categoryName = (cells[1] ?? '').trim();
   const detail = (cells[2] ?? '').trim();
@@ -203,9 +218,28 @@ function mapRow(cells: string[]): DetailRow | { error: string } {
     detail: detail || '—',
     cost,
     period: periodLabel(date, periode),
-    pic: normalizePic(picRaw),
+    picRaw,
     status: process.env.IMPORT_DEFAULT_STATUS?.trim() || 'Done',
   };
+}
+
+async function loadPlanPicMap(): Promise<Map<string, Pic>> {
+  const rows = await db
+    .select({
+      categoryId: budgets.categoryId,
+      period: budgets.period,
+      pic: budgets.pic,
+    })
+    .from(budgets);
+
+  const map = new Map<string, Pic>();
+  for (const row of rows) {
+    const pic = row.pic?.trim() ?? '';
+    if (isValidPic(pic)) {
+      map.set(`${row.categoryId}|${row.period}`, pic);
+    }
+  }
+  return map;
 }
 
 async function loadCategoryMap(): Promise<Map<string, number>> {
@@ -239,9 +273,10 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const categoryMap = await loadCategoryMap();
+  const [categoryMap, planPicMap] = await Promise.all([loadCategoryMap(), loadPlanPicMap()]);
   const toInsert: (typeof transactions.$inferInsert)[] = [];
   const skipped: string[] = [];
+  let planPicFallbacks = 0;
 
   for (let i = 0; i < parsed.length; i += 1) {
     const cells = parsed[i];
@@ -259,13 +294,16 @@ async function main(): Promise<void> {
       continue;
     }
 
+    const pic = resolvePic(mapped.picRaw, categoryId, mapped.period, planPicMap);
+    if (!parseExplicitPic(mapped.picRaw)) planPicFallbacks += 1;
+
     toInsert.push({
       date: mapped.date,
       categoryId,
       detail: mapped.detail,
       cost: String(mapped.cost),
       period: mapped.period,
-      pic: mapped.pic,
+      pic,
       status: mapped.status,
     });
   }
@@ -282,7 +320,7 @@ async function main(): Promise<void> {
   console.log(`Inserting ${toInsert.length} transactions from ${path.basename(csvPath)}…`);
   await db.insert(transactions).values(toInsert);
 
-  console.log(`Done. Imported ${toInsert.length} rows.`);
+  console.log(`Done. Imported ${toInsert.length} rows (${planPicFallbacks} used Plan PIC for empty CSV PIC).`);
   if (skipped.length > 0) {
     console.log(`Skipped ${skipped.length} rows:`);
     for (const line of skipped.slice(0, 30)) console.log(`  ${line}`);
