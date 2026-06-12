@@ -9,6 +9,8 @@
     getCategories,
     getPlan,
     getTransactions,
+    syncDbToSheet,
+    syncSheetToDb,
     updateTransaction,
   } from '$lib/api';
   import { formatAmountInput, formatCurrency, formatDate, parseAmountInput } from '$lib/format';
@@ -28,6 +30,9 @@
   let loadingMore = $state(false);
   let saving = $state(false);
   let deletingId = $state<number | null>(null);
+  let syncing = $state<'db-to-sheet' | 'sheet-to-db' | null>(null);
+  let syncMessage = $state('');
+  let syncError = $state('');
   let error = $state('');
   let success = $state('');
 
@@ -42,11 +47,7 @@
   let pic = $state<Pic>(DEFAULT_PIC);
 
   let editingId = $state<number | null>(null);
-  let editDate = $state('');
-  let editCategoryId = $state(0);
-  let editDetail = $state('');
-  let editCost = $state('');
-  let editPic = $state<Pic>(DEFAULT_PIC);
+  let formEl = $state<HTMLFormElement | null>(null);
 
   function picForCategory(catId: number): Pic {
     const fromPlan = categoryPicById[catId];
@@ -74,6 +75,21 @@
     filterCategory = '';
     filterPic = '';
     filterSearch = '';
+  }
+
+  function picDiffersFromPlan(tx: Transaction): boolean {
+    const planPic = categoryPicById[tx.categoryId];
+    const txPic = tx.pic?.trim() ?? '';
+    if (!planPic || !txPic) return false;
+    return txPic !== planPic;
+  }
+
+  function resetInsertForm() {
+    date = new Date().toISOString().slice(0, 10);
+    if (categories.length) categoryId = categories[0].id;
+    detail = '';
+    cost = '';
+    pic = picForCategory(categoryId);
   }
 
   function sheetsMessage(sync?: { status: string; error?: string }): string {
@@ -146,22 +162,26 @@
   });
 
   $effect(() => {
-    if (categoryId) pic = picForCategory(categoryId);
+    if (categoryId && editingId == null) pic = picForCategory(categoryId);
   });
 
   function startEdit(tx: Transaction) {
     editingId = tx.id;
-    editDate = tx.date;
-    editCategoryId = tx.categoryId;
-    editDetail = tx.detail;
-    editCost = formatAmountInput(tx.cost);
-    editPic = tx.pic as Pic;
+    date = tx.date;
+    categoryId = tx.categoryId;
+    detail = tx.detail;
+    cost = formatAmountInput(tx.cost);
+    pic = (PICS as readonly string[]).includes(tx.pic) ? (tx.pic as Pic) : picForCategory(tx.categoryId);
     error = '';
     success = '';
+    queueMicrotask(() => {
+      formEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   }
 
   function cancelEdit() {
     editingId = null;
+    resetInsertForm();
   }
 
   async function handleSubmit(e: SubmitEvent) {
@@ -170,55 +190,86 @@
     error = '';
     success = '';
 
+    const body = {
+      date,
+      categoryId,
+      detail,
+      cost: parseAmountInput(cost),
+      pic,
+    };
+
     try {
-      const result = await createTransaction({
-        date,
-        categoryId,
-        detail,
-        cost: parseAmountInput(cost),
-        period,
-        pic,
-      });
-      detail = '';
-      cost = '';
-      success = `Transaction saved${sheetsMessage(result.sheetsSync)}`;
-      if (result.sheetsSync?.status === 'failed') {
-        error = result.sheetsSync.error ?? 'Spreadsheet sync failed';
+      if (editingId != null) {
+        const id = editingId;
+        const result = await updateTransaction(id, body);
+        success = `Transaction #${id} updated${sheetsMessage(result.sheetsSync)}`;
+        if (result.sheetsSync?.status === 'failed') {
+          error = result.sheetsSync.error ?? 'Spreadsheet sync failed';
+        }
+        editingId = null;
+        resetInsertForm();
+      } else {
+        const result = await createTransaction({ ...body, period });
+        success = `Transaction saved${sheetsMessage(result.sheetsSync)}`;
+        if (result.sheetsSync?.status === 'failed') {
+          error = result.sheetsSync.error ?? 'Spreadsheet sync failed';
+        }
+        detail = '';
+        cost = '';
       }
       await loadTransactions(period, true);
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to save';
+      error = e instanceof Error ? e.message : editingId != null ? 'Failed to update' : 'Failed to save';
     } finally {
       saving = false;
     }
   }
 
-  async function handleEditSubmit(e: SubmitEvent) {
-    e.preventDefault();
-    if (editingId == null) return;
+  async function handleSyncDbToSheet() {
+    if (
+      !confirm(
+        `Sync to Spreadsheet for ${period}?\n\nThis replaces all ${period} rows in the DETAIL tab with data from the database. This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
 
-    saving = true;
-    error = '';
-    success = '';
-
+    syncing = 'db-to-sheet';
+    syncMessage = '';
+    syncError = '';
     try {
-      const result = await updateTransaction(editingId, {
-        date: editDate,
-        categoryId: editCategoryId,
-        detail: editDetail,
-        cost: parseAmountInput(editCost),
-        pic: editPic,
-      });
-      success = `Transaction #${editingId} updated${sheetsMessage(result.sheetsSync)}`;
-      if (result.sheetsSync?.status === 'failed') {
-        error = result.sheetsSync.error ?? 'Spreadsheet sync failed';
-      }
-      editingId = null;
-      await loadTransactions(period, true);
+      const result = await syncDbToSheet(period);
+      syncMessage = `Spreadsheet updated: ${result.written ?? 0} rows written (${result.deleted ?? 0} old rows replaced).`;
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to update';
+      syncError = e instanceof Error ? e.message : 'Sync to spreadsheet failed';
     } finally {
-      saving = false;
+      syncing = null;
+    }
+  }
+
+  async function handleSyncSheetToDb() {
+    if (
+      !confirm(
+        `Sync from Spreadsheet for ${period}?\n\nThis deletes all ${period} transactions in the database and replaces them with rows from the DETAIL tab. This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+
+    syncing = 'sheet-to-db';
+    syncMessage = '';
+    syncError = '';
+    try {
+      const result = await syncSheetToDb(period);
+      syncMessage = `Database updated: ${result.written ?? 0} rows imported (${result.deleted ?? 0} removed).`;
+      if (result.skipped) {
+        syncMessage += ` ${result.skipped} sheet rows skipped.`;
+      }
+      await loadData(period);
+    } catch (e) {
+      syncError = e instanceof Error ? e.message : 'Sync from spreadsheet failed';
+    } finally {
+      syncing = null;
     }
   }
 
@@ -231,7 +282,10 @@
 
     try {
       const result = await deleteTransaction(id);
-      if (editingId === id) editingId = null;
+      if (editingId === id) {
+        editingId = null;
+        resetInsertForm();
+      }
       success = `Deleted "${detail}"${sheetsMessage(result.sheetsSync)}`;
       if (result.sheetsSync?.status === 'failed') {
         error = result.sheetsSync.error ?? 'Spreadsheet sync failed';
@@ -248,8 +302,32 @@
 </script>
 
 <section class="space-y-4">
-  <form onsubmit={handleSubmit} class="space-y-3 border border-zinc-200 p-3 dark:border-zinc-800">
-    <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Quick Insert · {period}</h2>
+  <form
+    bind:this={formEl}
+    onsubmit={handleSubmit}
+    class="space-y-3 border p-3 scroll-mt-3
+      {editingId != null
+      ? 'border-amber-300 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/20'
+      : 'border-zinc-200 dark:border-zinc-800'}"
+  >
+    <div class="flex items-center justify-between gap-2">
+      <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">
+        {#if editingId != null}
+          Edit #{editingId} · {period}
+        {:else}
+          Quick Insert · {period}
+        {/if}
+      </h2>
+      {#if editingId != null}
+        <button
+          type="button"
+          onclick={cancelEdit}
+          class="text-[11px] text-zinc-500 underline-offset-2 hover:underline"
+        >
+          Cancel
+        </button>
+      {/if}
+    </div>
 
     <div class="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
       <label class="min-w-0 space-y-1">
@@ -303,10 +381,10 @@
       </select>
     </label>
 
-    {#if error && !editingId}
+    {#if error}
       <p class="text-xs text-red-600 dark:text-red-400">{error}</p>
     {/if}
-    {#if success && !editingId}
+    {#if success}
       <p class="text-xs text-emerald-600 dark:text-emerald-400">{success}</p>
     {/if}
 
@@ -315,92 +393,62 @@
       disabled={saving || loading}
       class="w-full border border-black bg-black py-2.5 text-sm font-medium text-white transition-opacity disabled:opacity-50 dark:border-white dark:bg-white dark:text-black"
     >
-      {saving ? 'Saving…' : 'Add Transaction'}
+      {saving ? 'Saving…' : editingId != null ? 'Save Changes' : 'Add Transaction'}
     </button>
   </form>
 
-  {#if editingId != null}
-    <form onsubmit={handleEditSubmit} class="space-y-3 border border-zinc-400 p-3 dark:border-zinc-600">
-      <div class="flex items-center justify-between">
-        <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">
-          Edit #{editingId}
-        </h2>
-        <button
-          type="button"
-          onclick={cancelEdit}
-          class="text-[11px] text-zinc-500 underline-offset-2 hover:underline"
-        >
-          Cancel
-        </button>
-      </div>
-
-      <div class="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
-        <label class="min-w-0 space-y-1">
-          <span class="text-[11px] text-zinc-500">Date</span>
-          <input
-            type="date"
-            bind:value={editDate}
-            required
-            class="box-border w-full min-w-0 max-w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
-          />
-        </label>
-        <label class="min-w-0 space-y-1">
-          <span class="text-[11px] text-zinc-500">Cost</span>
-          <AmountInput bind:value={editCost} required />
-        </label>
-      </div>
-
-      <label class="block space-y-1">
-        <span class="text-[11px] text-zinc-500">Category</span>
-        <select
-          bind:value={editCategoryId}
-          required
-          class="w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
-        >
-          {#each categories as cat}
-            <option value={cat.id}>{cat.name}</option>
-          {/each}
-        </select>
-      </label>
-
-      <label class="block space-y-1">
-        <span class="text-[11px] text-zinc-500">Detail</span>
-        <input
-          type="text"
-          bind:value={editDetail}
-          required
-          class="w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
-        />
-      </label>
-
-      <label class="block space-y-1">
-        <span class="text-[11px] text-zinc-500">PIC</span>
-        <select
-          bind:value={editPic}
-          class="w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
-        >
-          {#each PICS as p}
-            <option value={p}>{p}</option>
-          {/each}
-        </select>
-      </label>
-
-      {#if error}
-        <p class="text-xs text-red-600 dark:text-red-400">{error}</p>
-      {/if}
-      {#if success}
-        <p class="text-xs text-emerald-600 dark:text-emerald-400">{success}</p>
-      {/if}
-
+  <div class="space-y-2 border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-900/60 dark:bg-amber-950/25">
+    <h2 class="text-xs font-medium uppercase tracking-wider text-amber-900 dark:text-amber-200">
+      Spreadsheet Sync · {period}
+    </h2>
+    <div
+      class="rounded border border-amber-300/80 bg-amber-100/50 px-2.5 py-2 text-[11px] leading-relaxed text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
+      role="note"
+    >
+      <p class="font-medium">Caution — destructive sync</p>
+      <p class="mt-1 text-amber-900/90 dark:text-amber-200/90">
+        Only <strong>{period}</strong> is affected (from the header month/year). Each direction
+        <strong>replaces</strong> that month in the target — not a merge. Double-check the period
+        before continuing.
+      </p>
+      <ul class="mt-1.5 list-inside list-disc space-y-0.5 text-amber-900/80 dark:text-amber-200/80">
+        <li><strong>To Spreadsheet</strong> — overwrites DETAIL tab rows for this month.</li>
+        <li><strong>From Spreadsheet</strong> — deletes DB transactions for this month, then re-imports.</li>
+      </ul>
+    </div>
+    <div class="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
       <button
-        type="submit"
-        disabled={saving}
-        class="w-full border border-black bg-black py-2.5 text-sm font-medium text-white disabled:opacity-50 dark:border-white dark:bg-white dark:text-black"
+        type="button"
+        disabled={syncing != null || loading}
+        onclick={handleSyncDbToSheet}
+        class="border border-amber-300 bg-white px-3 py-2 text-left text-xs disabled:opacity-50 dark:border-amber-800 dark:bg-black"
       >
-        {saving ? 'Saving…' : 'Save Changes'}
+        <span class="block font-medium">Sync to Spreadsheet</span>
+        <span class="text-[10px] text-zinc-500">Database → DETAIL tab</span>
+        {#if syncing === 'db-to-sheet'}
+          <span class="mt-1 block text-[10px] text-zinc-500">Syncing…</span>
+        {/if}
       </button>
-    </form>
-  {/if}
+      <button
+        type="button"
+        disabled={syncing != null || loading}
+        onclick={handleSyncSheetToDb}
+        class="border border-amber-300 bg-white px-3 py-2 text-left text-xs disabled:opacity-50 dark:border-amber-800 dark:bg-black"
+      >
+        <span class="block font-medium">Sync from Spreadsheet</span>
+        <span class="text-[10px] text-zinc-500">DETAIL tab → Database</span>
+        {#if syncing === 'sheet-to-db'}
+          <span class="mt-1 block text-[10px] text-zinc-500">Syncing…</span>
+        {/if}
+      </button>
+    </div>
+    {#if syncError}
+      <p class="text-xs text-red-600 dark:text-red-400">{syncError}</p>
+    {/if}
+    {#if syncMessage}
+      <p class="text-xs text-emerald-600 dark:text-emerald-400">{syncMessage}</p>
+    {/if}
+  </div>
 
   <div class="space-y-2">
     <div class="flex items-center justify-between gap-2">
@@ -478,9 +526,11 @@
           <tbody>
             {#each filteredTransactions as tx}
               {@const style = categoryStyle(tx.categoryName)}
+              {@const picMismatch = picDiffersFromPlan(tx)}
               <tr
                 class="border-b border-zinc-100 last:border-0 dark:border-zinc-900
-                  {editingId === tx.id ? 'bg-zinc-50 dark:bg-zinc-900' : ''}"
+                  {picMismatch ? 'bg-amber-50 dark:bg-amber-950/35' : ''}
+                  {editingId === tx.id ? 'ring-1 ring-inset ring-amber-400 dark:ring-amber-600' : ''}"
               >
                 <td class="px-2 py-2 whitespace-nowrap text-zinc-500">{formatDate(tx.date)}</td>
                 <td class="px-2 py-2">

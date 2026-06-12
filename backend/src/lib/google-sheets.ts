@@ -223,6 +223,73 @@ export async function updateTransactionInSheet(
   }
 }
 
+export async function readDetailSheetRows(): Promise<(string | number | undefined)[][]> {
+  const spreadsheetId = await getSpreadsheetId();
+  if (!spreadsheetId) {
+    throw new Error('GOOGLE_SHEETS_SPREADSHEET_ID is not set');
+  }
+
+  const sheets = await getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${SHEET_TAB_NAME}!A:G`,
+  });
+
+  return res.data.values ?? [];
+}
+
+export async function deleteDetailRows(rowNumbers: number[]): Promise<void> {
+  if (rowNumbers.length === 0) return;
+
+  const spreadsheetId = await getSpreadsheetId();
+  if (!spreadsheetId) {
+    throw new Error('GOOGLE_SHEETS_SPREADSHEET_ID is not set');
+  }
+
+  const sheetId = await getSheetId(spreadsheetId);
+  const sheets = await getSheetsClient();
+  const sorted = [...rowNumbers].sort((a, b) => b - a);
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: sorted.map((rowNumber) => ({
+        deleteDimension: {
+          range: {
+            sheetId,
+            dimension: 'ROWS',
+            startIndex: rowNumber - 1,
+            endIndex: rowNumber,
+          },
+        },
+      })),
+    },
+  });
+}
+
+export async function appendDetailRows(rows: TransactionSheetRow[]): Promise<void> {
+  if (rows.length === 0) return;
+
+  const spreadsheetId = await getSpreadsheetId();
+  if (!spreadsheetId) {
+    throw new Error('GOOGLE_SHEETS_SPREADSHEET_ID is not set');
+  }
+
+  const sheets = await getSheetsClient();
+  const values = rows.map((row) => {
+    const [a, b, c, d, e] = rowCoreValues(row);
+    return [a, b, c, d, e, '', picInitial(row.pic)];
+  });
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId,
+    range: `${SHEET_TAB_NAME}!A:G`,
+    valueInputOption: 'USER_ENTERED',
+    insertDataOption: 'INSERT_ROWS',
+    requestBody: { values },
+  });
+}
+
 export async function deleteTransactionFromSheet(
   row: TransactionSheetRow,
 ): Promise<SheetsSyncResult> {

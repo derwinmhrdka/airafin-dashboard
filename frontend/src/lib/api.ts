@@ -121,6 +121,31 @@ export function updateTransactionStatus(
   });
 }
 
+export interface SyncResult {
+  ok: boolean;
+  period: string;
+  direction: 'db-to-sheet' | 'sheet-to-db';
+  deleted?: number;
+  written?: number;
+  skipped?: number;
+  error?: string;
+  skipReasons?: string[];
+}
+
+export function syncDbToSheet(period: string): Promise<SyncResult> {
+  return fetchJson('/api/sync/db-to-sheet', {
+    method: 'POST',
+    body: JSON.stringify({ period }),
+  });
+}
+
+export function syncSheetToDb(period: string): Promise<SyncResult> {
+  return fetchJson('/api/sync/sheet-to-db', {
+    method: 'POST',
+    body: JSON.stringify({ period }),
+  });
+}
+
 export function savePlan(body: {
   period: string;
   incomes?: { source: string; amount: number }[];

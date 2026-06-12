@@ -4,6 +4,7 @@ import Fastify from 'fastify';
 import { budgetRoutes } from './routes/budgets.js';
 import { categoryRoutes } from './routes/categories.js';
 import { dashboardRoutes } from './routes/dashboard.js';
+import { syncRoutes } from './routes/sync.js';
 import { transactionRoutes } from './routes/transactions.js';
 
 const app = Fastify({
@@ -19,6 +20,7 @@ await app.register(categoryRoutes);
 await app.register(transactionRoutes);
 await app.register(dashboardRoutes);
 await app.register(budgetRoutes);
+await app.register(syncRoutes);
 
 app.get('/health', async () => ({ status: 'ok' }));
 
