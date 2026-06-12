@@ -131,6 +131,18 @@ SvelteKit `hooks.server.ts` proxies `/api/*` to the backend and injects `X-API-T
 | GET | `/api/plan?period=June+2026` | — | Incomes + budgets for period |
 | POST | `/api/budgets` | — | Upsert incomes and budget allocations |
 
+### Telegram bot (`bot-financial-tracker`)
+
+The Telegram bot in the sibling repo posts expenses here when configured:
+
+```env
+AIRAFIN_API_ENABLED=true
+AIRAFIN_API_URL=http://localhost:3081
+API_SECRET_TOKEN=<same as backend API_SECRET_TOKEN>
+```
+
+Disable `GOOGLE_SHEETS_ENABLED` on the bot when the backend mirrors to Sheets — otherwise rows are duplicated.
+
 ### POST /api/transactions (Phase 2 bot)
 
 ```bash
@@ -146,6 +158,26 @@ curl -X POST http://localhost:3081/api/transactions \
     "pic": "Derwin",
     "status": "Done"
   }'
+```
+
+## Import DETAIL tab (CSV → PostgreSQL)
+
+One-time migration from your spreadsheet:
+
+1. Export the **DETAIL** tab as CSV from Google Sheets.
+2. Save it as **`backend/data/import/detail.csv`** (see `backend/data/import/README.md`).
+3. Run (truncates existing transactions first):
+
+```bash
+cd backend
+npm run db:import-detail -- --yes
+```
+
+On VPS after deploy:
+
+```bash
+# copy CSV to server, then:
+docker compose exec backend node dist/db/import-detail.js --yes
 ```
 
 ## Google Sheets dual-write (optional)

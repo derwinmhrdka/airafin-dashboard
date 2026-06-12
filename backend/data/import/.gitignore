@@ -1,0 +1,3 @@
+# Your export goes here — never commit real financial data
+*.csv
+!detail.csv.example

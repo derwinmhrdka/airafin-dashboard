@@ -5,12 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "esbuild src/index.ts src/db/migrate.ts src/db/seed.ts --bundle --platform=node --target=es2022 --format=esm --outdir=dist --outbase=src --packages=external",
+    "build": "esbuild src/index.ts src/db/migrate.ts src/db/seed.ts src/db/import-detail.ts --bundle --platform=node --target=es2022 --format=esm --outdir=dist --outbase=src --packages=external",
     "build:tsc": "tsc",
     "start": "node dist/index.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
-    "db:seed": "tsx src/db/seed.ts"
+    "db:seed": "tsx src/db/seed.ts",
+    "db:import-detail": "tsx src/db/import-detail.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.0.1",
