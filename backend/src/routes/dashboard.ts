@@ -1,7 +1,11 @@
-import { and, desc, eq, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/index.js';
-import { budgets, categories, incomes, transactions } from '../db/schema.js';
+import { budgetSubcategories, budgets, categories, incomes, transactions } from '../db/schema.js';
+import {
+  resolvePlanPicFromMaps,
+  subcategoryPicKey,
+} from '../lib/plan-pic.js';
 import { isValidPic } from '../lib/pic.js';
 import { roundMoney, toNumber } from '../lib/money.js';
 
@@ -92,12 +96,25 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         })
         .from(budgets)
         .innerJoin(categories, eq(budgets.categoryId, categories.id))
-        .where(and(eq(budgets.period, period), ne(budgets.pic, '')));
+        .where(eq(budgets.period, period));
 
-      const planPicByCategory = new Map(
-        budgetRows
-          .filter((b) => isValidPic(b.planPic))
-          .map((b) => [b.categoryId, { pic: b.planPic, categoryName: b.categoryName }]),
+      const subcategoryRows = await db
+        .select({
+          categoryId: budgetSubcategories.categoryId,
+          name: budgetSubcategories.name,
+          pic: budgetSubcategories.pic,
+        })
+        .from(budgetSubcategories)
+        .where(eq(budgetSubcategories.period, period));
+
+      const mainPicByCategory = new Map(
+        budgetRows.map((b) => [b.categoryId, b.planPic]),
+      );
+      const categoryNameById = new Map(
+        budgetRows.map((b) => [b.categoryId, b.categoryName]),
+      );
+      const subPicByKey = new Map(
+        subcategoryRows.map((s) => [subcategoryPicKey(s.categoryId, s.name), s.pic]),
       );
 
       const txRows = await db
@@ -106,6 +123,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
           date: transactions.date,
           categoryId: transactions.categoryId,
           categoryName: categories.name,
+          subCategory: transactions.subCategory,
           detail: transactions.detail,
           cost: transactions.cost,
           period: transactions.period,
@@ -122,12 +140,18 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
           const txPic = tx.pic?.trim() ?? '';
           if (!txPic || !isValidPic(txPic)) return null;
 
-          const plan = planPicByCategory.get(tx.categoryId);
-          if (!plan || plan.pic === txPic) return null;
+          const planPic = resolvePlanPicFromMaps(
+            tx.categoryId,
+            tx.subCategory,
+            mainPicByCategory,
+            subPicByKey,
+          );
+          if (!planPic || planPic === txPic) return null;
 
           return {
             ...tx,
-            planPic: plan.pic,
+            planPic,
+            categoryName: categoryNameById.get(tx.categoryId) ?? tx.categoryName,
           };
         })
         .filter((row) => row != null);

@@ -80,6 +80,7 @@ export function getPlan(period: string): Promise<PlanData> {
 export function createTransaction(body: {
   date: string;
   categoryId: number;
+  subCategory?: string;
   detail: string;
   cost: number;
   period: string;
@@ -99,6 +100,7 @@ export function updateTransaction(
   body: {
     date: string;
     categoryId: number;
+    subCategory?: string;
     detail: string;
     cost: number;
     pic: string;
@@ -161,6 +163,7 @@ export function savePlan(body: {
   period: string;
   incomes?: { source: string; amount: number }[];
   budgets?: { categoryId: number; allocatedAmount: number; pic?: string }[];
+  subcategories?: { categoryId: number; name: string; pic?: string }[];
 }): Promise<{ ok: boolean }> {
   return fetchJson('/api/budgets', {
     method: 'POST',

@@ -1,7 +1,8 @@
 import { count, desc, eq, and, ilike, type SQL } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/index.js';
-import { budgets, categories, transactions } from '../db/schema.js';
+import { categories, transactions } from '../db/schema.js';
+import { getPlanPicForTransaction } from '../lib/plan-pic.js';
 import {
   appendTransactionToSheet,
   deleteTransactionFromSheet,
@@ -19,6 +20,7 @@ type Status = (typeof VALID_STATUS)[number];
 interface CreateTransactionBody {
   date: string;
   categoryId: number;
+  subCategory?: string;
   detail: string;
   cost: number;
   period: string;
@@ -29,6 +31,7 @@ interface CreateTransactionBody {
 interface UpdateTransactionBody {
   date: string;
   categoryId: number;
+  subCategory?: string;
   detail: string;
   cost: number;
   pic: Pic;
@@ -96,6 +99,7 @@ async function getTransactionWithCategory(id: number) {
       date: transactions.date,
       categoryId: transactions.categoryId,
       categoryName: categories.name,
+      subCategory: transactions.subCategory,
       detail: transactions.detail,
       cost: transactions.cost,
       period: transactions.period,
@@ -135,6 +139,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
           date: transactions.date,
           categoryId: transactions.categoryId,
           categoryName: categories.name,
+          subCategory: transactions.subCategory,
           detail: transactions.detail,
           cost: transactions.cost,
           period: transactions.period,
@@ -211,6 +216,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
         .values({
           date: body.date,
           categoryId: body.categoryId,
+          subCategory: body.subCategory?.trim() ?? '',
           detail: body.detail.trim(),
           cost: String(Math.round(body.cost)),
           period: body.period.trim(),
@@ -273,6 +279,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
         .set({
           date: body.date,
           categoryId: body.categoryId,
+          subCategory: body.subCategory?.trim() ?? '',
           detail: body.detail.trim(),
           cost: String(Math.round(body.cost)),
           pic: body.pic,
@@ -365,19 +372,12 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(404).send({ error: 'Transaction not found' });
       }
 
-      const [budget] = await db
-        .select({ pic: budgets.pic })
-        .from(budgets)
-        .where(
-          and(
-            eq(budgets.categoryId, existing.categoryId),
-            eq(budgets.period, existing.period),
-          ),
-        )
-        .limit(1);
-
-      const planPic = budget?.pic?.trim() ?? '';
-      if (!planPic || !isValidPic(planPic)) {
+      const planPic = await getPlanPicForTransaction(
+        existing.categoryId,
+        existing.period,
+        existing.subCategory,
+      );
+      if (!planPic) {
         return reply.code(400).send({ error: 'No plan PIC for this category' });
       }
 

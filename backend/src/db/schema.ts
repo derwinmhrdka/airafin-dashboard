@@ -38,12 +38,33 @@ export const budgets = pgTable(
   (table) => [uniqueIndex('budgets_category_period_idx').on(table.categoryId, table.period)],
 );
 
+export const budgetSubcategories = pgTable(
+  'budget_subcategories',
+  {
+    id: serial('id').primaryKey(),
+    categoryId: integer('category_id')
+      .notNull()
+      .references(() => categories.id),
+    period: text('period').notNull(),
+    name: text('name').notNull(),
+    pic: text('pic').notNull().default(''),
+  },
+  (table) => [
+    uniqueIndex('budget_subcategories_category_period_name_idx').on(
+      table.categoryId,
+      table.period,
+      table.name,
+    ),
+  ],
+);
+
 export const transactions = pgTable('transactions', {
   id: serial('id').primaryKey(),
   date: date('date').notNull(),
   categoryId: integer('category_id')
     .notNull()
     .references(() => categories.id),
+  subCategory: text('sub_category').notNull().default(''),
   detail: text('detail').notNull(),
   cost: numeric('cost', { precision: 14, scale: 2 }).notNull(),
   period: text('period').notNull(),
@@ -54,6 +75,7 @@ export const transactions = pgTable('transactions', {
 export type Category = typeof categories.$inferSelect;
 export type Income = typeof incomes.$inferSelect;
 export type Budget = typeof budgets.$inferSelect;
+export type BudgetSubcategory = typeof budgetSubcategories.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 
 export type NewTransaction = typeof transactions.$inferInsert;

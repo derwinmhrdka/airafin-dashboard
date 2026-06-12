@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/index.js';
-import { budgets, categories, incomes } from '../db/schema.js';
+import { budgetSubcategories, budgets, categories, incomes } from '../db/schema.js';
 import { isValidPic } from '../lib/pic.js';
 
 interface IncomeInput {
@@ -15,10 +15,17 @@ interface BudgetInput {
   pic?: string;
 }
 
+interface SubcategoryInput {
+  categoryId: number;
+  name: string;
+  pic?: string;
+}
+
 interface PlanBody {
   period: string;
   incomes?: IncomeInput[];
   budgets?: BudgetInput[];
+  subcategories?: SubcategoryInput[];
 }
 
 export async function budgetRoutes(app: FastifyInstance): Promise<void> {
@@ -47,12 +54,29 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
         .where(eq(budgets.period, period))
         .orderBy(categories.id);
 
-      return { period, incomes: incomeRows, budgets: budgetRows };
+      const subcategoryRows = await db
+        .select({
+          id: budgetSubcategories.id,
+          categoryId: budgetSubcategories.categoryId,
+          name: budgetSubcategories.name,
+          pic: budgetSubcategories.pic,
+          period: budgetSubcategories.period,
+        })
+        .from(budgetSubcategories)
+        .where(eq(budgetSubcategories.period, period))
+        .orderBy(budgetSubcategories.categoryId, budgetSubcategories.name);
+
+      return { period, incomes: incomeRows, budgets: budgetRows, subcategories: subcategoryRows };
     },
   );
 
   app.post<{ Body: PlanBody }>('/api/budgets', async (request, reply) => {
-    const { period, incomes: incomeInputs, budgets: budgetInputs } = request.body ?? {};
+    const {
+      period,
+      incomes: incomeInputs,
+      budgets: budgetInputs,
+      subcategories: subcategoryInputs,
+    } = request.body ?? {};
 
     if (!period?.trim()) {
       return reply.code(400).send({ error: 'period is required' });
@@ -117,6 +141,37 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
             target: [budgets.categoryId, budgets.period],
             set: { allocatedAmount: amount, pic },
           });
+      }
+    }
+
+    if (subcategoryInputs) {
+      await db.delete(budgetSubcategories).where(eq(budgetSubcategories.period, trimmedPeriod));
+
+      for (const sub of subcategoryInputs) {
+        const name = sub.name?.trim();
+        if (!sub.categoryId || !name) continue;
+
+        const [category] = await db
+          .select()
+          .from(categories)
+          .where(eq(categories.id, sub.categoryId))
+          .limit(1);
+
+        if (!category) {
+          return reply.code(400).send({ error: `Category ${sub.categoryId} not found` });
+        }
+
+        const pic = sub.pic?.trim() ?? '';
+        if (pic && !isValidPic(pic)) {
+          return reply.code(400).send({ error: 'Invalid pic value' });
+        }
+
+        await db.insert(budgetSubcategories).values({
+          categoryId: sub.categoryId,
+          period: trimmedPeriod,
+          name,
+          pic,
+        });
       }
     }
 

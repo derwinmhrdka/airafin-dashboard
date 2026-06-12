@@ -25,6 +25,7 @@ export interface Transaction {
   date: string;
   categoryId: number;
   categoryName: string;
+  subCategory: string;
   detail: string;
   cost: string;
   period: string;
@@ -52,8 +53,17 @@ export interface PlanBudget {
   period: string;
 }
 
+export interface PlanSubcategory {
+  id: number;
+  categoryId: number;
+  name: string;
+  pic: string;
+  period: string;
+}
+
 export interface PlanData {
   period: string;
   incomes: PlanIncome[];
   budgets: PlanBudget[];
+  subcategories: PlanSubcategory[];
 }

@@ -17,10 +17,17 @@
     amount: string;
   }
 
+  interface SubcategoryRow {
+    key: string;
+    name: string;
+    pic: Pic;
+  }
+
   let categories = $state<Category[]>([]);
   let incomeRows = $state<IncomeRow[]>([]);
   let budgetInputs = $state<Record<number, string>>({});
   let picInputs = $state<Record<number, Pic>>({});
+  let subcategoryInputs = $state<Record<number, SubcategoryRow[]>>({});
   let newCategoryName = $state('');
   let loading = $state(true);
   let saving = $state(false);
@@ -66,9 +73,11 @@
 
       const inputs: Record<number, string> = {};
       const pics: Record<number, Pic> = {};
+      const subs: Record<number, SubcategoryRow[]> = {};
       for (const cat of categories) {
         inputs[cat.id] = '';
         pics[cat.id] = DEFAULT_PIC;
+        subs[cat.id] = [];
       }
       for (const b of plan.budgets) {
         inputs[b.categoryId] = formatAmountInput(b.allocatedAmount);
@@ -76,8 +85,20 @@
           pics[b.categoryId] = b.pic as Pic;
         }
       }
+      for (const sub of plan.subcategories ?? []) {
+        if (!subs[sub.categoryId]) subs[sub.categoryId] = [];
+        subs[sub.categoryId].push({
+          key: `loaded-${sub.id}`,
+          name: sub.name,
+          pic:
+            sub.pic && (PICS as readonly string[]).includes(sub.pic)
+              ? (sub.pic as Pic)
+              : DEFAULT_PIC,
+        });
+      }
       budgetInputs = inputs;
       picInputs = pics;
+      subcategoryInputs = subs;
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load plan';
     } finally {
@@ -100,6 +121,7 @@
       categories = [...categories, category];
       budgetInputs = { ...budgetInputs, [category.id]: '' };
       picInputs = { ...picInputs, [category.id]: DEFAULT_PIC };
+      subcategoryInputs = { ...subcategoryInputs, [category.id]: [] };
       newCategoryName = '';
       success = `Category "${category.name}" added`;
     } catch (e) {
@@ -130,8 +152,18 @@
       }))
       .filter((b) => b.allocatedAmount > 0);
 
+    const subcategories = categories.flatMap((cat) =>
+      (subcategoryInputs[cat.id] ?? [])
+        .filter((row) => row.name.trim())
+        .map((row) => ({
+          categoryId: cat.id,
+          name: row.name.trim(),
+          pic: row.pic,
+        })),
+    );
+
     try {
-      await savePlan({ period, incomes, budgets });
+      await savePlan({ period, incomes, budgets, subcategories });
       success = `Plan saved for ${period}`;
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to save plan';
@@ -146,6 +178,23 @@
   const totalIncome = $derived(
     incomeRows.reduce((sum, row) => sum + parseAmountInput(row.amount || ''), 0),
   );
+
+  function addSubcategory(categoryId: number) {
+    subcategoryInputs = {
+      ...subcategoryInputs,
+      [categoryId]: [
+        ...(subcategoryInputs[categoryId] ?? []),
+        { key: `new-${Date.now()}`, name: '', pic: DEFAULT_PIC },
+      ],
+    };
+  }
+
+  function removeSubcategory(categoryId: number, key: string) {
+    subcategoryInputs = {
+      ...subcategoryInputs,
+      [categoryId]: (subcategoryInputs[categoryId] ?? []).filter((row) => row.key !== key),
+    };
+  }
 </script>
 
 <section class="space-y-4">
@@ -215,25 +264,70 @@
         </div>
 
         {#each categories as cat (cat.id)}
-          <div class="grid grid-cols-[minmax(0,1fr)_6rem_2.75rem] items-center gap-x-1.5 gap-y-2">
-            <span class="truncate text-sm">{cat.name}</span>
-            <AmountInput
-              bind:value={budgetInputs[cat.id]}
-              aria-label="Budget for {cat.name}"
-              class="px-1.5 py-1.5 text-right"
-            />
-            <div class="flex justify-center">
-              <select
-                bind:value={picInputs[cat.id]}
-                class="w-9 border border-zinc-200 bg-white px-0 py-1.5 text-center text-[10px] font-semibold dark:border-zinc-800 dark:bg-black"
-                aria-label="PIC for {cat.name}"
-                title={picInputs[cat.id]}
-              >
-                {#each PICS as p}
-                  <option value={p}>{picInitial(p)}</option>
-                {/each}
-              </select>
+          <div class="space-y-1.5">
+            <div class="grid grid-cols-[minmax(0,1fr)_6rem_2.75rem] items-center gap-x-1.5">
+              <span class="truncate text-sm">{cat.name}</span>
+              <AmountInput
+                bind:value={budgetInputs[cat.id]}
+                aria-label="Budget for {cat.name}"
+                class="px-1.5 py-1.5 text-right"
+              />
+              <div class="flex justify-center">
+                <select
+                  bind:value={picInputs[cat.id]}
+                  class="w-9 border border-zinc-200 bg-white px-0 py-1.5 text-center text-[10px] font-semibold dark:border-zinc-800 dark:bg-black"
+                  aria-label="PIC for {cat.name}"
+                  title={picInputs[cat.id]}
+                >
+                  {#each PICS as p}
+                    <option value={p}>{picInitial(p)}</option>
+                  {/each}
+                </select>
+              </div>
             </div>
+
+            {#each subcategoryInputs[cat.id] ?? [] as sub (sub.key)}
+              <div
+                class="grid grid-cols-[minmax(0,1fr)_6rem_2.75rem] items-center gap-x-1.5 pl-3"
+              >
+                <input
+                  type="text"
+                  bind:value={sub.name}
+                  placeholder="Sub category"
+                  class="min-w-0 border border-zinc-200 bg-white px-2 py-1.5 text-xs dark:border-zinc-800 dark:bg-black"
+                  aria-label="Sub category for {cat.name}"
+                />
+                <span class="text-center text-[10px] text-zinc-400">—</span>
+                <div class="flex items-center justify-center gap-0.5">
+                  <select
+                    bind:value={sub.pic}
+                    class="w-9 border border-zinc-200 bg-white px-0 py-1.5 text-center text-[10px] font-semibold dark:border-zinc-800 dark:bg-black"
+                    aria-label="PIC for sub category"
+                    title={sub.pic}
+                  >
+                    {#each PICS as p}
+                      <option value={p}>{picInitial(p)}</option>
+                    {/each}
+                  </select>
+                  <button
+                    type="button"
+                    onclick={() => removeSubcategory(cat.id, sub.key)}
+                    class="border border-zinc-200 px-1.5 py-1.5 text-[10px] text-zinc-500 dark:border-zinc-800"
+                    aria-label="Remove sub category"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            {/each}
+
+            <button
+              type="button"
+              onclick={() => addSubcategory(cat.id)}
+              class="ml-3 border border-dashed border-zinc-300 px-2 py-1 text-[10px] text-zinc-500 dark:border-zinc-700"
+            >
+              + Sub category
+            </button>
           </div>
         {/each}
 

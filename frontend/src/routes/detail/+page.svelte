@@ -22,6 +22,8 @@
 
   let categories = $state<Category[]>([]);
   let categoryPicById = $state<Record<number, Pic>>({});
+  let subPicByKey = $state<Record<string, Pic>>({});
+  let subcategoriesByCategory = $state<Record<number, string[]>>({});
   let transactions = $state<Transaction[]>([]);
   let total = $state(0);
   let monthTotal = $state(0);
@@ -41,6 +43,7 @@
 
   let date = $state(new Date().toISOString().slice(0, 10));
   let categoryId = $state(0);
+  let subCategory = $state('');
   let detail = $state('');
   let cost = $state('');
   let pic = $state<Pic>(DEFAULT_PIC);
@@ -73,8 +76,19 @@
     debouncedSearch = '';
   }
 
+  const subCategoryOptions = $derived(subcategoriesByCategory[categoryId] ?? []);
+
+  function expectedPlanPic(tx: Transaction): Pic | '' {
+    const sub = tx.subCategory?.trim();
+    if (sub) {
+      const subPic = subPicByKey[`${tx.categoryId}|${sub.toLowerCase()}`];
+      if (subPic) return subPic;
+    }
+    return categoryPicById[tx.categoryId] ?? '';
+  }
+
   function picDiffersFromPlan(tx: Transaction): boolean {
-    const planPic = categoryPicById[tx.categoryId];
+    const planPic = expectedPlanPic(tx);
     const txPic = tx.pic?.trim() ?? '';
     if (!planPic || !txPic) return false;
     return txPic !== planPic;
@@ -83,6 +97,7 @@
   function resetInsertForm() {
     date = new Date().toISOString().slice(0, 10);
     if (categories.length) categoryId = categories[0].id;
+    subCategory = '';
     detail = '';
     cost = '';
     pic = picForCategory(categoryId);
@@ -135,6 +150,19 @@
           .filter((b) => b.pic && (PICS as readonly string[]).includes(b.pic))
           .map((b) => [b.categoryId, b.pic as Pic]),
       );
+      subPicByKey = Object.fromEntries(
+        (plan.subcategories ?? [])
+          .filter((s) => s.pic && (PICS as readonly string[]).includes(s.pic))
+          .map((s) => [`${s.categoryId}|${s.name.trim().toLowerCase()}`, s.pic as Pic]),
+      );
+      subcategoriesByCategory = Object.fromEntries(
+        categories.map((cat) => [
+          cat.id,
+          (plan.subcategories ?? [])
+            .filter((s) => s.categoryId === cat.id)
+            .map((s) => s.name),
+        ]),
+      );
       if (!categoryId && categories.length) categoryId = categories[0].id;
       pic = picForCategory(categoryId);
       await loadTransactions(activePeriod, true);
@@ -179,13 +207,19 @@
   });
 
   $effect(() => {
-    if (categoryId && editingId == null) pic = picForCategory(categoryId);
+    if (categoryId && editingId == null) {
+      pic = picForCategory(categoryId);
+      if (subCategory && !subCategoryOptions.includes(subCategory)) {
+        subCategory = '';
+      }
+    }
   });
 
   function startEdit(tx: Transaction) {
     editingId = tx.id;
     date = tx.date;
     categoryId = tx.categoryId;
+    subCategory = tx.subCategory ?? '';
     detail = tx.detail;
     cost = formatAmountInput(tx.cost);
     pic = (PICS as readonly string[]).includes(tx.pic) ? (tx.pic as Pic) : picForCategory(tx.categoryId);
@@ -210,6 +244,7 @@
     const body = {
       date,
       categoryId,
+      subCategory: subCategory.trim(),
       detail,
       cost: parseAmountInput(cost),
       pic,
@@ -344,6 +379,19 @@
     </label>
 
     <label class="block space-y-1">
+      <span class="text-[11px] text-zinc-500">Sub Category</span>
+      <select
+        bind:value={subCategory}
+        class="w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
+      >
+        <option value="">— Main category</option>
+        {#each subCategoryOptions as name}
+          <option value={name}>{name}</option>
+        {/each}
+      </select>
+    </label>
+
+    <label class="block space-y-1">
       <span class="text-[11px] text-zinc-500">Detail</span>
       <input
         type="text"
@@ -452,6 +500,7 @@
             <tr>
               <th class="px-2 py-2 font-medium">Date</th>
               <th class="px-2 py-2 font-medium">Cat</th>
+              <th class="px-2 py-2 font-medium">Sub</th>
               <th class="px-2 py-2 font-medium">Detail</th>
               <th class="px-2 py-2 text-right font-medium">Cost</th>
               <th class="px-2 py-2 text-center font-medium">PIC</th>
@@ -472,6 +521,9 @@
                   <span class="rounded px-1.5 py-0.5 text-[10px] {style.bg} {style.text}">
                     {tx.categoryName.slice(0, 8)}
                   </span>
+                </td>
+                <td class="max-w-[56px] truncate px-2 py-2 text-[10px] text-zinc-500">
+                  {tx.subCategory?.trim() || '—'}
                 </td>
                 <td class="max-w-[96px] px-2 py-2">
                   <DetailPreview text={tx.detail} />
