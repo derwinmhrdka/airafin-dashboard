@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from '$app/state';
+  import AmountInput from '$lib/components/AmountInput.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
   import { categoryStyle } from '$lib/categories';
   import {
@@ -10,7 +11,7 @@
     getTransactions,
     updateTransaction,
   } from '$lib/api';
-  import { formatAmountInput, formatCurrency, formatDate } from '$lib/format';
+  import { formatAmountInput, formatCurrency, formatDate, parseAmountInput } from '$lib/format';
   import { periodFromUrl } from '$lib/period';
   import { DEFAULT_PIC, PICS, type Pic } from '$lib/pics';
   import type { Category, Transaction } from '$lib/types';
@@ -174,7 +175,7 @@
         date,
         categoryId,
         detail,
-        cost: Math.round(Number.parseFloat(cost)),
+        cost: parseAmountInput(cost),
         period,
         pic,
       });
@@ -205,7 +206,7 @@
         date: editDate,
         categoryId: editCategoryId,
         detail: editDetail,
-        cost: Math.round(Number.parseFloat(editCost)),
+        cost: parseAmountInput(editCost),
         pic: editPic,
       });
       success = `Transaction #${editingId} updated${sheetsMessage(result.sheetsSync)}`;
@@ -250,28 +251,19 @@
   <form onsubmit={handleSubmit} class="space-y-3 border border-zinc-200 p-3 dark:border-zinc-800">
     <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Quick Insert · {period}</h2>
 
-    <div class="grid grid-cols-2 gap-2">
-      <label class="space-y-1">
+    <div class="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
+      <label class="min-w-0 space-y-1">
         <span class="text-[11px] text-zinc-500">Date</span>
         <input
           type="date"
           bind:value={date}
           required
-          class="w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
+          class="box-border w-full min-w-0 max-w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
         />
       </label>
-      <label class="space-y-1">
+      <label class="min-w-0 space-y-1">
         <span class="text-[11px] text-zinc-500">Cost</span>
-        <input
-          type="number"
-          inputmode="numeric"
-          bind:value={cost}
-          required
-          min="0"
-          step="1"
-          placeholder="0"
-          class="w-full border border-zinc-200 bg-white px-2 py-2 font-mono text-sm dark:border-zinc-800 dark:bg-black"
-        />
+        <AmountInput bind:value={cost} required />
       </label>
     </div>
 
@@ -342,27 +334,19 @@
         </button>
       </div>
 
-      <div class="grid grid-cols-2 gap-2">
-        <label class="space-y-1">
+      <div class="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
+        <label class="min-w-0 space-y-1">
           <span class="text-[11px] text-zinc-500">Date</span>
           <input
             type="date"
             bind:value={editDate}
             required
-            class="w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
+            class="box-border w-full min-w-0 max-w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
           />
         </label>
-        <label class="space-y-1">
+        <label class="min-w-0 space-y-1">
           <span class="text-[11px] text-zinc-500">Cost</span>
-          <input
-            type="number"
-            inputmode="numeric"
-            bind:value={editCost}
-            required
-            min="0"
-            step="1"
-            class="w-full border border-zinc-200 bg-white px-2 py-2 font-mono text-sm dark:border-zinc-800 dark:bg-black"
-          />
+          <AmountInput bind:value={editCost} required />
         </label>
       </div>
 

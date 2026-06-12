@@ -17,11 +17,21 @@ export const handle: Handle = async ({ event, resolve }) => {
     if (token) headers.set('X-API-Token', token);
   }
 
-  const hasBody = !['GET', 'HEAD'].includes(event.request.method);
+  let body: string | undefined;
+  if (!['GET', 'HEAD'].includes(event.request.method)) {
+    const text = await event.request.text();
+    if (text) {
+      body = text;
+    } else {
+      headers.delete('content-type');
+      headers.delete('content-length');
+    }
+  }
+
   const response = await fetch(target, {
     method: event.request.method,
     headers,
-    body: hasBody ? await event.request.text() : undefined,
+    body,
   });
 
   return new Response(response.body, {

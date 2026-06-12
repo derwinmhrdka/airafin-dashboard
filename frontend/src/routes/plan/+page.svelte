@@ -1,7 +1,8 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { createCategory, getCategories, getPlan, savePlan } from '$lib/api';
-  import { formatAmountInput, formatCurrency } from '$lib/format';
+  import AmountInput from '$lib/components/AmountInput.svelte';
+  import { formatAmountInput, formatCurrency, parseAmountInput } from '$lib/format';
   import { periodFromUrl } from '$lib/period';
   import { DEFAULT_PIC, PICS, picInitial, type Pic } from '$lib/pics';
   import type { Category } from '$lib/types';
@@ -117,14 +118,14 @@
     const incomes = incomeRows
       .map((row) => ({
         source: row.source.trim(),
-        amount: Math.round(Number.parseFloat(row.amount || '0')),
+        amount: parseAmountInput(row.amount),
       }))
       .filter((row) => row.source && row.amount > 0);
 
     const budgets = categories
       .map((cat) => ({
         categoryId: cat.id,
-        allocatedAmount: Math.round(Number.parseFloat(budgetInputs[cat.id] || '0')),
+        allocatedAmount: parseAmountInput(budgetInputs[cat.id] || ''),
         pic: picInputs[cat.id] ?? DEFAULT_PIC,
       }))
       .filter((b) => b.allocatedAmount > 0);
@@ -140,10 +141,10 @@
   }
 
   const totalBudget = $derived(
-    Object.values(budgetInputs).reduce((sum, v) => sum + (Number.parseFloat(v || '0') || 0), 0),
+    Object.values(budgetInputs).reduce((sum, v) => sum + parseAmountInput(v || ''), 0),
   );
   const totalIncome = $derived(
-    incomeRows.reduce((sum, row) => sum + (Number.parseFloat(row.amount || '0') || 0), 0),
+    incomeRows.reduce((sum, row) => sum + parseAmountInput(row.amount || ''), 0),
   );
 </script>
 
@@ -169,17 +170,9 @@
                 class="w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
               />
             </label>
-            <label class="w-32 space-y-1">
+            <label class="w-32 shrink-0 space-y-1">
               <span class="text-[11px] text-zinc-500">Amount</span>
-              <input
-                type="number"
-                inputmode="numeric"
-                bind:value={row.amount}
-                min="0"
-                step="1"
-                placeholder="0"
-                class="w-full border border-zinc-200 bg-white px-2 py-2 font-mono text-sm dark:border-zinc-800 dark:bg-black"
-              />
+              <AmountInput bind:value={row.amount} class="text-right" />
             </label>
             {#if incomeRows.length > 1}
               <button
@@ -224,26 +217,23 @@
         {#each categories as cat (cat.id)}
           <div class="grid grid-cols-[minmax(0,1fr)_6rem_2.75rem] items-center gap-x-1.5 gap-y-2">
             <span class="truncate text-sm">{cat.name}</span>
-            <input
-              type="number"
-              inputmode="numeric"
+            <AmountInput
               bind:value={budgetInputs[cat.id]}
-              min="0"
-              step="1"
-              placeholder="0"
               aria-label="Budget for {cat.name}"
-              class="w-full border border-zinc-200 bg-white px-1.5 py-1.5 text-right font-mono text-sm dark:border-zinc-800 dark:bg-black"
+              class="px-1.5 py-1.5 text-right"
             />
-            <select
-              bind:value={picInputs[cat.id]}
-              class="w-full border border-zinc-200 bg-white px-0.5 py-1.5 text-center text-[10px] font-semibold dark:border-zinc-800 dark:bg-black"
-              aria-label="PIC for {cat.name}"
-              title={picInputs[cat.id]}
-            >
-              {#each PICS as p}
-                <option value={p}>{picInitial(p)}</option>
-              {/each}
-            </select>
+            <div class="flex justify-center">
+              <select
+                bind:value={picInputs[cat.id]}
+                class="w-9 border border-zinc-200 bg-white px-0 py-1.5 text-center text-[10px] font-semibold dark:border-zinc-800 dark:bg-black"
+                aria-label="PIC for {cat.name}"
+                title={picInputs[cat.id]}
+              >
+                {#each PICS as p}
+                  <option value={p}>{picInitial(p)}</option>
+                {/each}
+              </select>
+            </div>
           </div>
         {/each}
 
