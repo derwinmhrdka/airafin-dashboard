@@ -1,6 +1,5 @@
-import { fail, redirect } from '@sveltejs/kit';
-import type { Actions } from './$types';
-import { authenticate, isAuthenticated, setAuthCookie } from '$lib/server/auth';
+import { redirect } from '@sveltejs/kit';
+import { isAuthenticated } from '$lib/server/auth';
 
 export function load({ cookies }) {
   if (isAuthenticated(cookies)) {
@@ -8,17 +7,3 @@ export function load({ cookies }) {
   }
   return {};
 }
-
-export const actions: Actions = {
-  default: async ({ request, cookies }) => {
-    const data = await request.formData();
-    const password = data.get('password')?.toString() ?? '';
-
-    if (!authenticate(password)) {
-      return fail(401, { incorrect: true });
-    }
-
-    setAuthCookie(cookies);
-    redirect(303, '/');
-  },
-};

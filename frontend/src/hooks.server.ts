@@ -7,6 +7,7 @@ const BACKEND_URL = env.API_URL ?? 'http://localhost:3081';
 function isPublicPath(path: string): boolean {
   return (
     path === '/login' ||
+    path === '/auth/login' ||
     path.startsWith('/_app/') ||
     path.startsWith('/fonts/') ||
     path === '/favicon.ico' ||
