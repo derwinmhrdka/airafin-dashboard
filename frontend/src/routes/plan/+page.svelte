@@ -3,7 +3,7 @@
   import { createCategory, getCategories, getPlan, savePlan } from '$lib/api';
   import { formatAmountInput, formatCurrency } from '$lib/format';
   import { periodFromUrl } from '$lib/period';
-  import { DEFAULT_PIC, PICS, type Pic } from '$lib/pics';
+  import { DEFAULT_PIC, PICS, picInitial, type Pic } from '$lib/pics';
   import type { Category } from '$lib/types';
 
   const DEFAULT_INCOMES = ['Gaji Derwin', 'Gaji Anggita'] as const;
@@ -214,25 +214,16 @@
         </legend>
 
         <div
-          class="grid grid-cols-[minmax(0,1fr)_5.5rem_6.5rem] gap-x-2 gap-y-1 border-b border-zinc-200 pb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-500 dark:border-zinc-800"
+          class="grid grid-cols-[minmax(0,1fr)_6rem_2.75rem] gap-x-1.5 gap-y-1 border-b border-zinc-200 pb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-500 dark:border-zinc-800"
         >
           <span>Category</span>
-          <span class="text-center">PIC</span>
           <span class="text-right">Budget</span>
+          <span class="text-center">PIC</span>
         </div>
 
         {#each categories as cat (cat.id)}
-          <div class="grid grid-cols-[minmax(0,1fr)_5.5rem_6.5rem] items-center gap-x-2 gap-y-2">
+          <div class="grid grid-cols-[minmax(0,1fr)_6rem_2.75rem] items-center gap-x-1.5 gap-y-2">
             <span class="truncate text-sm">{cat.name}</span>
-            <select
-              bind:value={picInputs[cat.id]}
-              class="border border-zinc-200 bg-white px-1 py-1.5 text-center text-[11px] dark:border-zinc-800 dark:bg-black"
-              aria-label="PIC for {cat.name}"
-            >
-              {#each PICS as p}
-                <option value={p}>{p}</option>
-              {/each}
-            </select>
             <input
               type="number"
               inputmode="numeric"
@@ -241,8 +232,18 @@
               step="1"
               placeholder="0"
               aria-label="Budget for {cat.name}"
-              class="w-full border border-zinc-200 bg-white px-2 py-1.5 text-right font-mono text-sm dark:border-zinc-800 dark:bg-black"
+              class="w-full border border-zinc-200 bg-white px-1.5 py-1.5 text-right font-mono text-sm dark:border-zinc-800 dark:bg-black"
             />
+            <select
+              bind:value={picInputs[cat.id]}
+              class="w-full border border-zinc-200 bg-white px-0.5 py-1.5 text-center text-[10px] font-semibold dark:border-zinc-800 dark:bg-black"
+              aria-label="PIC for {cat.name}"
+              title={picInputs[cat.id]}
+            >
+              {#each PICS as p}
+                <option value={p}>{picInitial(p)}</option>
+              {/each}
+            </select>
           </div>
         {/each}
 

@@ -15,7 +15,11 @@
 
     const url = new URL(page.url);
     url.searchParams.set('period', currentPeriod());
-    goto(`${url.pathname}${url.search}`, { replaceState: true, noScroll: true, keepFocus: true });
+    const next = `${url.pathname}${url.search}`;
+    const current = `${page.url.pathname}${page.url.search}`;
+    if (next === current) return;
+
+    goto(next, { replaceState: true, noScroll: true, keepFocus: true });
   });
 </script>
 

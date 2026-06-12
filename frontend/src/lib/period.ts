@@ -25,9 +25,16 @@ export const MONTH_NAMES = [
 export function parsePeriodToDate(period: string): Date | null {
   const trimmed = period.trim();
   if (!trimmed) return null;
-  const parsed = new Date(`${trimmed} 1`);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed;
+
+  const parts = trimmed.split(/\s+/);
+  if (parts.length < 2) return null;
+
+  const year = Number.parseInt(parts[parts.length - 1] ?? '', 10);
+  const monthName = parts.slice(0, -1).join(' ');
+  const monthIndex = (MONTH_NAMES as readonly string[]).indexOf(monthName);
+
+  if (!Number.isFinite(year) || monthIndex < 0) return null;
+  return new Date(year, monthIndex, 1);
 }
 
 export function periodParts(period: string): { month: number; year: number } {

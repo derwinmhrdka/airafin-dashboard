@@ -21,13 +21,17 @@
     loading = true;
     error = '';
     try {
-      const [summaryRes, reimbRes] = await Promise.all([
-        getSummary(activePeriod),
-        getReimbursements(activePeriod),
-      ]);
+      const summaryRes = await getSummary(activePeriod);
       summary = summaryRes;
-      reimbursements = reimbRes.reimbursements;
+
+      try {
+        const reimbRes = await getReimbursements(activePeriod);
+        reimbursements = reimbRes.reimbursements;
+      } catch {
+        reimbursements = [];
+      }
     } catch (e) {
+      summary = null;
       error = e instanceof Error ? e.message : 'Failed to load summary';
     } finally {
       loading = false;
@@ -138,4 +142,8 @@
       {/if}
     </div>
   </section>
+{:else}
+  <p class="border border-dashed border-zinc-200 px-3 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800">
+    Unable to load overview. Try refreshing the page.
+  </p>
 {/if}
