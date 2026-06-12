@@ -16,6 +16,8 @@
   );
   const overBudget = $derived(item.sisa < 0);
   const hasSubs = $derived((item.subcategories?.length ?? 0) > 0);
+
+  let subsOpen = $state(false);
 </script>
 
 <article
@@ -56,33 +58,51 @@
   </div>
 
   {#if hasSubs}
-    <div class="mt-3 space-y-2 border-t border-zinc-100 pt-2 dark:border-zinc-900">
-      {#each item.subcategories as sub (sub.name)}
-        {@const subOver = sub.sisa < 0}
-        <div class="space-y-1 pl-2">
-          <p class="truncate text-[11px] font-medium text-zinc-600 dark:text-zinc-400">{sub.name}</p>
-          <div class="grid min-w-0 grid-cols-3 gap-1">
-            <div class="min-w-0">
-              <p class="text-[9px] text-zinc-500">Spent</p>
-              <p class="font-mono text-[10px] tabular-nums">{formatCurrency(sub.spent)}</p>
+    <div class="mt-2 border-t border-zinc-100 pt-2 dark:border-zinc-900">
+      <button
+        type="button"
+        class="flex w-full items-center justify-between gap-2 text-left text-[9px] font-medium uppercase tracking-wider text-zinc-500"
+        aria-expanded={subsOpen}
+        onclick={() => {
+          subsOpen = !subsOpen;
+        }}
+      >
+        <span>Sub Category</span>
+        <span class="font-mono text-[10px] normal-case tracking-normal text-zinc-400" aria-hidden="true">
+          {subsOpen ? '−' : '+'}
+        </span>
+      </button>
+
+      {#if subsOpen}
+        <div class="mt-1.5 space-y-1.5">
+          {#each item.subcategories as sub (sub.name)}
+            {@const subOver = sub.sisa < 0}
+            <div class="space-y-0.5 border-l border-zinc-200 pl-2 dark:border-zinc-800">
+              <p class="truncate text-[9px] text-zinc-500">{sub.name}</p>
+              <div class="grid min-w-0 grid-cols-3 gap-0.5">
+                <div class="min-w-0">
+                  <p class="text-[8px] text-zinc-400">Spent</p>
+                  <p class="font-mono text-[9px] tabular-nums">{formatCurrency(sub.spent)}</p>
+                </div>
+                <div class="min-w-0">
+                  <p class="text-[8px] text-zinc-400">Plan</p>
+                  <p class="font-mono text-[9px] tabular-nums">{formatCurrency(sub.allocated)}</p>
+                </div>
+                <div class="min-w-0 text-right">
+                  <p class="text-[8px] text-zinc-400">SISA</p>
+                  <p
+                    class="font-mono text-[9px] tabular-nums {subOver
+                      ? 'text-red-600 dark:text-red-400'
+                      : ''}"
+                  >
+                    {formatCurrency(sub.sisa)}
+                  </p>
+                </div>
+              </div>
             </div>
-            <div class="min-w-0">
-              <p class="text-[9px] text-zinc-500">Plan</p>
-              <p class="font-mono text-[10px] tabular-nums">{formatCurrency(sub.allocated)}</p>
-            </div>
-            <div class="min-w-0 text-right">
-              <p class="text-[9px] text-zinc-500">SISA</p>
-              <p
-                class="font-mono text-[10px] tabular-nums {subOver
-                  ? 'text-red-600 dark:text-red-400'
-                  : ''}"
-              >
-                {formatCurrency(sub.sisa)}
-              </p>
-            </div>
-          </div>
+          {/each}
         </div>
-      {/each}
+      {/if}
     </div>
   {/if}
 </article>

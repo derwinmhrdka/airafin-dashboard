@@ -29,6 +29,7 @@
   let monthTotal = $state(0);
   let hasMore = $state(false);
   let loading = $state(true);
+  let filterLoading = $state(false);
   let loadingMore = $state(false);
   let saving = $state(false);
   let deletingId = $state<number | null>(null);
@@ -58,8 +59,10 @@
   }
 
   const hasActiveFilters = $derived(
-    Boolean(filterCategory || filterPic || debouncedSearch.trim()),
+    Boolean(filterCategory || filterPic || filterSearch.trim() || debouncedSearch.trim()),
   );
+
+  const showFilters = $derived(monthTotal > 0 || hasActiveFilters);
 
   function currentFilters() {
     return {
@@ -109,11 +112,19 @@
     return '';
   }
 
-  async function loadTransactions(activePeriod: string, reset = false) {
+  async function loadTransactions(
+    activePeriod: string,
+    reset = false,
+    opts?: { filterOnly?: boolean },
+  ) {
     if (reset) {
-      loading = true;
+      if (opts?.filterOnly) {
+        filterLoading = true;
+      } else {
+        loading = true;
+      }
     } else {
-      if (!hasMore || loadingMore || loading) return;
+      if (!hasMore || loadingMore || loading || filterLoading) return;
       loadingMore = true;
     }
 
@@ -135,6 +146,7 @@
       error = e instanceof Error ? e.message : 'Failed to load transactions';
     } finally {
       loading = false;
+      filterLoading = false;
       loadingMore = false;
     }
   }
@@ -203,7 +215,7 @@
       filtersReady = true;
       return;
     }
-    void loadTransactions(period, true);
+    void loadTransactions(period, true, { filterOnly: true });
   });
 
   $effect(() => {
@@ -309,11 +321,11 @@
   }
 </script>
 
-<section class="space-y-4">
+<section class="space-y-4 lg:grid lg:grid-cols-[minmax(17rem,22rem)_minmax(0,1fr)] lg:items-start lg:gap-6 xl:gap-8">
   <form
     bind:this={formEl}
     onsubmit={handleSubmit}
-    class="space-y-3 border p-3 scroll-mt-3
+    class="space-y-3 border p-3 scroll-mt-3 lg:sticky lg:top-4
       {editingId != null
       ? 'border-amber-300 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/20'
       : 'border-zinc-200 dark:border-zinc-800'}"
@@ -352,7 +364,7 @@
       {/if}
     </div>
 
-    <div class="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
+    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
       <label class="min-w-0 space-y-1">
         <span class="text-[11px] text-zinc-500">Date</span>
         <input
@@ -435,7 +447,7 @@
     </button>
   </form>
 
-  <div class="space-y-2">
+  <div class="min-w-0 space-y-2">
     <div class="flex items-center justify-between gap-2">
       <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">
         Recent — {period}
@@ -451,12 +463,13 @@
       {/if}
     </div>
 
-    {#if !loading && (monthTotal > 0 || hasActiveFilters)}
+    {#if showFilters}
       <div class="space-y-2 border border-zinc-200 p-2 dark:border-zinc-800">
         <input
           type="search"
           bind:value={filterSearch}
           placeholder="Search detail…"
+          enterkeyhint="search"
           class="w-full border border-zinc-200 bg-white px-2 py-1.5 text-xs dark:border-zinc-800 dark:bg-black"
         />
         <div class="grid grid-cols-2 gap-2">
@@ -494,12 +507,15 @@
       <p class="border border-dashed border-zinc-200 px-3 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800">
         No transactions this month.
       </p>
-    {:else if total === 0}
+    {:else if total === 0 && !filterLoading}
       <p class="border border-dashed border-zinc-200 px-3 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800">
         No transactions match your filters.
       </p>
     {:else}
-      <div class="overflow-x-auto border border-zinc-200 dark:border-zinc-800">
+      <div
+        class="overflow-x-auto border border-zinc-200 transition-opacity dark:border-zinc-800
+          {filterLoading ? 'pointer-events-none opacity-50' : ''}"
+      >
         <table class="w-full text-left text-xs">
           <thead class="border-b border-zinc-200 bg-zinc-50 text-[10px] uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900">
             <tr>
@@ -527,10 +543,10 @@
                     {tx.categoryName.slice(0, 8)}
                   </span>
                 </td>
-                <td class="max-w-[56px] truncate px-2 py-2 text-[10px] text-zinc-500">
+                <td class="max-w-[56px] truncate px-2 py-2 text-[10px] text-zinc-500 md:max-w-[8rem]">
                   {tx.subCategory?.trim() || '—'}
                 </td>
-                <td class="max-w-[96px] px-2 py-2">
+                <td class="max-w-[96px] px-2 py-2 md:max-w-none md:min-w-[10rem]">
                   <DetailPreview text={tx.detail} />
                 </td>
                 <td class="px-2 py-2 text-right font-mono tabular-nums">

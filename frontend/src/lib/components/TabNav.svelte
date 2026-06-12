@@ -18,7 +18,7 @@
       href={withPeriodParam(tab.href, period)}
       aria-label={tab.label}
       title={tab.label}
-      class="flex items-center justify-center border-b-2 px-2 py-3 text-center text-xs font-medium transition-colors
+      class="flex items-center justify-center border-b-2 px-2 py-3 text-center text-xs font-medium transition-colors md:px-4 md:py-3.5 md:text-sm
         {page.url.pathname === tab.href
         ? 'border-black text-black dark:border-white dark:text-white'
         : 'border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}"

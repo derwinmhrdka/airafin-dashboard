@@ -11,6 +11,9 @@
 
   const period = $derived(periodFromUrl(page.url.searchParams));
 
+  const budgetGrid =
+    'grid grid-cols-[minmax(0,1fr)_6rem_2.75rem_2rem] items-center gap-x-1.5 md:grid-cols-[minmax(0,1fr)_8rem_3rem_2.25rem] md:gap-x-3';
+
   interface IncomeRow {
     key: string;
     source: string;
@@ -203,7 +206,7 @@
   }
 </script>
 
-<section class="space-y-4">
+<section class="mx-auto w-full space-y-4 md:space-y-6">
   {#if loading}
     <div class="h-48 animate-pulse border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900"></div>
   {:else}
@@ -233,7 +236,7 @@
               <button
                 type="button"
                 onclick={() => removeIncomeRow(row.key)}
-                class="mb-0.5 border border-zinc-200 px-2 py-2 text-xs text-zinc-500 dark:border-zinc-800"
+                class="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center border border-red-600 bg-red-600 text-sm text-white dark:border-red-500 dark:bg-red-600"
                 aria-label="Remove income"
               >
                 ×
@@ -262,23 +265,24 @@
         </legend>
 
         <div
-          class="grid grid-cols-[minmax(0,1fr)_6rem_2.75rem] gap-x-1.5 gap-y-1 border-b border-zinc-200 pb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-500 dark:border-zinc-800"
+          class="{budgetGrid} gap-y-1 border-b border-zinc-200 pb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-500 dark:border-zinc-800"
         >
           <span>Category</span>
           <span class="text-right">Budget</span>
           <span class="text-center">PIC</span>
+          <span class="text-center">Action</span>
         </div>
 
         {#each categories as cat (cat.id)}
           <div class="space-y-1.5">
-            <div class="grid grid-cols-[minmax(0,1fr)_6rem_2.75rem] items-center gap-x-1.5">
+            <div class={budgetGrid}>
               <span class="truncate text-sm">{cat.name}</span>
               <AmountInput
                 bind:value={budgetInputs[cat.id]}
                 aria-label="Budget for {cat.name}"
                 class="px-1.5 py-1.5 text-right"
               />
-              <div class="flex justify-center">
+              <div class="flex justify-center justify-self-center">
                 <select
                   bind:value={picInputs[cat.id]}
                   class="w-9 border border-zinc-200 bg-white px-0 py-1.5 text-center text-[10px] font-semibold dark:border-zinc-800 dark:bg-black"
@@ -290,12 +294,11 @@
                   {/each}
                 </select>
               </div>
+              <span aria-hidden="true"></span>
             </div>
 
             {#each subcategoryInputs[cat.id] ?? [] as sub (sub.key)}
-              <div
-                class="grid grid-cols-[minmax(0,1fr)_6rem_2.75rem] items-center gap-x-1.5 pl-3"
-              >
+              <div class="{budgetGrid} pl-3">
                 <input
                   type="text"
                   bind:value={sub.name}
@@ -308,7 +311,7 @@
                   aria-label="Budget for sub category {sub.name || 'new'}"
                   class="px-1.5 py-1.5 text-right"
                 />
-                <div class="flex items-center justify-center gap-0.5">
+                <div class="flex justify-center justify-self-center">
                   <select
                     bind:value={sub.pic}
                     class="w-9 border border-zinc-200 bg-white px-0 py-1.5 text-center text-[10px] font-semibold dark:border-zinc-800 dark:bg-black"
@@ -319,10 +322,12 @@
                       <option value={p}>{picInitial(p)}</option>
                     {/each}
                   </select>
+                </div>
+                <div class="flex justify-center justify-self-center">
                   <button
                     type="button"
                     onclick={() => removeSubcategory(cat.id, sub.key)}
-                    class="border border-zinc-200 px-1.5 py-1.5 text-[10px] text-zinc-500 dark:border-zinc-800"
+                    class="flex h-7 w-7 shrink-0 items-center justify-center border border-red-600 bg-red-600 text-sm text-white dark:border-red-500 dark:bg-red-600"
                     aria-label="Remove sub category"
                   >
                     ×

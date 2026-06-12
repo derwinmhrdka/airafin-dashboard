@@ -10,7 +10,7 @@ html {
 }
 
 body {
-  @apply bg-white text-black antialiased dark:bg-black dark:text-white;
+  @apply min-w-0 bg-white text-black antialiased dark:bg-black dark:text-white;
   font-family: var(--font-sans);
 }
 
@@ -23,4 +23,10 @@ body {
   font-size: clamp(0.5rem, 2.35vw, 0.875rem);
   line-height: 1.25;
   letter-spacing: -0.02em;
+}
+
+@media (min-width: 768px) {
+  .stat-amount {
+    font-size: 0.875rem;
+  }
 }

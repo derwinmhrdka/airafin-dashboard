@@ -120,9 +120,9 @@
     {error}
   </p>
 {:else if summary}
-  <section class="space-y-4">
-    <p class="text-[11px] uppercase tracking-wider text-zinc-500">Overview · {period}</p>
-    <div class="grid min-w-0 grid-cols-3 gap-1">
+  <section class="mx-auto w-full space-y-4 md:space-y-6">
+    <p class="text-[11px] uppercase tracking-wider text-zinc-500 md:text-xs">Overview · {period}</p>
+    <div class="grid min-w-0 grid-cols-3 gap-1 md:gap-3">
       <StatCard label="Income" value={summary.totalIncome} accent="income" />
       <StatCard label="Spent" value={summary.totalSpent} accent="spent" />
       <StatCard label="SISA" value={summary.totalSisa} accent="sisa" />
@@ -135,7 +135,7 @@
       </span>
     </div>
 
-    <div class="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
+    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
       <article class="border border-zinc-200 p-3 dark:border-zinc-800">
         <div class="mb-3 space-y-2">
           <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Plan vs Expenses</h2>
@@ -170,15 +170,17 @@
       </article>
     </div>
 
-    <div class="space-y-2">
+    <div class="space-y-2 md:space-y-3">
       <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">By Category</h2>
+      <div class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
       {#each summary.categories.filter(categoryHasData) as item, i}
         <CategoryProgress {item} index={i} />
       {:else}
-        <p class="border border-dashed border-zinc-200 px-3 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800">
+        <p class="border border-dashed border-zinc-200 px-3 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800 md:col-span-full">
           No budget data yet. Set your plan in the Plan tab.
         </p>
       {/each}
+      </div>
     </div>
 
     <div class="space-y-2">
@@ -192,9 +194,11 @@
           No pending reimbursements.
         </p>
       {:else}
-        <div class="divide-y divide-zinc-100 border border-zinc-200 dark:divide-zinc-900 dark:border-zinc-800">
+        <div
+          class="divide-y divide-zinc-100 border border-zinc-200 dark:divide-zinc-900 dark:border-zinc-800 md:grid md:grid-cols-2 md:divide-y-0 md:gap-px md:bg-zinc-200 md:dark:bg-zinc-800"
+        >
           {#each reimbursements as item (item.id)}
-            <div class="flex items-center gap-2 px-3 py-2.5">
+            <div class="flex items-center gap-2 bg-white px-3 py-2.5 dark:bg-black md:gap-3 md:px-4 md:py-3">
               <div class="min-w-0 flex-1">
                 <p class="truncate text-sm">{item.detail}</p>
                 <p class="font-mono text-[11px] tabular-nums text-zinc-500">
