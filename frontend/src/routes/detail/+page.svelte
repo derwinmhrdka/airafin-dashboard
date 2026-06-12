@@ -519,11 +519,11 @@
         <table class="w-full text-left text-xs">
           <thead class="border-b border-zinc-200 bg-zinc-50 text-[10px] uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900">
             <tr>
-              <th class="px-2 py-2 font-medium">Date</th>
-              <th class="px-2 py-2 font-medium">Cat</th>
-              <th class="px-2 py-2 font-medium">Sub</th>
-              <th class="px-2 py-2 font-medium">Detail</th>
-              <th class="px-2 py-2 text-right font-medium">Cost</th>
+              <th class="px-2 py-2 text-center font-medium">Date</th>
+              <th class="px-2 py-2 text-center font-medium">Cat</th>
+              <th class="px-2 py-2 text-center font-medium">Sub</th>
+              <th class="px-2 py-2 text-center font-medium">Detail</th>
+              <th class="px-2 py-2 text-center font-medium">Cost</th>
               <th class="px-2 py-2 text-center font-medium">PIC</th>
               <th class="px-2 py-2 text-center font-medium"></th>
             </tr>

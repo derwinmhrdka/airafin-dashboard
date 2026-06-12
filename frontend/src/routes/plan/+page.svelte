@@ -12,7 +12,10 @@
   const period = $derived(periodFromUrl(page.url.searchParams));
 
   const budgetGrid =
-    'grid grid-cols-[minmax(0,1fr)_6rem_2.75rem_2rem] items-center gap-x-1.5 md:grid-cols-[minmax(0,1fr)_8rem_3rem_2.25rem] md:gap-x-3';
+    'grid grid-cols-[minmax(0,1fr)_5.75rem_2.25rem_1.75rem] items-center gap-x-2 sm:grid-cols-[minmax(0,1fr)_6.5rem_2.5rem_2rem] md:grid-cols-[minmax(0,1fr)_8rem_3rem_2.5rem] md:gap-x-3';
+
+  const removeBtnClass =
+    'flex h-8 w-8 shrink-0 items-center justify-center bg-transparent text-xl leading-none font-light text-red-600 dark:bg-transparent dark:text-red-500';
 
   interface IncomeRow {
     key: string;
@@ -236,7 +239,7 @@
               <button
                 type="button"
                 onclick={() => removeIncomeRow(row.key)}
-                class="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center border border-red-600 bg-red-600 text-sm text-white dark:border-red-500 dark:bg-red-600"
+                class="mb-0.5 {removeBtnClass}"
                 aria-label="Remove income"
               >
                 ×
@@ -267,25 +270,27 @@
         <div
           class="{budgetGrid} gap-y-1 border-b border-zinc-200 pb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-500 dark:border-zinc-800"
         >
-          <span>Category</span>
-          <span class="text-right">Budget</span>
-          <span class="text-center">PIC</span>
-          <span class="text-center">Action</span>
+          <span class="min-w-0 text-center">Category</span>
+          <span class="min-w-0 text-center">Budget</span>
+          <span class="min-w-0 text-center">PIC</span>
+          <span class="min-w-0 text-center">Action</span>
         </div>
 
         {#each categories as cat (cat.id)}
           <div class="space-y-1.5">
             <div class={budgetGrid}>
-              <span class="truncate text-sm">{cat.name}</span>
-              <AmountInput
-                bind:value={budgetInputs[cat.id]}
-                aria-label="Budget for {cat.name}"
-                class="px-1.5 py-1.5 text-right"
-              />
-              <div class="flex justify-center justify-self-center">
+              <span class="min-w-0 truncate text-sm">{cat.name}</span>
+              <div class="min-w-0">
+                <AmountInput
+                  bind:value={budgetInputs[cat.id]}
+                  aria-label="Budget for {cat.name}"
+                  class="w-full px-1.5 py-1.5 text-right"
+                />
+              </div>
+              <div class="flex justify-center">
                 <select
                   bind:value={picInputs[cat.id]}
-                  class="w-9 border border-zinc-200 bg-white px-0 py-1.5 text-center text-[10px] font-semibold dark:border-zinc-800 dark:bg-black"
+                  class="h-8 w-9 border border-zinc-200 bg-white px-0 text-center text-[10px] font-semibold leading-8 dark:border-zinc-800 dark:bg-black"
                   aria-label="PIC for {cat.name}"
                   title={picInputs[cat.id]}
                 >
@@ -294,27 +299,31 @@
                   {/each}
                 </select>
               </div>
-              <span aria-hidden="true"></span>
+              <span class="block min-h-8" aria-hidden="true"></span>
             </div>
 
             {#each subcategoryInputs[cat.id] ?? [] as sub (sub.key)}
-              <div class="{budgetGrid} pl-3">
-                <input
-                  type="text"
-                  bind:value={sub.name}
-                  placeholder="Sub category"
-                  class="min-w-0 border border-zinc-200 bg-white px-2 py-1.5 text-xs dark:border-zinc-800 dark:bg-black"
-                  aria-label="Sub category for {cat.name}"
-                />
-                <AmountInput
-                  bind:value={sub.amount}
-                  aria-label="Budget for sub category {sub.name || 'new'}"
-                  class="px-1.5 py-1.5 text-right"
-                />
-                <div class="flex justify-center justify-self-center">
+              <div class={budgetGrid}>
+                <div class="min-w-0 pl-3">
+                  <input
+                    type="text"
+                    bind:value={sub.name}
+                    placeholder="Sub category"
+                    class="w-full border border-zinc-200 bg-white px-2 py-1.5 text-xs dark:border-zinc-800 dark:bg-black"
+                    aria-label="Sub category for {cat.name}"
+                  />
+                </div>
+                <div class="min-w-0">
+                  <AmountInput
+                    bind:value={sub.amount}
+                    aria-label="Budget for sub category {sub.name || 'new'}"
+                    class="w-full px-1.5 py-1.5 text-right"
+                  />
+                </div>
+                <div class="flex justify-center">
                   <select
                     bind:value={sub.pic}
-                    class="w-9 border border-zinc-200 bg-white px-0 py-1.5 text-center text-[10px] font-semibold dark:border-zinc-800 dark:bg-black"
+                    class="h-8 w-9 border border-zinc-200 bg-white px-0 text-center text-[10px] font-semibold leading-8 dark:border-zinc-800 dark:bg-black"
                     aria-label="PIC for sub category"
                     title={sub.pic}
                   >
@@ -323,11 +332,11 @@
                     {/each}
                   </select>
                 </div>
-                <div class="flex justify-center justify-self-center">
+                <div class="flex justify-center">
                   <button
                     type="button"
                     onclick={() => removeSubcategory(cat.id, sub.key)}
-                    class="flex h-7 w-7 shrink-0 items-center justify-center border border-red-600 bg-red-600 text-sm text-white dark:border-red-500 dark:bg-red-600"
+                    class={removeBtnClass}
                     aria-label="Remove sub category"
                   >
                     ×
