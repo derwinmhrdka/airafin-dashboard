@@ -15,6 +15,7 @@
     item.allocated > 0 ? Math.min((item.spent / item.allocated) * 100, 100) : 0,
   );
   const overBudget = $derived(item.sisa < 0);
+  const hasSubs = $derived((item.subcategories?.length ?? 0) > 0);
 </script>
 
 <article
@@ -53,6 +54,37 @@
       </p>
     </div>
   </div>
+
+  {#if hasSubs}
+    <div class="mt-3 space-y-2 border-t border-zinc-100 pt-2 dark:border-zinc-900">
+      {#each item.subcategories as sub (sub.name)}
+        {@const subOver = sub.sisa < 0}
+        <div class="space-y-1 pl-2">
+          <p class="truncate text-[11px] font-medium text-zinc-600 dark:text-zinc-400">{sub.name}</p>
+          <div class="grid min-w-0 grid-cols-3 gap-1">
+            <div class="min-w-0">
+              <p class="text-[9px] text-zinc-500">Spent</p>
+              <p class="font-mono text-[10px] tabular-nums">{formatCurrency(sub.spent)}</p>
+            </div>
+            <div class="min-w-0">
+              <p class="text-[9px] text-zinc-500">Plan</p>
+              <p class="font-mono text-[10px] tabular-nums">{formatCurrency(sub.allocated)}</p>
+            </div>
+            <div class="min-w-0 text-right">
+              <p class="text-[9px] text-zinc-500">SISA</p>
+              <p
+                class="font-mono text-[10px] tabular-nums {subOver
+                  ? 'text-red-600 dark:text-red-400'
+                  : ''}"
+              >
+                {formatCurrency(sub.sisa)}
+              </p>
+            </div>
+          </div>
+        </div>
+      {/each}
+    </div>
+  {/if}
 </article>
 
 <style>

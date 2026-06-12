@@ -20,6 +20,7 @@
   interface SubcategoryRow {
     key: string;
     name: string;
+    amount: string;
     pic: Pic;
   }
 
@@ -90,6 +91,7 @@
         subs[sub.categoryId].push({
           key: `loaded-${sub.id}`,
           name: sub.name,
+          amount: formatAmountInput(sub.allocatedAmount ?? ''),
           pic:
             sub.pic && (PICS as readonly string[]).includes(sub.pic)
               ? (sub.pic as Pic)
@@ -158,6 +160,7 @@
         .map((row) => ({
           categoryId: cat.id,
           name: row.name.trim(),
+          allocatedAmount: parseAmountInput(row.amount || ''),
           pic: row.pic,
         })),
     );
@@ -173,7 +176,10 @@
   }
 
   const totalBudget = $derived(
-    Object.values(budgetInputs).reduce((sum, v) => sum + parseAmountInput(v || ''), 0),
+    Object.values(budgetInputs).reduce((sum, v) => sum + parseAmountInput(v || ''), 0) +
+      Object.values(subcategoryInputs)
+        .flat()
+        .reduce((sum, row) => sum + parseAmountInput(row.amount || ''), 0),
   );
   const totalIncome = $derived(
     incomeRows.reduce((sum, row) => sum + parseAmountInput(row.amount || ''), 0),
@@ -184,7 +190,7 @@
       ...subcategoryInputs,
       [categoryId]: [
         ...(subcategoryInputs[categoryId] ?? []),
-        { key: `new-${Date.now()}`, name: '', pic: DEFAULT_PIC },
+        { key: `new-${Date.now()}`, name: '', amount: '', pic: DEFAULT_PIC },
       ],
     };
   }
@@ -297,7 +303,11 @@
                   class="min-w-0 border border-zinc-200 bg-white px-2 py-1.5 text-xs dark:border-zinc-800 dark:bg-black"
                   aria-label="Sub category for {cat.name}"
                 />
-                <span class="text-center text-[10px] text-zinc-400">—</span>
+                <AmountInput
+                  bind:value={sub.amount}
+                  aria-label="Budget for sub category {sub.name || 'new'}"
+                  class="px-1.5 py-1.5 text-right"
+                />
                 <div class="flex items-center justify-center gap-0.5">
                   <select
                     bind:value={sub.pic}

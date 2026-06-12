@@ -163,7 +163,7 @@ export function savePlan(body: {
   period: string;
   incomes?: { source: string; amount: number }[];
   budgets?: { categoryId: number; allocatedAmount: number; pic?: string }[];
-  subcategories?: { categoryId: number; name: string; pic?: string }[];
+  subcategories?: { categoryId: number; name: string; allocatedAmount?: number; pic?: string }[];
 }): Promise<{ ok: boolean }> {
   return fetchJson('/api/budgets', {
     method: 'POST',

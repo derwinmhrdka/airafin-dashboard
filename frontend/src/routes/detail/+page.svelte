@@ -207,11 +207,14 @@
   });
 
   $effect(() => {
-    if (categoryId && editingId == null) {
+    if (!categoryId) return;
+    if (editingId == null) {
       pic = picForCategory(categoryId);
-      if (subCategory && !subCategoryOptions.includes(subCategory)) {
-        subCategory = '';
-      }
+    }
+    if (subCategoryOptions.length === 0) {
+      subCategory = '';
+    } else if (subCategory && !subCategoryOptions.includes(subCategory)) {
+      subCategory = '';
     }
   });
 
@@ -378,18 +381,20 @@
       </select>
     </label>
 
-    <label class="block space-y-1">
-      <span class="text-[11px] text-zinc-500">Sub Category</span>
-      <select
-        bind:value={subCategory}
-        class="w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
-      >
-        <option value="">— Main category</option>
-        {#each subCategoryOptions as name}
-          <option value={name}>{name}</option>
-        {/each}
-      </select>
-    </label>
+    {#if subCategoryOptions.length > 0}
+      <label class="block space-y-1">
+        <span class="text-[11px] text-zinc-500">Sub Category</span>
+        <select
+          bind:value={subCategory}
+          class="w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
+        >
+          <option value="">Main (default)</option>
+          {#each subCategoryOptions as name}
+            <option value={name}>{name}</option>
+          {/each}
+        </select>
+      </label>
+    {/if}
 
     <label class="block space-y-1">
       <span class="text-[11px] text-zinc-500">Detail</span>

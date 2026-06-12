@@ -47,6 +47,9 @@ export const budgetSubcategories = pgTable(
       .references(() => categories.id),
     period: text('period').notNull(),
     name: text('name').notNull(),
+    allocatedAmount: numeric('allocated_amount', { precision: 14, scale: 2 })
+      .notNull()
+      .default('0'),
     pic: text('pic').notNull().default(''),
   },
   (table) => [

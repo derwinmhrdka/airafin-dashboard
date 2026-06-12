@@ -18,6 +18,7 @@ interface BudgetInput {
 interface SubcategoryInput {
   categoryId: number;
   name: string;
+  allocatedAmount?: number;
   pic?: string;
 }
 
@@ -59,6 +60,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
           id: budgetSubcategories.id,
           categoryId: budgetSubcategories.categoryId,
           name: budgetSubcategories.name,
+          allocatedAmount: budgetSubcategories.allocatedAmount,
           pic: budgetSubcategories.pic,
           period: budgetSubcategories.period,
         })
@@ -166,10 +168,13 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
           return reply.code(400).send({ error: 'Invalid pic value' });
         }
 
+        const amount = String(Math.round(sub.allocatedAmount ?? 0));
+
         await db.insert(budgetSubcategories).values({
           categoryId: sub.categoryId,
           period: trimmedPeriod,
           name,
+          allocatedAmount: amount,
           pic,
         });
       }

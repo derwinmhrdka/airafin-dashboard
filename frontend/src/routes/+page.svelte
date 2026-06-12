@@ -10,9 +10,14 @@
   import { planVsExpenseSlices } from '$lib/plan-vs-expense';
   import { periodFromUrl } from '$lib/period';
   import { picInitial } from '$lib/pics';
-  import type { DashboardSummary, ReimbursementItem } from '$lib/types';
+  import type { CategorySummary, DashboardSummary, ReimbursementItem } from '$lib/types';
 
   const period = $derived(periodFromUrl(page.url.searchParams));
+
+  function categoryHasData(c: CategorySummary): boolean {
+    if (c.allocated > 0 || c.spent > 0) return true;
+    return c.subcategories?.some((s) => s.allocated > 0 || s.spent > 0) ?? false;
+  }
 
   let summary = $state<DashboardSummary | null>(null);
   let reimbursements = $state<ReimbursementItem[]>([]);
@@ -23,7 +28,7 @@
   let planVsScope = $state('general');
 
   const chartCategories = $derived(
-    summary?.categories.filter((c) => c.allocated > 0 || c.spent > 0) ?? [],
+    summary?.categories.filter(categoryHasData) ?? [],
   );
 
   const planVsNumbers = $derived.by(() => {
@@ -167,7 +172,7 @@
 
     <div class="space-y-2">
       <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">By Category</h2>
-      {#each summary.categories.filter((c) => c.allocated > 0 || c.spent > 0) as item, i}
+      {#each summary.categories.filter(categoryHasData) as item, i}
         <CategoryProgress {item} index={i} />
       {:else}
         <p class="border border-dashed border-zinc-200 px-3 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800">

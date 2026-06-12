@@ -3,12 +3,20 @@ export interface Category {
   name: string;
 }
 
+export interface SubcategorySummary {
+  name: string;
+  allocated: number;
+  spent: number;
+  sisa: number;
+}
+
 export interface CategorySummary {
   categoryId: number;
   categoryName: string;
   allocated: number;
   spent: number;
   sisa: number;
+  subcategories: SubcategorySummary[];
 }
 
 export interface DashboardSummary {
@@ -57,6 +65,7 @@ export interface PlanSubcategory {
   id: number;
   categoryId: number;
   name: string;
+  allocatedAmount: string;
   pic: string;
   period: string;
 }

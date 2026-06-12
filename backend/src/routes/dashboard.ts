@@ -29,6 +29,11 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         .from(budgets)
         .where(eq(budgets.period, period));
 
+      const [subBudgetRow] = await db
+        .select({ total: sql<string>`coalesce(sum(${budgetSubcategories.allocatedAmount}), 0)` })
+        .from(budgetSubcategories)
+        .where(eq(budgetSubcategories.period, period));
+
       const [spentRow] = await db
         .select({ total: sql<string>`coalesce(sum(${transactions.cost}), 0)` })
         .from(transactions)
@@ -36,6 +41,10 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
 
       const allCategories = await db.select().from(categories).orderBy(categories.id);
       const periodBudgets = await db.select().from(budgets).where(eq(budgets.period, period));
+      const periodSubcategories = await db
+        .select()
+        .from(budgetSubcategories)
+        .where(eq(budgetSubcategories.period, period));
       const periodTransactions = await db
         .select()
         .from(transactions)
@@ -45,26 +54,56 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         periodBudgets.map((b) => [b.categoryId, toNumber(b.allocatedAmount)]),
       );
       const spentByCategory = new Map<number, number>();
+      const spentBySubKey = new Map<string, number>();
 
       for (const tx of periodTransactions) {
+        const cost = toNumber(tx.cost);
         const current = spentByCategory.get(tx.categoryId) ?? 0;
-        spentByCategory.set(tx.categoryId, current + toNumber(tx.cost));
+        spentByCategory.set(tx.categoryId, current + cost);
+
+        const sub = tx.subCategory?.trim();
+        if (sub) {
+          const key = `${tx.categoryId}|${sub.toLowerCase()}`;
+          spentBySubKey.set(key, (spentBySubKey.get(key) ?? 0) + cost);
+        }
+      }
+
+      const subsByCategory = new Map<number, typeof periodSubcategories>();
+      for (const sub of periodSubcategories) {
+        const list = subsByCategory.get(sub.categoryId) ?? [];
+        list.push(sub);
+        subsByCategory.set(sub.categoryId, list);
       }
 
       const totalIncome = roundMoney(toNumber(incomeRow?.total));
-      const totalBudgetAllocated = roundMoney(toNumber(budgetRow?.total));
+      const totalBudgetAllocated = roundMoney(
+        toNumber(budgetRow?.total) + toNumber(subBudgetRow?.total),
+      );
       const totalSpent = roundMoney(toNumber(spentRow?.total));
       const totalSisa = roundMoney(totalBudgetAllocated - totalSpent);
 
       const categoriesSummary = allCategories.map((cat) => {
         const allocated = roundMoney(allocatedByCategory.get(cat.id) ?? 0);
         const spent = roundMoney(spentByCategory.get(cat.id) ?? 0);
+        const subcategories = (subsByCategory.get(cat.id) ?? []).map((sub) => {
+          const subAllocated = roundMoney(toNumber(sub.allocatedAmount));
+          const subSpent = roundMoney(
+            spentBySubKey.get(`${cat.id}|${sub.name.toLowerCase()}`) ?? 0,
+          );
+          return {
+            name: sub.name,
+            allocated: subAllocated,
+            spent: subSpent,
+            sisa: roundMoney(subAllocated - subSpent),
+          };
+        });
         return {
           categoryId: cat.id,
           categoryName: cat.name,
           allocated,
           spent,
           sisa: roundMoney(allocated - spent),
+          subcategories,
         };
       });
 
