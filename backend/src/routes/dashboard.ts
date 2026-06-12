@@ -119,8 +119,12 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
 
       const reimbursements = txRows
         .map((tx) => {
+          const txPic = tx.pic?.trim() ?? '';
+          if (!txPic || !isValidPic(txPic)) return null;
+
           const plan = planPicByCategory.get(tx.categoryId);
-          if (!plan || plan.pic === tx.pic) return null;
+          if (!plan || plan.pic === txPic) return null;
+
           return {
             ...tx,
             planPic: plan.pic,
