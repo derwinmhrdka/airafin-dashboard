@@ -35,11 +35,11 @@ export function isAuthenticated(cookies: Cookies): boolean {
   return safeEqual(token, expectedToken());
 }
 
-export function setAuthCookie(cookies: Cookies): void {
+export function setAuthCookie(cookies: Cookies, secure = false): void {
   cookies.set(COOKIE_NAME, expectedToken(), {
     path: '/',
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure,
     sameSite: 'lax',
     maxAge: 60 * 60 * 24 * 365,
   });

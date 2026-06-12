@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { authenticate, setAuthCookie } from '$lib/server/auth';
 
-export const POST: RequestHandler = async ({ request, cookies }) => {
+export const POST: RequestHandler = async ({ request, cookies, url }) => {
   const body = await request.json().catch(() => ({}));
   const password = typeof body.password === 'string' ? body.password : '';
 
@@ -10,6 +10,6 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     return json({ error: 'Incorrect password' }, { status: 401 });
   }
 
-  setAuthCookie(cookies);
+  setAuthCookie(cookies, url.protocol === 'https:');
   return json({ ok: true });
 };
