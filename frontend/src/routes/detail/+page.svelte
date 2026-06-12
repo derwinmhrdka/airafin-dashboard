@@ -1,23 +1,25 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import PicBadge from '$lib/components/PicBadge.svelte';
   import { categoryStyle } from '$lib/categories';
   import {
     createTransaction,
     deleteTransaction,
     getCategories,
+    getPlan,
     getTransactions,
     updateTransaction,
   } from '$lib/api';
-  import { formatCurrency, formatDate } from '$lib/format';
+  import { formatAmountInput, formatCurrency, formatDate } from '$lib/format';
   import { periodFromUrl } from '$lib/period';
+  import { DEFAULT_PIC, PICS, type Pic } from '$lib/pics';
   import type { Category, Transaction } from '$lib/types';
 
-  const period = $derived(periodFromUrl($page.url.searchParams));
-  const pics = ['Derwin', 'Anggita'] as const;
+  const period = $derived(periodFromUrl(page.url.searchParams));
   const PAGE_SIZE = 5;
 
   let categories = $state<Category[]>([]);
+  let categoryPicById = $state<Record<number, Pic>>({});
   let transactions = $state<Transaction[]>([]);
   let total = $state(0);
   let hasMore = $state(false);
@@ -36,14 +38,20 @@
   let categoryId = $state(0);
   let detail = $state('');
   let cost = $state('');
-  let pic = $state<(typeof pics)[number]>('Derwin');
+  let pic = $state<Pic>(DEFAULT_PIC);
 
   let editingId = $state<number | null>(null);
   let editDate = $state('');
   let editCategoryId = $state(0);
   let editDetail = $state('');
   let editCost = $state('');
-  let editPic = $state<(typeof pics)[number]>('Derwin');
+  let editPic = $state<Pic>(DEFAULT_PIC);
+
+  function picForCategory(catId: number): Pic {
+    const fromPlan = categoryPicById[catId];
+    if (fromPlan && (PICS as readonly string[]).includes(fromPlan)) return fromPlan;
+    return DEFAULT_PIC;
+  }
 
   const filteredTransactions = $derived(
     transactions.filter((tx) => {
@@ -105,9 +113,15 @@
     error = '';
     loading = true;
     try {
-      const catRes = await getCategories();
+      const [catRes, plan] = await Promise.all([getCategories(), getPlan(activePeriod)]);
       categories = catRes.categories;
+      categoryPicById = Object.fromEntries(
+        plan.budgets
+          .filter((b) => b.pic && (PICS as readonly string[]).includes(b.pic))
+          .map((b) => [b.categoryId, b.pic as Pic]),
+      );
       if (!categoryId && categories.length) categoryId = categories[0].id;
+      pic = picForCategory(categoryId);
       await loadTransactions(activePeriod, true);
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load data';
@@ -130,13 +144,17 @@
     void loadData(period);
   });
 
+  $effect(() => {
+    if (categoryId) pic = picForCategory(categoryId);
+  });
+
   function startEdit(tx: Transaction) {
     editingId = tx.id;
     editDate = tx.date;
     editCategoryId = tx.categoryId;
     editDetail = tx.detail;
-    editCost = tx.cost;
-    editPic = tx.pic as (typeof pics)[number];
+    editCost = formatAmountInput(tx.cost);
+    editPic = tx.pic as Pic;
     error = '';
     success = '';
   }
@@ -156,7 +174,7 @@
         date,
         categoryId,
         detail,
-        cost: Number.parseFloat(cost),
+        cost: Math.round(Number.parseFloat(cost)),
         period,
         pic,
       });
@@ -187,7 +205,7 @@
         date: editDate,
         categoryId: editCategoryId,
         detail: editDetail,
-        cost: Number.parseFloat(editCost),
+        cost: Math.round(Number.parseFloat(editCost)),
         pic: editPic,
       });
       success = `Transaction #${editingId} updated${sheetsMessage(result.sheetsSync)}`;
@@ -230,7 +248,7 @@
 
 <section class="space-y-4">
   <form onsubmit={handleSubmit} class="space-y-3 border border-zinc-200 p-3 dark:border-zinc-800">
-    <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Quick Insert</h2>
+    <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Quick Insert · {period}</h2>
 
     <div class="grid grid-cols-2 gap-2">
       <label class="space-y-1">
@@ -246,11 +264,11 @@
         <span class="text-[11px] text-zinc-500">Cost</span>
         <input
           type="number"
-          inputmode="decimal"
+          inputmode="numeric"
           bind:value={cost}
           required
           min="0"
-          step="any"
+          step="1"
           placeholder="0"
           class="w-full border border-zinc-200 bg-white px-2 py-2 font-mono text-sm dark:border-zinc-800 dark:bg-black"
         />
@@ -287,7 +305,7 @@
         bind:value={pic}
         class="w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
       >
-        {#each pics as p}
+        {#each PICS as p}
           <option value={p}>{p}</option>
         {/each}
       </select>
@@ -338,11 +356,11 @@
           <span class="text-[11px] text-zinc-500">Cost</span>
           <input
             type="number"
-            inputmode="decimal"
+            inputmode="numeric"
             bind:value={editCost}
             required
             min="0"
-            step="any"
+            step="1"
             class="w-full border border-zinc-200 bg-white px-2 py-2 font-mono text-sm dark:border-zinc-800 dark:bg-black"
           />
         </label>
@@ -377,7 +395,7 @@
           bind:value={editPic}
           class="w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
         >
-          {#each pics as p}
+          {#each PICS as p}
             <option value={p}>{p}</option>
           {/each}
         </select>
@@ -439,7 +457,7 @@
             class="border border-zinc-200 bg-white px-1.5 py-1.5 text-[11px] dark:border-zinc-800 dark:bg-black"
           >
             <option value="">All PIC</option>
-            {#each pics as p}
+            {#each PICS as p}
               <option value={p}>{p}</option>
             {/each}
           </select>

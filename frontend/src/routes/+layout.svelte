@@ -1,9 +1,22 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import '../app.css';
   import PeriodSelector from '$lib/components/PeriodSelector.svelte';
   import TabNav from '$lib/components/TabNav.svelte';
+  import { currentPeriod, parsePeriodToDate } from '$lib/period';
 
   let { children } = $props();
+
+  // Keep ?period= in the URL so all tabs share the same month/year.
+  $effect(() => {
+    const raw = page.url.searchParams.get('period')?.trim();
+    if (raw && parsePeriodToDate(raw)) return;
+
+    const url = new URL(page.url);
+    url.searchParams.set('period', currentPeriod());
+    goto(`${url.pathname}${url.search}`, { replaceState: true, noScroll: true, keepFocus: true });
+  });
 </script>
 
 <svelte:head>

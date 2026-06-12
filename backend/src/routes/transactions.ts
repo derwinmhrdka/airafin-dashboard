@@ -1,13 +1,14 @@
-import { count, desc, eq } from 'drizzle-orm';
+import { count, desc, eq, and } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/index.js';
-import { categories, transactions } from '../db/schema.js';
+import { budgets, categories, transactions } from '../db/schema.js';
 import {
   appendTransactionToSheet,
   deleteTransactionFromSheet,
   updateTransactionInSheet,
 } from '../lib/google-sheets.js';
 import { requireApiToken } from '../middleware/api-token.js';
+import { isValidPic } from '../lib/pic.js';
 
 const VALID_PIC = ['Derwin', 'Anggita'] as const;
 const VALID_STATUS = ['Done', 'On Going', 'Not Yet'] as const;
@@ -163,7 +164,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
           date: body.date,
           categoryId: body.categoryId,
           detail: body.detail.trim(),
-          cost: body.cost.toFixed(2),
+          cost: String(Math.round(body.cost)),
           period: body.period.trim(),
           pic: body.pic,
           status,
@@ -225,7 +226,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
           date: body.date,
           categoryId: body.categoryId,
           detail: body.detail.trim(),
-          cost: body.cost.toFixed(2),
+          cost: String(Math.round(body.cost)),
           pic: body.pic,
         })
         .where(eq(transactions.id, id))
@@ -298,6 +299,64 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
       }
 
       return { transaction: updated };
+    },
+  );
+
+  /** Plan owner reimburses the PIC who paid — updates transaction PIC to plan PIC. */
+  app.patch<{ Params: { id: string } }>(
+    '/api/transactions/:id/reimburse',
+    async (request, reply) => {
+      const id = Number.parseInt(request.params.id, 10);
+
+      if (!Number.isFinite(id)) {
+        return reply.code(400).send({ error: 'Invalid transaction id' });
+      }
+
+      const existing = await getTransactionWithCategory(id);
+      if (!existing) {
+        return reply.code(404).send({ error: 'Transaction not found' });
+      }
+
+      const [budget] = await db
+        .select({ pic: budgets.pic })
+        .from(budgets)
+        .where(
+          and(
+            eq(budgets.categoryId, existing.categoryId),
+            eq(budgets.period, existing.period),
+          ),
+        )
+        .limit(1);
+
+      const planPic = budget?.pic?.trim() ?? '';
+      if (!planPic || !isValidPic(planPic)) {
+        return reply.code(400).send({ error: 'No plan PIC for this category' });
+      }
+
+      if (existing.pic === planPic) {
+        return reply.code(400).send({ error: 'Already settled' });
+      }
+
+      const [updated] = await db
+        .update(transactions)
+        .set({ pic: planPic })
+        .where(eq(transactions.id, id))
+        .returning();
+
+      if (!updated) {
+        return reply.code(404).send({ error: 'Transaction not found' });
+      }
+
+      const sheetsSync = await updateTransactionInSheet(
+        toSheetRow(updated, existing.categoryName),
+        toSheetRow(existing, existing.categoryName),
+      );
+
+      if (sheetsSync.status === 'failed') {
+        request.log.warn({ sheetsSync }, 'Reimburse updated in DB but Sheets sync failed');
+      }
+
+      return { transaction: updated, sheetsSync };
     },
   );
 }

@@ -63,7 +63,7 @@ export function shiftPeriod(period: string, deltaMonths: number): string {
 
 export function listYearOptions(
   anchor = new Date(),
-  yearsBefore = 3,
+  yearsBefore = 1,
   yearsAfter = 1,
 ): number[] {
   const years: number[] = [];
@@ -71,4 +71,16 @@ export function listYearOptions(
   const end = anchor.getFullYear() + yearsAfter;
   for (let y = end; y >= start; y--) years.push(y);
   return years;
+}
+
+/** Ensures the active period year is always selectable in the dropdown. */
+export function listYearOptionsForPeriod(
+  selectedYear: number,
+  anchor = new Date(),
+  yearsBefore = 1,
+  yearsAfter = 1,
+): number[] {
+  const years = new Set(listYearOptions(anchor, yearsBefore, yearsAfter));
+  years.add(selectedYear);
+  return [...years].sort((a, b) => b - a);
 }

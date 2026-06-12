@@ -1,24 +1,23 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import {
     MONTH_NAMES,
-    listYearOptions,
+    listYearOptionsForPeriod,
     periodFromParts,
     periodFromUrl,
     periodParts,
   } from '$lib/period';
 
-  const years = listYearOptions();
-
-  const period = $derived(periodFromUrl($page.url.searchParams));
+  const period = $derived(periodFromUrl(page.url.searchParams));
   const parts = $derived(periodParts(period));
+  const years = $derived(listYearOptionsForPeriod(parts.year));
 
   const selectClass =
     'w-full appearance-none border border-zinc-200 bg-white py-2 pl-2.5 pr-7 text-xs font-medium dark:border-zinc-800 dark:bg-black';
 
   function setParts(month: number, year: number) {
-    const url = new URL($page.url);
+    const url = new URL(page.url);
     url.searchParams.set('period', periodFromParts(month, year));
     goto(`${url.pathname}${url.search}`, { replaceState: true, keepFocus: true, noScroll: true });
   }
@@ -79,3 +78,7 @@
     </div>
   </label>
 </div>
+
+<p class="mt-2 text-[10px] text-zinc-500">
+  Viewing <span class="font-medium text-zinc-700 dark:text-zinc-300">{period}</span>
+</p>

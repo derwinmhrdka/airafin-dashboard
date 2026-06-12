@@ -1,7 +1,8 @@
-import { eq, sql } from 'drizzle-orm';
+import { and, desc, eq, ne, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/index.js';
 import { budgets, categories, incomes, transactions } from '../db/schema.js';
+import { isValidPic } from '../lib/pic.js';
 import { roundMoney, toNumber } from '../lib/money.js';
 
 export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
@@ -71,6 +72,63 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         totalSisa,
         categories: categoriesSummary,
       };
+    },
+  );
+
+  app.get<{ Querystring: { period?: string } }>(
+    '/api/dashboard/reimbursements',
+    async (request, reply) => {
+      const period = request.query.period?.trim();
+
+      if (!period) {
+        return reply.code(400).send({ error: 'period query parameter is required' });
+      }
+
+      const budgetRows = await db
+        .select({
+          categoryId: budgets.categoryId,
+          categoryName: categories.name,
+          planPic: budgets.pic,
+        })
+        .from(budgets)
+        .innerJoin(categories, eq(budgets.categoryId, categories.id))
+        .where(and(eq(budgets.period, period), ne(budgets.pic, '')));
+
+      const planPicByCategory = new Map(
+        budgetRows
+          .filter((b) => isValidPic(b.planPic))
+          .map((b) => [b.categoryId, { pic: b.planPic, categoryName: b.categoryName }]),
+      );
+
+      const txRows = await db
+        .select({
+          id: transactions.id,
+          date: transactions.date,
+          categoryId: transactions.categoryId,
+          categoryName: categories.name,
+          detail: transactions.detail,
+          cost: transactions.cost,
+          period: transactions.period,
+          pic: transactions.pic,
+          status: transactions.status,
+        })
+        .from(transactions)
+        .innerJoin(categories, eq(transactions.categoryId, categories.id))
+        .where(eq(transactions.period, period))
+        .orderBy(desc(transactions.id));
+
+      const reimbursements = txRows
+        .map((tx) => {
+          const plan = planPicByCategory.get(tx.categoryId);
+          if (!plan || plan.pic === tx.pic) return null;
+          return {
+            ...tx,
+            planPic: plan.pic,
+          };
+        })
+        .filter((row) => row != null);
+
+      return { period, reimbursements };
     },
   );
 }

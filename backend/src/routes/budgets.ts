@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/index.js';
 import { budgets, categories, incomes } from '../db/schema.js';
+import { isValidPic } from '../lib/pic.js';
 
 interface IncomeInput {
   source: string;
@@ -11,6 +12,7 @@ interface IncomeInput {
 interface BudgetInput {
   categoryId: number;
   allocatedAmount: number;
+  pic?: string;
 }
 
 interface PlanBody {
@@ -37,6 +39,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
           categoryId: budgets.categoryId,
           categoryName: categories.name,
           allocatedAmount: budgets.allocatedAmount,
+          pic: budgets.pic,
           period: budgets.period,
         })
         .from(budgets)
@@ -67,12 +70,12 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
           .insert(incomes)
           .values({
             source: income.source.trim(),
-            amount: income.amount.toFixed(2),
+            amount: String(Math.round(income.amount)),
             period: trimmedPeriod,
           })
           .onConflictDoUpdate({
             target: [incomes.source, incomes.period],
-            set: { amount: income.amount.toFixed(2) },
+            set: { amount: String(Math.round(income.amount)) },
           });
       }
     }
@@ -95,16 +98,24 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
           return reply.code(400).send({ error: `Category ${budget.categoryId} not found` });
         }
 
+        const pic = budget.pic?.trim() ?? '';
+        if (pic && !isValidPic(pic)) {
+          return reply.code(400).send({ error: 'Invalid pic value' });
+        }
+
+        const amount = String(Math.round(budget.allocatedAmount));
+
         await db
           .insert(budgets)
           .values({
             categoryId: budget.categoryId,
-            allocatedAmount: budget.allocatedAmount.toFixed(2),
+            allocatedAmount: amount,
+            pic,
             period: trimmedPeriod,
           })
           .onConflictDoUpdate({
             target: [budgets.categoryId, budgets.period],
-            set: { allocatedAmount: budget.allocatedAmount.toFixed(2) },
+            set: { allocatedAmount: amount, pic },
           });
       }
     }

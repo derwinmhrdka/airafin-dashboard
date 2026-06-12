@@ -32,6 +32,10 @@ export interface Transaction {
   status: string;
 }
 
+export interface ReimbursementItem extends Transaction {
+  planPic: string;
+}
+
 export interface PlanIncome {
   id: number;
   source: string;
@@ -44,6 +48,7 @@ export interface PlanBudget {
   categoryId: number;
   categoryName: string;
   allocatedAmount: string;
+  pic: string;
   period: string;
 }
 

@@ -1,13 +1,14 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { createCategory, getCategories, getPlan, savePlan } from '$lib/api';
-  import { formatCurrency } from '$lib/format';
+  import { formatAmountInput, formatCurrency } from '$lib/format';
   import { periodFromUrl } from '$lib/period';
+  import { DEFAULT_PIC, PICS, type Pic } from '$lib/pics';
   import type { Category } from '$lib/types';
 
   const DEFAULT_INCOMES = ['Gaji Derwin', 'Gaji Anggita'] as const;
 
-  const period = $derived(periodFromUrl($page.url.searchParams));
+  const period = $derived(periodFromUrl(page.url.searchParams));
 
   interface IncomeRow {
     key: string;
@@ -18,6 +19,7 @@
   let categories = $state<Category[]>([]);
   let incomeRows = $state<IncomeRow[]>([]);
   let budgetInputs = $state<Record<number, string>>({});
+  let picInputs = $state<Record<number, Pic>>({});
   let newCategoryName = $state('');
   let loading = $state(true);
   let saving = $state(false);
@@ -57,14 +59,24 @@
           ? plan.incomes.map((income, i) => ({
               key: `loaded-${income.id ?? i}`,
               source: income.source,
-              amount: income.amount,
+              amount: formatAmountInput(income.amount),
             }))
           : defaultIncomeRows();
 
       const inputs: Record<number, string> = {};
-      for (const cat of categories) inputs[cat.id] = '';
-      for (const b of plan.budgets) inputs[b.categoryId] = b.allocatedAmount;
+      const pics: Record<number, Pic> = {};
+      for (const cat of categories) {
+        inputs[cat.id] = '';
+        pics[cat.id] = DEFAULT_PIC;
+      }
+      for (const b of plan.budgets) {
+        inputs[b.categoryId] = formatAmountInput(b.allocatedAmount);
+        if (b.pic && (PICS as readonly string[]).includes(b.pic)) {
+          pics[b.categoryId] = b.pic as Pic;
+        }
+      }
       budgetInputs = inputs;
+      picInputs = pics;
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load plan';
     } finally {
@@ -86,6 +98,7 @@
       const { category } = await createCategory(name);
       categories = [...categories, category];
       budgetInputs = { ...budgetInputs, [category.id]: '' };
+      picInputs = { ...picInputs, [category.id]: DEFAULT_PIC };
       newCategoryName = '';
       success = `Category "${category.name}" added`;
     } catch (e) {
@@ -104,14 +117,15 @@
     const incomes = incomeRows
       .map((row) => ({
         source: row.source.trim(),
-        amount: Number.parseFloat(row.amount || '0'),
+        amount: Math.round(Number.parseFloat(row.amount || '0')),
       }))
       .filter((row) => row.source && row.amount > 0);
 
     const budgets = categories
       .map((cat) => ({
         categoryId: cat.id,
-        allocatedAmount: Number.parseFloat(budgetInputs[cat.id] || '0'),
+        allocatedAmount: Math.round(Number.parseFloat(budgetInputs[cat.id] || '0')),
+        pic: picInputs[cat.id] ?? DEFAULT_PIC,
       }))
       .filter((b) => b.allocatedAmount > 0);
 
@@ -159,9 +173,10 @@
               <span class="text-[11px] text-zinc-500">Amount</span>
               <input
                 type="number"
-                inputmode="decimal"
+                inputmode="numeric"
                 bind:value={row.amount}
                 min="0"
+                step="1"
                 placeholder="0"
                 class="w-full border border-zinc-200 bg-white px-2 py-2 font-mono text-sm dark:border-zinc-800 dark:bg-black"
               />
@@ -198,18 +213,37 @@
           Budget per Category
         </legend>
 
+        <div
+          class="grid grid-cols-[minmax(0,1fr)_5.5rem_6.5rem] gap-x-2 gap-y-1 border-b border-zinc-200 pb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-500 dark:border-zinc-800"
+        >
+          <span>Category</span>
+          <span class="text-center">PIC</span>
+          <span class="text-right">Budget</span>
+        </div>
+
         {#each categories as cat (cat.id)}
-          <label class="flex items-center justify-between gap-3">
-            <span class="text-sm">{cat.name}</span>
+          <div class="grid grid-cols-[minmax(0,1fr)_5.5rem_6.5rem] items-center gap-x-2 gap-y-2">
+            <span class="truncate text-sm">{cat.name}</span>
+            <select
+              bind:value={picInputs[cat.id]}
+              class="border border-zinc-200 bg-white px-1 py-1.5 text-center text-[11px] dark:border-zinc-800 dark:bg-black"
+              aria-label="PIC for {cat.name}"
+            >
+              {#each PICS as p}
+                <option value={p}>{p}</option>
+              {/each}
+            </select>
             <input
               type="number"
-              inputmode="decimal"
+              inputmode="numeric"
               bind:value={budgetInputs[cat.id]}
               min="0"
+              step="1"
               placeholder="0"
-              class="w-32 border border-zinc-200 bg-white px-2 py-1.5 text-right font-mono text-sm dark:border-zinc-800 dark:bg-black"
+              aria-label="Budget for {cat.name}"
+              class="w-full border border-zinc-200 bg-white px-2 py-1.5 text-right font-mono text-sm dark:border-zinc-800 dark:bg-black"
             />
-          </label>
+          </div>
         {/each}
 
         <div class="flex gap-2 pt-1">

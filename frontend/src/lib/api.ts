@@ -1,5 +1,5 @@
 import { env } from '$env/dynamic/public';
-import type { Category, DashboardSummary, PlanData, Transaction } from './types';
+import type { Category, DashboardSummary, PlanData, ReimbursementItem, Transaction } from './types';
 
 function apiBase(): string {
   return env.PUBLIC_API_URL ?? '';
@@ -24,6 +24,19 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
 
 export function getSummary(period: string): Promise<DashboardSummary> {
   return fetchJson(`/api/dashboard/summary?period=${encodeURIComponent(period)}`);
+}
+
+export function getReimbursements(
+  period: string,
+): Promise<{ period: string; reimbursements: ReimbursementItem[] }> {
+  return fetchJson(`/api/dashboard/reimbursements?period=${encodeURIComponent(period)}`);
+}
+
+export function markReimbursementPaid(id: number): Promise<{
+  transaction: Transaction;
+  sheetsSync?: { status: 'synced' | 'skipped' | 'failed'; error?: string };
+}> {
+  return fetchJson(`/api/transactions/${id}/reimburse`, { method: 'PATCH' });
 }
 
 export function getCategories(): Promise<{ categories: Category[] }> {
@@ -109,7 +122,7 @@ export function updateTransactionStatus(
 export function savePlan(body: {
   period: string;
   incomes?: { source: string; amount: number }[];
-  budgets?: { categoryId: number; allocatedAmount: number }[];
+  budgets?: { categoryId: number; allocatedAmount: number; pic?: string }[];
 }): Promise<{ ok: boolean }> {
   return fetchJson('/api/budgets', {
     method: 'POST',

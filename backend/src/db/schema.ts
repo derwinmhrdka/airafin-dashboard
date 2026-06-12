@@ -32,6 +32,7 @@ export const budgets = pgTable(
       .notNull()
       .references(() => categories.id),
     allocatedAmount: numeric('allocated_amount', { precision: 14, scale: 2 }).notNull(),
+    pic: text('pic').notNull().default(''),
     period: text('period').notNull(),
   },
   (table) => [uniqueIndex('budgets_category_period_idx').on(table.categoryId, table.period)],

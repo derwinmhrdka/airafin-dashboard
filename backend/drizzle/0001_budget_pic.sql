@@ -1,0 +1,1 @@
+ALTER TABLE "budgets" ADD COLUMN IF NOT EXISTS "pic" text NOT NULL DEFAULT '';

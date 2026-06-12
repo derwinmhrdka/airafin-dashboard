@@ -1,40 +1,32 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import CategoryProgress from '$lib/components/CategoryProgress.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
   import StatCard from '$lib/components/StatCard.svelte';
-  import { getSummary, getTransactions, updateTransactionStatus } from '$lib/api';
+  import { getReimbursements, getSummary, markReimbursementPaid } from '$lib/api';
   import { formatCurrency } from '$lib/format';
   import { periodFromUrl } from '$lib/period';
-  import type { DashboardSummary, Transaction } from '$lib/types';
+  import { picInitial } from '$lib/pics';
+  import type { DashboardSummary, ReimbursementItem } from '$lib/types';
 
-  const statuses = ['Done', 'On Going', 'Not Yet'] as const;
-
-  const period = $derived(periodFromUrl($page.url.searchParams));
+  const period = $derived(periodFromUrl(page.url.searchParams));
 
   let summary = $state<DashboardSummary | null>(null);
-  let transactions = $state<Transaction[]>([]);
+  let reimbursements = $state<ReimbursementItem[]>([]);
   let loading = $state(true);
   let error = $state('');
-  let filterStatus = $state('');
-  let updatingId = $state<number | null>(null);
-
-  const filteredTransactions = $derived(
-    filterStatus
-      ? transactions.filter((tx) => tx.status === filterStatus)
-      : transactions,
-  );
+  let payingId = $state<number | null>(null);
 
   async function loadData(activePeriod: string) {
     loading = true;
     error = '';
     try {
-      const [summaryRes, txRes] = await Promise.all([
+      const [summaryRes, reimbRes] = await Promise.all([
         getSummary(activePeriod),
-        getTransactions(activePeriod),
+        getReimbursements(activePeriod),
       ]);
       summary = summaryRes;
-      transactions = txRes.transactions;
+      reimbursements = reimbRes.reimbursements;
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load summary';
     } finally {
@@ -46,15 +38,16 @@
     void loadData(period);
   });
 
-  async function handleStatusChange(id: number, status: string) {
-    updatingId = id;
+  async function handlePaid(item: ReimbursementItem) {
+    payingId = item.id;
+    error = '';
     try {
-      const { transaction } = await updateTransactionStatus(id, status);
-      transactions = transactions.map((tx) => (tx.id === id ? { ...tx, status: transaction.status } : tx));
+      await markReimbursementPaid(item.id);
+      reimbursements = reimbursements.filter((r) => r.id !== item.id);
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to update status';
+      error = e instanceof Error ? e.message : 'Failed to mark as paid';
     } finally {
-      updatingId = null;
+      payingId = null;
     }
   }
 </script>
@@ -102,44 +95,43 @@
     </div>
 
     <div class="space-y-2">
-      <div class="flex items-center justify-between gap-2">
-        <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Status</h2>
-        <select
-          bind:value={filterStatus}
-          class="border border-zinc-200 bg-white px-2 py-1 text-[11px] dark:border-zinc-800 dark:bg-black"
-        >
-          <option value="">All</option>
-          {#each statuses as s}
-            <option value={s}>{s}</option>
-          {/each}
-        </select>
-      </div>
+      <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Reimbursements</h2>
+      <p class="text-[10px] text-zinc-500">
+        Plan PIC paid by someone else — mark Paid when settled (updates PIC in Detail).
+      </p>
 
-      {#if filteredTransactions.length === 0}
+      {#if reimbursements.length === 0}
         <p class="border border-dashed border-zinc-200 px-3 py-4 text-center text-sm text-zinc-500 dark:border-zinc-800">
-          No transactions for this status.
+          No pending reimbursements.
         </p>
       {:else}
         <div class="divide-y divide-zinc-100 border border-zinc-200 dark:divide-zinc-900 dark:border-zinc-800">
-          {#each filteredTransactions as tx (tx.id)}
+          {#each reimbursements as item (item.id)}
             <div class="flex items-center gap-2 px-3 py-2.5">
               <div class="min-w-0 flex-1">
-                <p class="truncate text-sm">{tx.detail}</p>
+                <p class="truncate text-sm">{item.detail}</p>
                 <p class="font-mono text-[11px] tabular-nums text-zinc-500">
-                  {formatCurrency(tx.cost)} · {tx.categoryName}
+                  {formatCurrency(item.cost)} · {item.categoryName}
+                </p>
+                <p class="mt-0.5 flex items-center gap-1 text-[10px] text-zinc-500">
+                  <span>Plan {picInitial(item.planPic)}</span>
+                  <span aria-hidden="true">→</span>
+                  <span>Paid {picInitial(item.pic)}</span>
                 </p>
               </div>
-              <PicBadge name={tx.pic} />
-              <select
-                value={tx.status}
-                disabled={updatingId === tx.id}
-                onchange={(e) => handleStatusChange(tx.id, e.currentTarget.value)}
-                class="max-w-[5.5rem] border border-zinc-200 bg-white px-1 py-1 text-[10px] dark:border-zinc-800 dark:bg-black"
+              <div class="flex shrink-0 items-center gap-1">
+                <PicBadge name={item.planPic} />
+                <span class="text-[10px] text-zinc-400">→</span>
+                <PicBadge name={item.pic} />
+              </div>
+              <button
+                type="button"
+                disabled={payingId === item.id}
+                onclick={() => handlePaid(item)}
+                class="shrink-0 border border-zinc-300 px-2 py-1 text-[10px] font-medium disabled:opacity-50 dark:border-zinc-600"
               >
-                {#each statuses as s}
-                  <option value={s}>{s}</option>
-                {/each}
-              </select>
+                {payingId === item.id ? '…' : 'Paid'}
+              </button>
             </div>
           {/each}
         </div>
