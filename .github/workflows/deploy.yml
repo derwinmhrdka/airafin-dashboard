@@ -23,5 +23,12 @@ jobs:
             APP_DIR="${{ secrets.VPS_APP_DIR }}"
             if [ -z "$APP_DIR" ]; then APP_DIR="/apps/airafin-dashboard"; fi
             cd "$APP_DIR"
+            # Bootstrap: first deploy may run before deploy/ exists on the VPS
+            if [ ! -f deploy/git-sync.sh ]; then
+              echo "==> Bootstrap: pulling latest main (deploy scripts not on VPS yet)..."
+              git fetch origin main
+              git checkout main
+              git reset --hard origin/main
+            fi
             bash deploy/git-sync.sh
             bash deploy/docker-deploy.sh
