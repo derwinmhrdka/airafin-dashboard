@@ -1,4 +1,4 @@
-import { count, desc, eq, and } from 'drizzle-orm';
+import { count, desc, eq, and, ilike, type SQL } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/index.js';
 import { budgets, categories, transactions } from '../db/schema.js';
@@ -58,6 +58,37 @@ function toSheetRow(
   };
 }
 
+function transactionListFilters(query: {
+  period?: string;
+  categoryId?: string;
+  pic?: string;
+  search?: string;
+}): SQL | undefined {
+  const conditions: SQL[] = [];
+
+  if (query.period) {
+    conditions.push(eq(transactions.period, query.period));
+  }
+
+  const categoryId = Number.parseInt(query.categoryId ?? '', 10);
+  if (Number.isFinite(categoryId) && categoryId > 0) {
+    conditions.push(eq(transactions.categoryId, categoryId));
+  }
+
+  const pic = query.pic?.trim();
+  if (pic && isValidPic(pic)) {
+    conditions.push(eq(transactions.pic, pic));
+  }
+
+  const search = query.search?.trim();
+  if (search) {
+    const escaped = search.replace(/[%_\\]/g, '\\$&');
+    conditions.push(ilike(transactions.detail, `%${escaped}%`));
+  }
+
+  return conditions.length ? and(...conditions) : undefined;
+}
+
 async function getTransactionWithCategory(id: number) {
   const [row] = await db
     .select({
@@ -80,13 +111,23 @@ async function getTransactionWithCategory(id: number) {
 }
 
 export async function transactionRoutes(app: FastifyInstance): Promise<void> {
-  app.get<{ Querystring: { period?: string; limit?: string; offset?: string } }>(
+  app.get<{
+    Querystring: {
+      period?: string;
+      limit?: string;
+      offset?: string;
+      categoryId?: string;
+      pic?: string;
+      search?: string;
+    };
+  }>(
     '/api/transactions',
     async (request) => {
-      const period = request.query.period;
+      const { period, categoryId, pic, search } = request.query;
       const limit = Math.min(Math.max(Number.parseInt(request.query.limit ?? '50', 10) || 50, 1), 200);
       const offset = Math.max(Number.parseInt(request.query.offset ?? '0', 10) || 0, 0);
-      const periodFilter = period ? eq(transactions.period, period) : undefined;
+      const where = transactionListFilters({ period, categoryId, pic, search });
+      const periodOnly = period ? eq(transactions.period, period) : undefined;
 
       const rows = await db
         .select({
@@ -102,7 +143,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
         })
         .from(transactions)
         .innerJoin(categories, eq(transactions.categoryId, categories.id))
-        .where(periodFilter)
+        .where(where)
         .orderBy(desc(transactions.id))
         .limit(limit)
         .offset(offset);
@@ -110,13 +151,20 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
       const [totalRow] = await db
         .select({ total: count() })
         .from(transactions)
-        .where(periodFilter);
+        .where(where);
+
+      const [monthTotalRow] = await db
+        .select({ total: count() })
+        .from(transactions)
+        .where(periodOnly);
 
       const total = totalRow?.total ?? 0;
+      const monthTotal = monthTotalRow?.total ?? 0;
 
       return {
         transactions: rows,
         total,
+        monthTotal,
         hasMore: offset + rows.length < total,
       };
     },

@@ -24,6 +24,7 @@
   let categoryPicById = $state<Record<number, Pic>>({});
   let transactions = $state<Transaction[]>([]);
   let total = $state(0);
+  let monthTotal = $state(0);
   let hasMore = $state(false);
   let loading = $state(true);
   let loadingMore = $state(false);
@@ -35,6 +36,8 @@
   let filterCategory = $state('');
   let filterPic = $state('');
   let filterSearch = $state('');
+  let debouncedSearch = $state('');
+  let filtersReady = $state(false);
 
   let date = $state(new Date().toISOString().slice(0, 10));
   let categoryId = $state(0);
@@ -51,26 +54,23 @@
     return DEFAULT_PIC;
   }
 
-  const filteredTransactions = $derived(
-    transactions.filter((tx) => {
-      if (filterCategory && tx.categoryId !== Number(filterCategory)) return false;
-      if (filterPic && tx.pic !== filterPic) return false;
-      if (filterSearch.trim()) {
-        const q = filterSearch.trim().toLowerCase();
-        if (!tx.detail.toLowerCase().includes(q)) return false;
-      }
-      return true;
-    }),
+  const hasActiveFilters = $derived(
+    Boolean(filterCategory || filterPic || debouncedSearch.trim()),
   );
 
-  const hasActiveFilters = $derived(
-    Boolean(filterCategory || filterPic || filterSearch.trim()),
-  );
+  function currentFilters() {
+    return {
+      categoryId: filterCategory || undefined,
+      pic: filterPic || undefined,
+      search: debouncedSearch.trim() || undefined,
+    };
+  }
 
   function clearFilters() {
     filterCategory = '';
     filterPic = '';
     filterSearch = '';
+    debouncedSearch = '';
   }
 
   function picDiffersFromPlan(tx: Transaction): boolean {
@@ -107,12 +107,14 @@
       const txRes = await getTransactions(activePeriod, {
         limit: PAGE_SIZE,
         offset: reset ? 0 : transactions.length,
+        ...currentFilters(),
       });
 
       transactions = reset
         ? txRes.transactions
         : [...transactions, ...txRes.transactions];
       total = txRes.total;
+      monthTotal = txRes.monthTotal;
       hasMore = txRes.hasMore;
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load transactions';
@@ -155,6 +157,25 @@
 
   $effect(() => {
     void loadData(period);
+  });
+
+  $effect(() => {
+    const q = filterSearch;
+    const timer = setTimeout(() => {
+      debouncedSearch = q;
+    }, 300);
+    return () => clearTimeout(timer);
+  });
+
+  $effect(() => {
+    filterCategory;
+    filterPic;
+    debouncedSearch;
+    if (!filtersReady) {
+      filtersReady = true;
+      return;
+    }
+    void loadTransactions(period, true);
   });
 
   $effect(() => {
@@ -240,6 +261,7 @@
       }
       transactions = transactions.filter((tx) => tx.id !== id);
       total = Math.max(0, total - 1);
+      monthTotal = Math.max(0, monthTotal - 1);
       hasMore = transactions.length < total;
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to delete';
@@ -376,7 +398,7 @@
       {/if}
     </div>
 
-    {#if !loading && total > 0}
+    {#if !loading && (monthTotal > 0 || hasActiveFilters)}
       <div class="space-y-2 border border-zinc-200 p-2 dark:border-zinc-800">
         <input
           type="search"
@@ -405,18 +427,21 @@
           </select>
         </div>
         <p class="text-[10px] text-zinc-500">
-          {filteredTransactions.length} shown · loaded {transactions.length} of {total}
+          {transactions.length} loaded of {total}{hasActiveFilters ? ' matching' : ''}
+          {#if hasActiveFilters && monthTotal > total}
+            · {monthTotal} total this month
+          {/if}
         </p>
       </div>
     {/if}
 
     {#if loading}
       <div class="h-32 animate-pulse border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900"></div>
-    {:else if total === 0}
+    {:else if monthTotal === 0}
       <p class="border border-dashed border-zinc-200 px-3 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800">
         No transactions this month.
       </p>
-    {:else if filteredTransactions.length === 0}
+    {:else if total === 0}
       <p class="border border-dashed border-zinc-200 px-3 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800">
         No transactions match your filters.
       </p>
@@ -434,7 +459,7 @@
             </tr>
           </thead>
           <tbody>
-            {#each filteredTransactions as tx}
+            {#each transactions as tx}
               {@const style = categoryStyle(tx.categoryName)}
               {@const picMismatch = picDiffersFromPlan(tx)}
               <tr

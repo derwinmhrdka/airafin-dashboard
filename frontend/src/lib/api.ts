@@ -52,13 +52,24 @@ export function createCategory(name: string): Promise<{ category: Category }> {
   });
 }
 
+export interface TransactionFilters {
+  limit?: number;
+  offset?: number;
+  categoryId?: string;
+  pic?: string;
+  search?: string;
+}
+
 export function getTransactions(
   period: string,
-  opts?: { limit?: number; offset?: number },
-): Promise<{ transactions: Transaction[]; total: number; hasMore: boolean }> {
+  opts?: TransactionFilters,
+): Promise<{ transactions: Transaction[]; total: number; monthTotal: number; hasMore: boolean }> {
   const params = new URLSearchParams({ period });
   if (opts?.limit != null) params.set('limit', String(opts.limit));
   if (opts?.offset != null) params.set('offset', String(opts.offset));
+  if (opts?.categoryId) params.set('categoryId', opts.categoryId);
+  if (opts?.pic) params.set('pic', opts.pic);
+  if (opts?.search?.trim()) params.set('search', opts.search.trim());
   return fetchJson(`/api/transactions?${params}`);
 }
 
