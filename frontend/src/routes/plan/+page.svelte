@@ -3,9 +3,15 @@
   import { createCategory, getCategories, getPlan, savePlan } from '$lib/api';
   import AmountInput from '$lib/components/AmountInput.svelte';
   import { formatAmountInput, formatCurrency, parseAmountInput } from '$lib/format';
-  import { periodFromUrl } from '$lib/period';
+  import {
+    listYearOptionsForPeriod,
+    MONTH_NAMES,
+    periodFromParts,
+    periodFromUrl,
+    periodParts,
+  } from '$lib/period';
   import { DEFAULT_PIC, PICS, picInitial, type Pic } from '$lib/pics';
-  import type { Category } from '$lib/types';
+  import type { Category, PlanData } from '$lib/types';
 
   const DEFAULT_INCOMES = ['Gaji Derwin', 'Gaji Anggita'] as const;
 
@@ -41,6 +47,15 @@
   let addingCategory = $state(false);
   let error = $state('');
   let success = $state('');
+  let copyOpen = $state(false);
+  let copyMonth = $state(0);
+  let copyYear = $state(new Date().getFullYear());
+  let copying = $state(false);
+
+  const copyYears = $derived(listYearOptionsForPeriod(copyYear));
+
+  const selectClass =
+    'w-full appearance-none border border-zinc-200 bg-white py-2 pl-2.5 pr-7 text-xs font-medium dark:border-zinc-800 dark:bg-black';
 
   function defaultIncomeRows(): IncomeRow[] {
     return DEFAULT_INCOMES.map((source, i) => ({
@@ -61,6 +76,86 @@
     incomeRows = incomeRows.filter((row) => row.key !== key);
   }
 
+  function applyPlanToForm(plan: PlanData) {
+    incomeRows =
+      plan.incomes.length > 0
+        ? plan.incomes.map((income, i) => ({
+            key: `copied-${income.id ?? i}-${Date.now()}`,
+            source: income.source,
+            amount: formatAmountInput(income.amount),
+          }))
+        : defaultIncomeRows();
+
+    const inputs: Record<number, string> = {};
+    const pics: Record<number, Pic> = {};
+    const subs: Record<number, SubcategoryRow[]> = {};
+    for (const cat of categories) {
+      inputs[cat.id] = '';
+      pics[cat.id] = DEFAULT_PIC;
+      subs[cat.id] = [];
+    }
+    for (const b of plan.budgets) {
+      inputs[b.categoryId] = formatAmountInput(b.allocatedAmount);
+      if (b.pic && (PICS as readonly string[]).includes(b.pic)) {
+        pics[b.categoryId] = b.pic as Pic;
+      }
+    }
+    for (const sub of plan.subcategories ?? []) {
+      if (!subs[sub.categoryId]) subs[sub.categoryId] = [];
+      subs[sub.categoryId].push({
+        key: `copied-${sub.id}-${Date.now()}`,
+        name: sub.name,
+        amount: formatAmountInput(sub.allocatedAmount ?? ''),
+        pic:
+          sub.pic && (PICS as readonly string[]).includes(sub.pic)
+            ? (sub.pic as Pic)
+            : DEFAULT_PIC,
+      });
+    }
+    budgetInputs = inputs;
+    picInputs = pics;
+    subcategoryInputs = subs;
+  }
+
+  function defaultCopySourceParts(): { month: number; year: number } {
+    const parts = periodParts(period);
+    if (parts.month === 0) {
+      return { month: 11, year: parts.year - 1 };
+    }
+    return { month: parts.month - 1, year: parts.year };
+  }
+
+  function openCopyPanel() {
+    const defaults = defaultCopySourceParts();
+    copyMonth = defaults.month;
+    copyYear = defaults.year;
+    copyOpen = true;
+    error = '';
+    success = '';
+  }
+
+  async function handleCopyPlan() {
+    const sourcePeriod = periodFromParts(copyMonth, copyYear);
+    if (sourcePeriod === period) {
+      error = 'Choose a different month than the current plan.';
+      return;
+    }
+
+    copying = true;
+    error = '';
+    success = '';
+    try {
+      const plan = await getPlan(sourcePeriod);
+      applyPlanToForm(plan);
+      copyOpen = false;
+      success = `Copied plan from ${sourcePeriod}. Review and click Save Plan to apply.`;
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to copy plan';
+    } finally {
+      copying = false;
+    }
+  }
+
   async function loadData(activePeriod: string) {
     loading = true;
     error = '';
@@ -68,45 +163,7 @@
     try {
       const [catRes, plan] = await Promise.all([getCategories(), getPlan(activePeriod)]);
       categories = catRes.categories;
-
-      incomeRows =
-        plan.incomes.length > 0
-          ? plan.incomes.map((income, i) => ({
-              key: `loaded-${income.id ?? i}`,
-              source: income.source,
-              amount: formatAmountInput(income.amount),
-            }))
-          : defaultIncomeRows();
-
-      const inputs: Record<number, string> = {};
-      const pics: Record<number, Pic> = {};
-      const subs: Record<number, SubcategoryRow[]> = {};
-      for (const cat of categories) {
-        inputs[cat.id] = '';
-        pics[cat.id] = DEFAULT_PIC;
-        subs[cat.id] = [];
-      }
-      for (const b of plan.budgets) {
-        inputs[b.categoryId] = formatAmountInput(b.allocatedAmount);
-        if (b.pic && (PICS as readonly string[]).includes(b.pic)) {
-          pics[b.categoryId] = b.pic as Pic;
-        }
-      }
-      for (const sub of plan.subcategories ?? []) {
-        if (!subs[sub.categoryId]) subs[sub.categoryId] = [];
-        subs[sub.categoryId].push({
-          key: `loaded-${sub.id}`,
-          name: sub.name,
-          amount: formatAmountInput(sub.allocatedAmount ?? ''),
-          pic:
-            sub.pic && (PICS as readonly string[]).includes(sub.pic)
-              ? (sub.pic as Pic)
-              : DEFAULT_PIC,
-        });
-      }
-      budgetInputs = inputs;
-      picInputs = pics;
-      subcategoryInputs = subs;
+      applyPlanToForm(plan);
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load plan';
     } finally {
@@ -213,7 +270,80 @@
   {#if loading}
     <div class="h-48 animate-pulse border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900"></div>
   {:else}
-    <p class="text-[11px] uppercase tracking-wider text-zinc-500">Plan · {period}</p>
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <p class="text-[11px] uppercase tracking-wider text-zinc-500">Plan · {period}</p>
+      <button
+        type="button"
+        onclick={openCopyPanel}
+        class="border border-zinc-300 px-2.5 py-1 text-[11px] font-medium dark:border-zinc-600"
+      >
+        Copy Plan
+      </button>
+    </div>
+
+    {#if copyOpen}
+      <div class="space-y-3 border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
+        <p class="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+          Copy plan into <span class="font-mono">{period}</span> from
+        </p>
+        <div class="grid grid-cols-2 gap-2">
+          <label class="block min-w-0">
+            <span class="mb-1 block text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+              Month
+            </span>
+            <div class="relative">
+              <select bind:value={copyMonth} class={selectClass} aria-label="Copy from month">
+                {#each MONTH_NAMES as name, index}
+                  <option value={index}>{name}</option>
+                {/each}
+              </select>
+              <span
+                class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-zinc-400"
+                aria-hidden="true"
+              >▼</span>
+            </div>
+          </label>
+          <label class="block min-w-0">
+            <span class="mb-1 block text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+              Year
+            </span>
+            <div class="relative">
+              <select bind:value={copyYear} class={selectClass} aria-label="Copy from year">
+                {#each copyYears as year}
+                  <option value={year}>{year}</option>
+                {/each}
+              </select>
+              <span
+                class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-zinc-400"
+                aria-hidden="true"
+              >▼</span>
+            </div>
+          </label>
+        </div>
+        <p class="text-[10px] text-zinc-500">
+          Copies income, category budgets, PIC, and sub-categories. You still need to save.
+        </p>
+        <div class="flex gap-2">
+          <button
+            type="button"
+            disabled={copying}
+            onclick={handleCopyPlan}
+            class="border border-black bg-black px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 dark:border-white dark:bg-white dark:text-black"
+          >
+            {copying ? 'Copying…' : 'Copy'}
+          </button>
+          <button
+            type="button"
+            disabled={copying}
+            onclick={() => (copyOpen = false)}
+            class="border border-zinc-300 px-3 py-1.5 text-xs dark:border-zinc-600"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    {/if}
+
     <form onsubmit={handleSubmit} class="space-y-4">
       <fieldset class="space-y-2 border border-zinc-200 p-3 dark:border-zinc-800">
         <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">

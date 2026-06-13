@@ -24,6 +24,7 @@
   let loading = $state(true);
   let error = $state('');
   let payingId = $state<number | null>(null);
+  let payingAllKey = $state<string | null>(null);
   /** 'general' or categoryId string */
   let planVsScope = $state('general');
 
@@ -118,6 +119,34 @@
       payingId = null;
     }
   }
+
+  function reimbursementPairKey(planPic: string, paidBy: string): string {
+    return `${planPic}\0${paidBy}`;
+  }
+
+  async function handlePaidAll(planPic: string, paidBy: string) {
+    const key = reimbursementPairKey(planPic, paidBy);
+    payingAllKey = key;
+    error = '';
+    const items = reimbursements.filter((r) => r.planPic === planPic && r.pic === paidBy);
+    const ids = new Set(items.map((item) => item.id));
+    try {
+      for (const item of items) {
+        await markReimbursementPaid(item.id);
+      }
+      reimbursements = reimbursements.filter((r) => !ids.has(r.id));
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to mark all as paid';
+      try {
+        const reimbRes = await getReimbursements(period);
+        reimbursements = reimbRes.reimbursements;
+      } catch {
+        /* keep partial state */
+      }
+    } finally {
+      payingAllKey = null;
+    }
+  }
 </script>
 
 {#if loading}
@@ -209,8 +238,9 @@
         <div
           class="space-y-1.5 border border-zinc-200 bg-zinc-50 px-3 py-2.5 dark:border-zinc-800 dark:bg-zinc-900"
         >
-          <p class="text-[10px] font-medium uppercase tracking-wider text-zinc-500">Totals owed</p>
+          <p class="text-[10px] font-medium uppercase tracking-wider text-zinc-500">Total Paid</p>
           {#each reimbursementTotals as row (row.planPic + row.paidBy)}
+            {@const pairKey = reimbursementPairKey(row.planPic, row.paidBy)}
             <div class="flex items-center justify-between gap-2 text-xs">
               <div class="flex min-w-0 items-center gap-1.5">
                 <PicBadge name={row.planPic} />
@@ -218,12 +248,22 @@
                 <PicBadge name={row.paidBy} />
                 <span
                   class="truncate text-[10px] text-zinc-500"
-                  title="{row.planPic} owes {row.paidBy}"
+                  title="{row.paidBy} need paid"
                 >
-                  {picInitial(row.planPic)} owes {picInitial(row.paidBy)}
+                  {picInitial(row.paidBy)} need paid
                 </span>
               </div>
-              <span class="shrink-0 font-mono tabular-nums">{formatCurrency(row.total)}</span>
+              <div class="flex shrink-0 items-center gap-2">
+                <span class="font-mono tabular-nums">{formatCurrency(row.total)}</span>
+                <button
+                  type="button"
+                  disabled={payingAllKey != null || payingId != null}
+                  onclick={() => handlePaidAll(row.planPic, row.paidBy)}
+                  class="border border-zinc-300 px-2 py-1 text-[10px] font-medium disabled:opacity-50 dark:border-zinc-600"
+                >
+                  {payingAllKey === pairKey ? '…' : 'Paid All'}
+                </button>
+              </div>
             </div>
           {/each}
         </div>
@@ -258,7 +298,7 @@
               </div>
               <button
                 type="button"
-                disabled={payingId === item.id}
+                disabled={payingId === item.id || payingAllKey != null}
                 onclick={() => handlePaid(item)}
                 class="shrink-0 border border-zinc-300 px-2 py-1 text-[10px] font-medium disabled:opacity-50 dark:border-zinc-600"
               >
