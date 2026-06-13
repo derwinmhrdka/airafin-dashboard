@@ -335,3 +335,80 @@ export async function deleteTransactionFromSheet(
     return { status: 'failed', error: message };
   }
 }
+
+async function getSheetIdByTitle(spreadsheetId: string, title: string): Promise<number | null> {
+  const sheets = await getSheetsClient();
+  const meta = await sheets.spreadsheets.get({ spreadsheetId });
+  const sheet = meta.data.sheets?.find((s) => s.properties?.title === title);
+  return sheet?.properties?.sheetId ?? null;
+}
+
+/** Create a month tab (e.g. JULY) if missing; returns whether it was newly created. */
+export async function ensureMonthSheetTab(
+  tabName: string,
+): Promise<{ created: boolean; sheetId: number }> {
+  const spreadsheetId = await getSpreadsheetId();
+  if (!spreadsheetId) {
+    throw new Error('GOOGLE_SHEETS_SPREADSHEET_ID is not set');
+  }
+
+  const sheets = await getSheetsClient();
+  const existingId = await getSheetIdByTitle(spreadsheetId, tabName);
+  if (existingId != null) {
+    return { created: false, sheetId: existingId };
+  }
+
+  const res = await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          addSheet: {
+            properties: {
+              title: tabName,
+              gridProperties: { rowCount: 1000, columnCount: 26 },
+            },
+          },
+        },
+      ],
+    },
+  });
+
+  const sheetId = res.data.replies?.[0]?.addSheet?.properties?.sheetId;
+  if (sheetId == null) {
+    throw new Error(`Failed to create sheet tab "${tabName}"`);
+  }
+
+  return { created: true, sheetId };
+}
+
+/** Replace all values on a month tab (A–P). */
+export async function writeMonthSheetGrid(
+  tabName: string,
+  values: (string | number)[][],
+): Promise<void> {
+  const spreadsheetId = await getSpreadsheetId();
+  if (!spreadsheetId) {
+    throw new Error('GOOGLE_SHEETS_SPREADSHEET_ID is not set');
+  }
+
+  const sheets = await getSheetsClient();
+  const sheetId = await getSheetIdByTitle(spreadsheetId, tabName);
+  if (sheetId == null) {
+    throw new Error(`Sheet tab "${tabName}" not found`);
+  }
+
+  const rowCount = Math.max(values.length, 1);
+
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId,
+    range: `${tabName}!A:P`,
+  });
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${tabName}!A1:P${rowCount}`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: { values },
+  });
+}

@@ -152,6 +152,22 @@ export function syncDbToSheet(period: string): Promise<SyncResult> {
   });
 }
 
+export interface CreateMonthSheetResult {
+  ok: boolean;
+  period: string;
+  sheetName: string;
+  created?: boolean;
+  rowsWritten?: number;
+  error?: string;
+}
+
+export function createMonthSheet(period: string): Promise<CreateMonthSheetResult> {
+  return fetchJson('/api/sync/create-month-sheet', {
+    method: 'POST',
+    body: JSON.stringify({ period }),
+  });
+}
+
 export function syncSheetToDb(period: string): Promise<SyncResult> {
   return fetchJson('/api/sync/sheet-to-db', {
     method: 'POST',
@@ -164,7 +180,16 @@ export function savePlan(body: {
   incomes?: { source: string; amount: number }[];
   budgets?: { categoryId: number; allocatedAmount: number; pic?: string }[];
   subcategories?: { categoryId: number; name: string; allocatedAmount?: number; pic?: string }[];
-}): Promise<{ ok: boolean }> {
+}): Promise<{
+  ok: boolean;
+  period?: string;
+  monthSheet?: {
+    sheetName: string;
+    created?: boolean;
+    rowsWritten?: number;
+    error?: string;
+  };
+}> {
   return fetchJson('/api/budgets', {
     method: 'POST',
     body: JSON.stringify(body),

@@ -229,8 +229,15 @@
     );
 
     try {
-      await savePlan({ period, incomes, budgets, subcategories });
+      const result = await savePlan({ period, incomes, budgets, subcategories });
       success = `Plan saved for ${period}`;
+      if (result.monthSheet?.sheetName && !result.monthSheet.error) {
+        success += result.monthSheet.created
+          ? ` · Created ${result.monthSheet.sheetName} sheet`
+          : ` · Updated ${result.monthSheet.sheetName} sheet`;
+      } else if (result.monthSheet?.error) {
+        success += ` · Sheet not updated (${result.monthSheet.error})`;
+      }
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to save plan';
     } finally {
