@@ -420,10 +420,11 @@
     </label>
 
     <label class="block space-y-1">
-      <span class="text-[11px] text-zinc-500">PIC</span>
+      <span class="text-[11px] text-zinc-500">Paid by</span>
       <select
         bind:value={pic}
         class="w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
+        aria-label="Paid by"
       >
         {#each PICS as p}
           <option value={p}>{p}</option>
@@ -486,7 +487,7 @@
             bind:value={filterPic}
             class="border border-zinc-200 bg-white px-1.5 py-1.5 text-[11px] dark:border-zinc-800 dark:bg-black"
           >
-            <option value="">All PIC</option>
+            <option value="">All paid by</option>
             {#each PICS as p}
               <option value={p}>{p}</option>
             {/each}
@@ -524,7 +525,7 @@
               <th class="px-2 py-2 text-center font-medium">Sub</th>
               <th class="px-2 py-2 text-center font-medium">Detail</th>
               <th class="px-2 py-2 text-center font-medium">Cost</th>
-              <th class="px-2 py-2 text-center font-medium">PIC</th>
+              <th class="px-2 py-2 text-center font-medium">By</th>
               <th class="px-2 py-2 text-center font-medium"></th>
             </tr>
           </thead>

@@ -65,6 +65,22 @@
       })),
   );
 
+  /** Plan owner → who paid: how much is still owed per pair. */
+  const reimbursementTotals = $derived.by(() => {
+    const byPair = new Map<string, number>();
+    for (const item of reimbursements) {
+      const key = `${item.planPic}\0${item.pic}`;
+      const cost = Number.parseFloat(item.cost) || 0;
+      byPair.set(key, (byPair.get(key) ?? 0) + cost);
+    }
+    return [...byPair.entries()]
+      .map(([key, total]) => {
+        const [planPic, paidBy] = key.split('\0');
+        return { planPic, paidBy, total };
+      })
+      .sort((a, b) => b.total - a.total);
+  });
+
   async function loadData(activePeriod: string) {
     loading = true;
     error = '';
@@ -186,8 +202,32 @@
     <div class="space-y-2">
       <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Reimbursements</h2>
       <p class="text-[10px] text-zinc-500">
-        Plan PIC paid by someone else — mark Paid when settled (updates PIC in Detail).
+        Plan owner paid by someone else — mark Paid when settled (updates Paid by in Detail).
       </p>
+
+      {#if reimbursementTotals.length > 0}
+        <div
+          class="space-y-1.5 border border-zinc-200 bg-zinc-50 px-3 py-2.5 dark:border-zinc-800 dark:bg-zinc-900"
+        >
+          <p class="text-[10px] font-medium uppercase tracking-wider text-zinc-500">Totals owed</p>
+          {#each reimbursementTotals as row (row.planPic + row.paidBy)}
+            <div class="flex items-center justify-between gap-2 text-xs">
+              <div class="flex min-w-0 items-center gap-1.5">
+                <PicBadge name={row.planPic} />
+                <span class="text-[10px] text-zinc-400" aria-hidden="true">→</span>
+                <PicBadge name={row.paidBy} />
+                <span
+                  class="truncate text-[10px] text-zinc-500"
+                  title="{row.planPic} owes {row.paidBy}"
+                >
+                  {picInitial(row.planPic)} owes {picInitial(row.paidBy)}
+                </span>
+              </div>
+              <span class="shrink-0 font-mono tabular-nums">{formatCurrency(row.total)}</span>
+            </div>
+          {/each}
+        </div>
+      {/if}
 
       {#if reimbursements.length === 0}
         <p class="border border-dashed border-zinc-200 px-3 py-4 text-center text-sm text-zinc-500 dark:border-zinc-800">
@@ -208,7 +248,7 @@
                 <p class="mt-0.5 flex items-center gap-1 text-[10px] text-zinc-500">
                   <span>Plan {picInitial(item.planPic)}</span>
                   <span aria-hidden="true">→</span>
-                  <span>Paid {picInitial(item.pic)}</span>
+                  <span>By {picInitial(item.pic)}</span>
                 </p>
               </div>
               <div class="flex shrink-0 items-center gap-1">
