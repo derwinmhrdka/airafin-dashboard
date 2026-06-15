@@ -14,25 +14,13 @@
 #
 # Deploy app: bash deploy/docker-deploy.sh
 #
-# Optional: redirect direct IP access to the domain. Replace VPS_PUBLIC_IP in the
-# blocks below with this server's public IPv4 (e.g. curl -4 ifconfig.me).
+# Optional: redirect IP:3080 → airafin domain (replace VPS_PUBLIC_IP).
+# Does NOT touch port 80/443 on the bare IP (teknodika / default server keeps those).
 
-# Redirect http://<vps-ip>/ → https://airafin.teknodika.com/
 server {
-    listen 80;
-    listen [::]:80;
+    listen 3080;
+    listen [::]:3080;
     server_name VPS_PUBLIC_IP;
-
-    return 301 https://airafin.teknodika.com$request_uri;
-}
-
-# Redirect https://<vps-ip>/ → domain (browser may warn: cert is for the domain, not the IP)
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name VPS_PUBLIC_IP;
-
-    # certbot adds ssl_certificate / ssl_certificate_key here
 
     return 301 https://airafin.teknodika.com$request_uri;
 }
