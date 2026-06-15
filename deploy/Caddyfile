@@ -1,0 +1,5 @@
+# HTTPS reverse proxy — set DOMAIN in .env (default: airafin.teknodika.com)
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy frontend:3080
+}

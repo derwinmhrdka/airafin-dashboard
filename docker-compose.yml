@@ -32,7 +32,8 @@ services:
       - ./backend/secrets:/app/secrets:ro
       - ./backend/data/import:/app/data/import:ro
     ports:
-      - '3081:3081'
+      # Localhost only — Telegram bot / internal API; not exposed on the public internet
+      - '127.0.0.1:3081:3081'
 
   frontend:
     build: ./frontend
@@ -40,15 +41,33 @@ services:
     depends_on:
       - backend
     environment:
-      API_URL: /api
+      API_URL: http://backend:3081
       API_SECRET_TOKEN: ${API_SECRET_TOKEN:-change-me-in-production}
       PORT: 3080
       HOST: 0.0.0.0
-      ORIGIN: ${ORIGIN:-http://localhost:3080}
+      ORIGIN: ${ORIGIN:-https://airafin.teknodika.com}
       DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD}
       SESSION_SECRET: ${SESSION_SECRET:-change-me-in-production}
     ports:
-      - '3080:3080'
+      # Localhost only — public HTTPS goes through caddy (or host nginx)
+      - '127.0.0.1:3080:3080'
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - frontend
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      DOMAIN: ${DOMAIN:-airafin.teknodika.com}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
 
 volumes:
   pgdata:
+  caddy_data:
+  caddy_config:

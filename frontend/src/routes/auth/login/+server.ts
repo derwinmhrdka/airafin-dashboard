@@ -10,6 +10,8 @@ export const POST: RequestHandler = async ({ request, cookies, url }) => {
     return json({ error: 'Incorrect password' }, { status: 401 });
   }
 
-  setAuthCookie(cookies, url.protocol === 'https:');
+  const forwarded = request.headers.get('x-forwarded-proto');
+  const secure = url.protocol === 'https:' || forwarded === 'https';
+  setAuthCookie(cookies, secure);
   return json({ ok: true });
 };
