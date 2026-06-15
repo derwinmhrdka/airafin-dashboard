@@ -47,6 +47,18 @@ export const handle: Handle = async ({ event, resolve }) => {
   const target = `${resolveBackendUrl()}${path}${event.url.search}`;
   const headers = new Headers(event.request.headers);
   headers.delete('host');
+  for (const name of [
+    'connection',
+    'keep-alive',
+    'proxy-authenticate',
+    'proxy-authorization',
+    'te',
+    'trailers',
+    'transfer-encoding',
+    'upgrade',
+  ]) {
+    headers.delete(name);
+  }
 
   if (event.request.method === 'POST' && path === '/api/transactions') {
     const token = env.API_SECRET_TOKEN;
@@ -73,7 +85,9 @@ export const handle: Handle = async ({ event, resolve }) => {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Backend unreachable';
-    console.error(`API proxy failed: ${target} — ${message}`);
+    const cause =
+      error instanceof Error && error.cause instanceof Error ? error.cause.message : undefined;
+    console.error(`API proxy failed: ${target} — ${message}${cause ? ` (${cause})` : ''}`);
     return new Response(
       JSON.stringify({
         error: 'Backend unreachable',

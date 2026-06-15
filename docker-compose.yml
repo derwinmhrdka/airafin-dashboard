@@ -21,6 +21,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3081/health | grep -q ok']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-airafin}:${POSTGRES_PASSWORD:-airafin}@db:5432/${POSTGRES_DB:-airafin}
       API_SECRET_TOKEN: ${API_SECRET_TOKEN:-change-me-in-production}
@@ -39,8 +45,10 @@ services:
     build: ./frontend
     restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     environment:
+      NODE_OPTIONS: --dns-result-order=ipv4first
       API_URL: http://backend:3081
       API_SECRET_TOKEN: ${API_SECRET_TOKEN:-change-me-in-production}
       PORT: 3080

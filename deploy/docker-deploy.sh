@@ -17,8 +17,9 @@ DOMAIN="${DOMAIN:-airafin.teknodika.com}"
 ORIGIN="${ORIGIN:-https://${DOMAIN}}"
 
 if [[ "$ORIGIN" != https://* ]]; then
-  echo "WARNING: ORIGIN should be https:// for production (current: ${ORIGIN})" >&2
-  echo "         Set ORIGIN=https://${DOMAIN} in .env" >&2
+  echo "ERROR: ORIGIN must be https:// for production (current: ${ORIGIN})" >&2
+  echo "       Set ORIGIN=https://${DOMAIN} in .env (not http://localhost:3080)" >&2
+  exit 1
 fi
 
 echo "==> Building and starting containers (db, backend, frontend)..."
@@ -66,6 +67,21 @@ if curl -fsS "http://127.0.0.1:3081/api/dashboard/summary?period=June%202026" 2>
   echo "==> Backend /api/dashboard/summary OK"
 else
   echo "WARNING: Backend summary endpoint check failed on :3081" >&2
+fi
+
+echo "==> Frontend → backend proxy (Node fetch inside container)..."
+if $COMPOSE exec -T frontend node -e "fetch('http://backend:3081/health').then((r)=>r.text()).then((t)=>{if(!t.includes('ok'))process.exit(1)}).catch(()=>process.exit(1))"; then
+  echo "==> Frontend can reach backend via fetch"
+else
+  echo "ERROR: Frontend container cannot fetch http://backend:3081" >&2
+  $COMPOSE logs frontend --tail 20
+  exit 1
+fi
+
+RUNNING_ORIGIN="$($COMPOSE exec -T frontend printenv ORIGIN 2>/dev/null | tr -d '\r' || true)"
+if [[ -n "$RUNNING_ORIGIN" && "$RUNNING_ORIGIN" != https://* ]]; then
+  echo "ERROR: frontend ORIGIN is ${RUNNING_ORIGIN} — set ORIGIN=https://${DOMAIN} in .env and redeploy" >&2
+  exit 1
 fi
 
 echo "==> Checking public HTTPS (host nginx)..."
