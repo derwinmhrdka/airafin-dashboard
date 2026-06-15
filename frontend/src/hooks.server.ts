@@ -2,7 +2,14 @@ import { env } from '$env/dynamic/private';
 import { redirect, type Handle } from '@sveltejs/kit';
 import { isAuthenticated } from '$lib/server/auth';
 
-const BACKEND_URL = env.API_URL ?? 'http://localhost:3081';
+/** Internal backend URL — must include http:// host (never a path like /api). */
+function resolveBackendUrl(): string {
+  const raw = env.API_URL?.trim();
+  if (raw && (raw.startsWith('http://') || raw.startsWith('https://'))) {
+    return raw.replace(/\/$/, '');
+  }
+  return 'http://backend:3081';
+}
 
 function isPublicPath(path: string): boolean {
   return (
@@ -37,7 +44,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     return resolve(event);
   }
 
-  const target = `${BACKEND_URL}${path}${event.url.search}`;
+  const target = `${resolveBackendUrl()}${path}${event.url.search}`;
   const headers = new Headers(event.request.headers);
   headers.delete('host');
 

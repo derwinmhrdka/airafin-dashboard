@@ -61,6 +61,13 @@ if [ "$FRONTEND_READY" = false ]; then
   exit 1
 fi
 
+echo "==> Backend API route check (must be /api/..., not /dashboard/...)..."
+if curl -fsS "http://127.0.0.1:3081/api/dashboard/summary?period=June%202026" 2>/dev/null | grep -q '"period"'; then
+  echo "==> Backend /api/dashboard/summary OK"
+else
+  echo "WARNING: Backend summary endpoint check failed on :3081" >&2
+fi
+
 echo "==> Checking public HTTPS (host nginx)..."
 if curl -fsS -o /dev/null "https://${DOMAIN}" 2>/dev/null; then
   echo "==> Deploy finished OK — https://${DOMAIN}"
