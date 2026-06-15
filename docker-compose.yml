@@ -57,8 +57,8 @@ services:
       DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD}
       SESSION_SECRET: ${SESSION_SECRET:-change-me-in-production}
     ports:
-      # Localhost only — host nginx (not Docker) proxies HTTPS → here
-      - '127.0.0.1:3080:3080'
+      # 13080 on host — nginx owns public :3080 for IP→domain redirect
+      - '127.0.0.1:13080:3080'
 
 volumes:
   pgdata:

@@ -47,8 +47,8 @@ fi
 echo "==> Waiting for frontend health..."
 FRONTEND_READY=false
 for i in $(seq 1 20); do
-  if curl -fsS -o /dev/null http://127.0.0.1:3080 2>/dev/null; then
-    echo "==> Frontend OK on 127.0.0.1:3080"
+  if curl -fsS -o /dev/null http://127.0.0.1:13080 2>/dev/null; then
+    echo "==> Frontend OK on 127.0.0.1:13080"
     FRONTEND_READY=true
     break
   fi
@@ -57,7 +57,7 @@ for i in $(seq 1 20); do
 done
 
 if [ "$FRONTEND_READY" = false ]; then
-  echo "ERROR: Frontend not responding on 127.0.0.1:3080" >&2
+  echo "ERROR: Frontend not responding on 127.0.0.1:13080" >&2
   $COMPOSE logs frontend --tail 40
   exit 1
 fi
