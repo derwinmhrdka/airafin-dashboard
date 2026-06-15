@@ -8,3 +8,11 @@ export function picInitial(name: string): string {
   if (name === 'Anggita') return 'A';
   return name.charAt(0).toUpperCase() || '?';
 }
+
+/** Map income source label to PIC (e.g. "Gaji Derwin" → Derwin). */
+export function incomePicFromSource(source: string): Pic | null {
+  const s = source.toLowerCase();
+  if (s.includes('derwin')) return 'Derwin';
+  if (s.includes('anggita')) return 'Anggita';
+  return null;
+}

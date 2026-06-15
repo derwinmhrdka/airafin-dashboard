@@ -2,6 +2,7 @@
   import { page } from '$app/state';
   import { createCategory, getCategories, getPlan, savePlan } from '$lib/api';
   import AmountInput from '$lib/components/AmountInput.svelte';
+  import PicBadge from '$lib/components/PicBadge.svelte';
   import { formatAmountInput, formatCurrency, parseAmountInput } from '$lib/format';
   import {
     listYearOptionsForPeriod,
@@ -10,7 +11,7 @@
     periodFromUrl,
     periodParts,
   } from '$lib/period';
-  import { DEFAULT_PIC, PICS, picInitial, type Pic } from '$lib/pics';
+  import { DEFAULT_PIC, incomePicFromSource, PICS, picInitial, type Pic } from '$lib/pics';
   import type { Category, PlanData } from '$lib/types';
 
   const DEFAULT_INCOMES = ['Gaji Derwin', 'Gaji Anggita'] as const;
@@ -254,6 +255,43 @@
   const totalIncome = $derived(
     incomeRows.reduce((sum, row) => sum + parseAmountInput(row.amount || ''), 0),
   );
+
+  const picSummary = $derived.by(() => {
+    const incomeByPic: Record<Pic, number> = { Derwin: 0, Anggita: 0 };
+    const planByPic: Record<Pic, number> = { Derwin: 0, Anggita: 0 };
+
+    for (const row of incomeRows) {
+      const owner = incomePicFromSource(row.source);
+      if (owner) {
+        incomeByPic[owner] += parseAmountInput(row.amount || '');
+      }
+    }
+
+    for (const cat of categories) {
+      const pic = picInputs[cat.id] ?? DEFAULT_PIC;
+      planByPic[pic] += parseAmountInput(budgetInputs[cat.id] || '');
+      for (const sub of subcategoryInputs[cat.id] ?? []) {
+        planByPic[sub.pic] += parseAmountInput(sub.amount || '');
+      }
+    }
+
+    return PICS.map((pic) => ({
+      pic,
+      income: incomeByPic[pic],
+      plan: planByPic[pic],
+      balancing: incomeByPic[pic] - planByPic[pic],
+    }));
+  });
+
+  const transferNote = $derived.by(() => {
+    const rows = picSummary;
+    const surplus = rows.find((r) => r.balancing > 0);
+    const deficit = rows.find((r) => r.balancing < 0);
+    if (!surplus || !deficit) return '';
+
+    const amount = Math.min(surplus.balancing, Math.abs(deficit.balancing));
+    return `${surplus.pic} transfer ${formatCurrency(amount)} to ${deficit.pic}`;
+  });
 
   function addSubcategory(categoryId: number) {
     subcategoryInputs = {
@@ -513,6 +551,50 @@
           Total Plan:
           <span class="font-mono text-black dark:text-white">{formatCurrency(totalBudget)}</span>
         </p>
+      </fieldset>
+
+      <fieldset class="space-y-2 border border-zinc-200 p-3 dark:border-zinc-800">
+        <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">
+          Per PIC
+        </legend>
+        <p class="text-[10px] text-zinc-500">
+          Balancing = Income − Plan. A negative balance means that PIC needs more from the other.
+        </p>
+
+        <div
+          class="grid grid-cols-[minmax(0,4.5rem)_1fr_1fr_1fr] items-center gap-x-2 gap-y-2 border-b border-zinc-200 pb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-500 dark:border-zinc-800"
+        >
+          <span>PIC</span>
+          <span class="text-right">Income</span>
+          <span class="text-right">Plan</span>
+          <span class="text-right">Balancing</span>
+        </div>
+
+        {#each picSummary as row (row.pic)}
+          <div
+            class="grid grid-cols-[minmax(0,4.5rem)_1fr_1fr_1fr] items-center gap-x-2 text-xs"
+          >
+            <PicBadge name={row.pic} />
+            <span class="font-mono text-right tabular-nums">{formatCurrency(row.income)}</span>
+            <span class="font-mono text-right tabular-nums">{formatCurrency(row.plan)}</span>
+            <span
+              class="font-mono text-right tabular-nums
+                {row.balancing > 0
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : row.balancing < 0
+                  ? 'text-amber-600 dark:text-amber-400'
+                  : 'text-zinc-500'}"
+            >
+              {formatCurrency(row.balancing)}
+            </span>
+          </div>
+        {/each}
+
+        {#if transferNote}
+          <p class="border-t border-zinc-200 pt-2 text-[11px] text-amber-700 dark:border-zinc-800 dark:text-amber-400">
+            {transferNote}
+          </p>
+        {/if}
       </fieldset>
 
       {#if error}
