@@ -17,10 +17,11 @@
 # Optional: redirect IP:3080 → airafin domain (replace VPS_PUBLIC_IP).
 # Does NOT touch port 80/443 on the bare IP (teknodika / default server keeps those).
 
+# Bind public IP:3080 only (Docker uses 127.0.0.1:3080 — do not listen 0.0.0.0:3080).
+
 server {
-    listen 0.0.0.0:3080;
-    listen [::]:3080;
-    server_name VPS_PUBLIC_IP;
+    listen VPS_PUBLIC_IP:3080;
+    server_name _;
 
     return 301 https://airafin.teknodika.com$request_uri;
 }
