@@ -21,7 +21,8 @@ if [[ "$ORIGIN" != https://* ]]; then
   echo "         Set ORIGIN=https://${DOMAIN} in .env" >&2
 fi
 
-echo "==> Building and starting containers..."
+echo "==> Building and starting containers (db, backend, frontend)..."
+echo "    HTTPS is handled by host nginx — see deploy/nginx-airafin.conf.example"
 $COMPOSE up -d --build --remove-orphans
 
 echo "==> Container status:"
@@ -46,7 +47,7 @@ echo "==> Waiting for frontend health..."
 FRONTEND_READY=false
 for i in $(seq 1 20); do
   if curl -fsS -o /dev/null http://127.0.0.1:3080 2>/dev/null; then
-    echo "==> Frontend OK"
+    echo "==> Frontend OK on 127.0.0.1:3080"
     FRONTEND_READY=true
     break
   fi
@@ -60,22 +61,11 @@ if [ "$FRONTEND_READY" = false ]; then
   exit 1
 fi
 
-echo "==> Waiting for HTTPS (${DOMAIN})..."
-HTTPS_READY=false
-for i in $(seq 1 30); do
-  if curl -fsS -o /dev/null "https://${DOMAIN}" 2>/dev/null; then
-    echo "==> HTTPS OK: https://${DOMAIN}"
-    HTTPS_READY=true
-    break
-  fi
-  echo "Attempt $i: HTTPS not ready yet (DNS/Let's Encrypt may take a minute)..."
-  sleep 5
-done
-
-if [ "$HTTPS_READY" = false ]; then
-  echo "WARNING: https://${DOMAIN} not reachable yet." >&2
-  echo "         Check DNS A record → this server, ports 80/443 open, and: docker compose logs caddy" >&2
-  echo "         If host nginx already uses 80/443, disable caddy and use deploy/nginx-airafin.conf.example" >&2
-else
+echo "==> Checking public HTTPS (host nginx)..."
+if curl -fsS -o /dev/null "https://${DOMAIN}" 2>/dev/null; then
   echo "==> Deploy finished OK — https://${DOMAIN}"
+else
+  echo "==> Containers OK. HTTPS not reachable yet at https://${DOMAIN}" >&2
+  echo "    Configure host nginx: deploy/nginx-airafin.conf.example" >&2
+  echo "    Then: sudo certbot --nginx -d ${DOMAIN}" >&2
 fi
