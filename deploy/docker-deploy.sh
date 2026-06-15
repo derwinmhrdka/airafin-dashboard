@@ -29,8 +29,20 @@ if ! curl -fsS http://localhost:3081/health 2>/dev/null | grep -q '"status":"ok"
   exit 1
 fi
 
-if ! curl -fsS -o /dev/null http://localhost:3080; then
-  echo "ERROR: Frontend not responding on :3080" >&2
+echo "==> Waiting for frontend health..."
+FRONTEND_READY=false
+for i in $(seq 1 20); do
+  if curl -fsS -o /dev/null http://localhost:3080 2>/dev/null; then
+    echo "==> Frontend OK"
+    FRONTEND_READY=true
+    break
+  fi
+  echo "Percobaan $i: Frontend belum siap, menunggu 3 detik..."
+  sleep 3
+done
+
+if [ "$FRONTEND_READY" = false ]; then
+  echo "ERROR: Frontend tidak merespon di :3080" >&2
   $COMPOSE logs frontend --tail 40
   exit 1
 fi
