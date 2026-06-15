@@ -40,7 +40,7 @@ services:
     depends_on:
       - backend
     environment:
-      API_URL: http://backend:3081
+      API_URL: /api
       API_SECRET_TOKEN: ${API_SECRET_TOKEN:-change-me-in-production}
       PORT: 3080
       HOST: 0.0.0.0
