@@ -64,11 +64,25 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
   }
 
-  const response = await fetch(target, {
-    method: event.request.method,
-    headers,
-    body,
-  });
+  let response: Response;
+  try {
+    response = await fetch(target, {
+      method: event.request.method,
+      headers,
+      body,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Backend unreachable';
+    console.error(`API proxy failed: ${target} — ${message}`);
+    return new Response(
+      JSON.stringify({
+        error: 'Backend unreachable',
+        detail: message,
+        target,
+      }),
+      { status: 502, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
 
   return new Response(response.body, {
     status: response.status,

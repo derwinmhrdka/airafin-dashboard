@@ -22,6 +22,14 @@ await app.register(dashboardRoutes);
 await app.register(budgetRoutes);
 await app.register(syncRoutes);
 
+app.setErrorHandler((error, request, reply) => {
+  request.log.error({ err: error, url: request.url }, 'Unhandled route error');
+  reply.code(500).send({
+    error: 'Internal Server Error',
+    message: error instanceof Error ? error.message : 'Unknown error',
+  });
+});
+
 app.get('/health', async () => ({ status: 'ok' }));
 
 const port = Number.parseInt(process.env.PORT ?? '3081', 10);
