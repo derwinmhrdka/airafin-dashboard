@@ -2,7 +2,6 @@ import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/index.js';
 import { budgetSubcategories, budgets, categories, incomes } from '../db/schema.js';
-import { createMonthSheet, periodToMonthSheetName } from '../lib/month-sheet.js';
 import { isValidPic } from '../lib/pic.js';
 
 interface IncomeInput {
@@ -181,23 +180,6 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
-    let monthSheet:
-      | { sheetName: string; created?: boolean; rowsWritten?: number; error?: string }
-      | undefined;
-
-    if (periodToMonthSheetName(trimmedPeriod)) {
-      const sheetResult = await createMonthSheet(trimmedPeriod);
-      if (sheetResult.ok) {
-        monthSheet = {
-          sheetName: sheetResult.sheetName,
-          created: sheetResult.created,
-          rowsWritten: sheetResult.rowsWritten,
-        };
-      } else if (sheetResult.error && sheetResult.error !== 'Google Sheets is not configured') {
-        monthSheet = { sheetName: sheetResult.sheetName, error: sheetResult.error };
-      }
-    }
-
-    return reply.code(200).send({ ok: true, period: trimmedPeriod, monthSheet });
+    return reply.code(200).send({ ok: true, period: trimmedPeriod });
   });
 }
