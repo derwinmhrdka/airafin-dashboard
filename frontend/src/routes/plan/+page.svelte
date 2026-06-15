@@ -507,7 +507,6 @@
 
             {#if (subcategoryInputs[cat.id] ?? []).length > 0}
               {@const subs = subcategoryInputs[cat.id] ?? []}
-              {@const subTotal = subAmountTotal(subs)}
               {@const mainRemainder = mainCategoryRemainder(budgetInputs[cat.id] || '', subs)}
               {@const overSub = subExceedsCategory(budgetInputs[cat.id] || '', subs)}
               <div class="{budgetGrid} text-zinc-500">
@@ -516,13 +515,11 @@
                 <span class="text-center text-[10px]">{picInitial(picInputs[cat.id] ?? DEFAULT_PIC)}</span>
                 <span></span>
               </div>
-              <p class="ml-3 text-[10px] {overSub ? 'text-red-600 dark:text-red-400' : 'text-zinc-500'}">
-                {#if overSub}
-                  Sub total {formatCurrency(subTotal)} exceeds category {formatCurrency(parseAmountInput(budgetInputs[cat.id] || ''))}.
-                {:else}
-                  Category {formatCurrency(parseAmountInput(budgetInputs[cat.id] || ''))} = subs {formatCurrency(subTotal)} + main {formatCurrency(mainRemainder)}
-                {/if}
-              </p>
+              {#if overSub}
+                <p class="ml-3 text-[10px] text-red-600 dark:text-red-400">
+                  Sub total {formatCurrency(subAmountTotal(subs))} exceeds category {formatCurrency(parseAmountInput(budgetInputs[cat.id] || ''))}.
+                </p>
+              {/if}
             {/if}
           </div>
         {/each}
@@ -559,20 +556,20 @@
         </p>
 
         <div
-          class="grid grid-cols-[minmax(0,4.5rem)_1fr_1fr_1fr] items-center gap-x-2 gap-y-2 border-b border-zinc-200 pb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-500 dark:border-zinc-800"
+          class="grid grid-cols-[minmax(0,4.5rem)_1fr_1fr] items-center gap-x-2 gap-y-2 border-b border-zinc-200 pb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-500 md:grid-cols-[minmax(0,4.5rem)_1fr_1fr_1fr] dark:border-zinc-800"
         >
           <span>PIC</span>
-          <span class="text-right">Income</span>
+          <span class="hidden text-right md:block">Income</span>
           <span class="text-right">Plan</span>
           <span class="text-right">Balancing</span>
         </div>
 
         {#each picSummary as row (row.pic)}
           <div
-            class="grid grid-cols-[minmax(0,4.5rem)_1fr_1fr_1fr] items-center gap-x-2 text-xs"
+            class="grid grid-cols-[minmax(0,4.5rem)_1fr_1fr] items-center gap-x-2 text-xs md:grid-cols-[minmax(0,4.5rem)_1fr_1fr_1fr]"
           >
             <PicBadge name={row.pic} />
-            <span class="font-mono text-right tabular-nums">{formatCurrency(row.income)}</span>
+            <span class="hidden font-mono text-right tabular-nums md:block">{formatCurrency(row.income)}</span>
             <span class="font-mono text-right tabular-nums">{formatCurrency(row.plan)}</span>
             <span
               class="font-mono text-right tabular-nums
