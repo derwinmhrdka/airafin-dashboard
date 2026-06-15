@@ -5,13 +5,20 @@
   import PicBadge from '$lib/components/PicBadge.svelte';
   import { formatAmountInput, formatCurrency, parseAmountInput } from '$lib/format';
   import {
+    mainCategoryRemainder,
+    picPlanSummary,
+    subAmountTotal,
+    subExceedsCategory,
+    totalPlanFromCategories,
+  } from '$lib/plan-allocations';
+  import {
     listYearOptionsForPeriod,
     MONTH_NAMES,
     periodFromParts,
     periodFromUrl,
     periodParts,
   } from '$lib/period';
-  import { DEFAULT_PIC, incomePicFromSource, PICS, picInitial, type Pic } from '$lib/pics';
+  import { DEFAULT_PIC, PICS, picInitial, type Pic } from '$lib/pics';
   import type { Category, PlanData } from '$lib/types';
 
   const DEFAULT_INCOMES = ['Gaji Derwin', 'Gaji Anggita'] as const;
@@ -218,18 +225,22 @@
       }))
       .filter((b) => b.allocatedAmount > 0);
 
-    const subcategories = categories.flatMap((cat) =>
-      (subcategoryInputs[cat.id] ?? [])
-        .filter((row) => row.name.trim())
-        .map((row) => ({
+    try {
+      const subcategories = categories.flatMap((cat) => {
+        const subs = (subcategoryInputs[cat.id] ?? []).filter((row) => row.name.trim());
+        if (subExceedsCategory(budgetInputs[cat.id] || '', subs)) {
+          throw new Error(
+            `Sub-categories for ${cat.name} exceed the category budget. Subs split the main amount, not add on top.`,
+          );
+        }
+        return subs.map((row) => ({
           categoryId: cat.id,
           name: row.name.trim(),
           allocatedAmount: parseAmountInput(row.amount || ''),
           pic: row.pic,
-        })),
-    );
+        }));
+      });
 
-    try {
       const result = await savePlan({ period, incomes, budgets, subcategories });
       success = `Plan saved for ${period}`;
       if (result.monthSheet?.sheetName && !result.monthSheet.error) {
@@ -246,42 +257,15 @@
     }
   }
 
-  const totalBudget = $derived(
-    Object.values(budgetInputs).reduce((sum, v) => sum + parseAmountInput(v || ''), 0) +
-      Object.values(subcategoryInputs)
-        .flat()
-        .reduce((sum, row) => sum + parseAmountInput(row.amount || ''), 0),
-  );
+  const totalBudget = $derived(totalPlanFromCategories(categories.map((c) => c.id), budgetInputs));
+
   const totalIncome = $derived(
     incomeRows.reduce((sum, row) => sum + parseAmountInput(row.amount || ''), 0),
   );
 
-  const picSummary = $derived.by(() => {
-    const incomeByPic: Record<Pic, number> = { Derwin: 0, Anggita: 0 };
-    const planByPic: Record<Pic, number> = { Derwin: 0, Anggita: 0 };
-
-    for (const row of incomeRows) {
-      const owner = incomePicFromSource(row.source);
-      if (owner) {
-        incomeByPic[owner] += parseAmountInput(row.amount || '');
-      }
-    }
-
-    for (const cat of categories) {
-      const pic = picInputs[cat.id] ?? DEFAULT_PIC;
-      planByPic[pic] += parseAmountInput(budgetInputs[cat.id] || '');
-      for (const sub of subcategoryInputs[cat.id] ?? []) {
-        planByPic[sub.pic] += parseAmountInput(sub.amount || '');
-      }
-    }
-
-    return PICS.map((pic) => ({
-      pic,
-      income: incomeByPic[pic],
-      plan: planByPic[pic],
-      balancing: incomeByPic[pic] - planByPic[pic],
-    }));
-  });
+  const picSummary = $derived(
+    picPlanSummary({ incomeRows, categories, budgetInputs, picInputs, subcategoryInputs }),
+  );
 
   const transferNote = $derived.by(() => {
     const rows = picSummary;
@@ -527,6 +511,26 @@
             >
               + Sub category
             </button>
+
+            {#if (subcategoryInputs[cat.id] ?? []).length > 0}
+              {@const subs = subcategoryInputs[cat.id] ?? []}
+              {@const subTotal = subAmountTotal(subs)}
+              {@const mainRemainder = mainCategoryRemainder(budgetInputs[cat.id] || '', subs)}
+              {@const overSub = subExceedsCategory(budgetInputs[cat.id] || '', subs)}
+              <div class="{budgetGrid} text-zinc-500">
+                <span class="min-w-0 pl-3 text-xs italic">Main (remaining)</span>
+                <span class="font-mono text-right text-xs tabular-nums">{formatCurrency(mainRemainder)}</span>
+                <span class="text-center text-[10px]">{picInitial(picInputs[cat.id] ?? DEFAULT_PIC)}</span>
+                <span></span>
+              </div>
+              <p class="ml-3 text-[10px] {overSub ? 'text-red-600 dark:text-red-400' : 'text-zinc-500'}">
+                {#if overSub}
+                  Sub total {formatCurrency(subTotal)} exceeds category {formatCurrency(parseAmountInput(budgetInputs[cat.id] || ''))}.
+                {:else}
+                  Category {formatCurrency(parseAmountInput(budgetInputs[cat.id] || ''))} = subs {formatCurrency(subTotal)} + main {formatCurrency(mainRemainder)}
+                {/if}
+              </p>
+            {/if}
           </div>
         {/each}
 

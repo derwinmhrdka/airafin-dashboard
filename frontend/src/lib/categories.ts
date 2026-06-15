@@ -56,3 +56,10 @@ export function categoryStyle(name: string) {
     }
   );
 }
+
+export function defaultCategoryId(
+  categories: readonly { id: number; name: string }[],
+): number {
+  const daily = categories.find((c) => c.name.toLowerCase() === 'daily');
+  return daily?.id ?? categories[0]?.id ?? 0;
+}

@@ -3,7 +3,7 @@
   import AmountInput from '$lib/components/AmountInput.svelte';
   import DetailPreview from '$lib/components/DetailPreview.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
-  import { categoryStyle } from '$lib/categories';
+  import { categoryStyle, defaultCategoryId } from '$lib/categories';
   import {
     createTransaction,
     deleteTransaction,
@@ -99,7 +99,7 @@
 
   function resetInsertForm() {
     date = new Date().toISOString().slice(0, 10);
-    if (categories.length) categoryId = categories[0].id;
+    if (categories.length) categoryId = defaultCategoryId(categories);
     subCategory = '';
     detail = '';
     cost = '';
@@ -175,7 +175,7 @@
             .map((s) => s.name),
         ]),
       );
-      if (!categoryId && categories.length) categoryId = categories[0].id;
+      if (!categoryId && categories.length) categoryId = defaultCategoryId(categories);
       pic = picForCategory(categoryId);
       await loadTransactions(activePeriod, true);
     } catch (e) {

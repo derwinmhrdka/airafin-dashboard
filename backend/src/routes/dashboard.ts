@@ -29,11 +29,6 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         .from(budgets)
         .where(eq(budgets.period, period));
 
-      const [subBudgetRow] = await db
-        .select({ total: sql<string>`coalesce(sum(${budgetSubcategories.allocatedAmount}), 0)` })
-        .from(budgetSubcategories)
-        .where(eq(budgetSubcategories.period, period));
-
       const [spentRow] = await db
         .select({ total: sql<string>`coalesce(sum(${transactions.cost}), 0)` })
         .from(transactions)
@@ -76,16 +71,19 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const totalIncome = roundMoney(toNumber(incomeRow?.total));
-      const totalBudgetAllocated = roundMoney(
-        toNumber(budgetRow?.total) + toNumber(subBudgetRow?.total),
-      );
+      const totalBudgetAllocated = roundMoney(toNumber(budgetRow?.total));
       const totalSpent = roundMoney(toNumber(spentRow?.total));
       const totalSisa = roundMoney(totalBudgetAllocated - totalSpent);
 
       const categoriesSummary = allCategories.map((cat) => {
         const allocated = roundMoney(allocatedByCategory.get(cat.id) ?? 0);
         const spent = roundMoney(spentByCategory.get(cat.id) ?? 0);
-        const subcategories = (subsByCategory.get(cat.id) ?? []).map((sub) => {
+        const subs = subsByCategory.get(cat.id) ?? [];
+        const subAllocatedSum = roundMoney(
+          subs.reduce((sum, sub) => sum + toNumber(sub.allocatedAmount), 0),
+        );
+
+        const subcategories = subs.map((sub) => {
           const subAllocated = roundMoney(toNumber(sub.allocatedAmount));
           const subSpent = roundMoney(
             spentBySubKey.get(`${cat.id}|${sub.name.toLowerCase()}`) ?? 0,
@@ -97,6 +95,21 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
             sisa: roundMoney(subAllocated - subSpent),
           };
         });
+
+        if (subs.length > 0) {
+          const mainAllocated = roundMoney(Math.max(0, allocated - subAllocatedSum));
+          const subSpentSum = roundMoney(
+            subcategories.reduce((sum, sub) => sum + sub.spent, 0),
+          );
+          const mainSpent = roundMoney(Math.max(0, spent - subSpentSum));
+          subcategories.unshift({
+            name: 'Main (default)',
+            allocated: mainAllocated,
+            spent: mainSpent,
+            sisa: roundMoney(mainAllocated - mainSpent),
+          });
+        }
+
         return {
           categoryId: cat.id,
           categoryName: cat.name,
