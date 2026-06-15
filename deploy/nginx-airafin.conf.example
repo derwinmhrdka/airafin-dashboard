@@ -18,7 +18,7 @@
 # Does NOT touch port 80/443 on the bare IP (teknodika / default server keeps those).
 
 server {
-    listen 3080;
+    listen 0.0.0.0:3080;
     listen [::]:3080;
     server_name VPS_PUBLIC_IP;
 
