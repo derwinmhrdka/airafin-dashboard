@@ -312,37 +312,28 @@
     {#if (summary.picPocketTotals?.length ?? 0) > 0}
       <div class="space-y-2 md:space-y-3">
         <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Pocket</h2>
-        <div class="overflow-x-auto border border-zinc-200 dark:border-zinc-800">
-          <table class="w-full min-w-[30rem] border-collapse text-[11px]">
-            <thead class="bg-zinc-50 text-[10px] uppercase tracking-wider text-zinc-500 dark:bg-zinc-900">
-              <tr>
-                <th class="border-b border-zinc-200 px-2 py-2 text-left font-medium dark:border-zinc-800">
-                  PIC
-                </th>
-                {#each pocketColumns as pocket}
-                  <th
-                    class="border-b border-zinc-200 px-2 py-2 text-right font-medium dark:border-zinc-800"
-                  >
-                    {pocket}
-                  </th>
-                {/each}
-              </tr>
-            </thead>
-            <tbody>
-              {#each summary.picPocketTotals as row (row.pic)}
-                <tr class="border-b border-zinc-100 last:border-b-0 dark:border-zinc-900">
-                  <td class="px-2 py-2">
-                    <PicBadge name={row.pic} />
-                  </td>
-                  {#each pocketColumns as pocket}
-                    <td class="px-2 py-2 text-right font-mono tabular-nums">
-                      <span class="font-medium">{formatCurrency(pocketTotalFor(row, pocket).sisa)}</span>
-                    </td>
-                  {/each}
-                </tr>
+        <div class="space-y-2">
+          {#each summary.picPocketTotals as row (row.pic)}
+            <article class="space-y-1.5 border border-zinc-200 p-3 dark:border-zinc-800">
+              <div class="flex items-center justify-between gap-2">
+                <PicBadge name={row.pic} />
+                <span class="text-[10px] uppercase tracking-wider text-zinc-500">Pocket</span>
+              </div>
+              {#each pocketColumns as pocket}
+                <div class="flex items-center justify-between gap-2 text-xs">
+                  <span class="text-zinc-500">{pocket}</span>
+                  <div class="text-right">
+                    <p class="font-mono font-medium tabular-nums">
+                      {formatCurrency(pocketTotalFor(row, pocket).sisa)}
+                    </p>
+                    <p class="text-[10px] text-zinc-500">
+                      plan {formatCurrency(pocketTotalFor(row, pocket).total)}
+                    </p>
+                  </div>
+                </div>
               {/each}
-            </tbody>
-          </table>
+            </article>
+          {/each}
         </div>
       </div>
     {/if}

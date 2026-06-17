@@ -29,7 +29,7 @@
   const period = $derived(periodFromUrl(page.url.searchParams));
 
   const budgetGrid =
-    'grid grid-cols-[minmax(7rem,1fr)_5.4rem_2.2rem_4.7rem_1.5rem] items-center gap-x-1.5 md:grid-cols-[minmax(12rem,1fr)_8rem_3rem_6.5rem_2.5rem] md:gap-x-3';
+    'grid grid-cols-[minmax(7.5rem,1fr)_5.2rem_1.9rem_3.9rem_1.1rem] items-center gap-x-1 md:grid-cols-[minmax(12rem,1fr)_8rem_3rem_6.5rem_2.5rem] md:gap-x-3';
 
   const removeBtnClass =
     'flex h-6 w-6 shrink-0 items-center justify-center bg-transparent text-base leading-none font-light text-red-600 dark:bg-transparent dark:text-red-500 md:h-8 md:w-8 md:text-xl';
@@ -395,47 +395,50 @@
         <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">
           Income — {period}
         </legend>
+        <div class="overflow-x-auto">
+          <div class="min-w-[22rem] space-y-2 md:min-w-0">
+            {#each incomeRows as row (row.key)}
+              <div class="flex items-end gap-2">
+                <label class="min-w-0 flex-1 space-y-1">
+                  <span class="text-[11px] text-zinc-500">Source</span>
+                  <input
+                    type="text"
+                    bind:value={row.source}
+                    placeholder="e.g. Gaji, Bonus"
+                    class="w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
+                  />
+                </label>
+                <label class="w-32 shrink-0 space-y-1">
+                  <span class="text-[11px] text-zinc-500">Amount</span>
+                  <AmountInput bind:value={row.amount} class="text-right" />
+                </label>
+                {#if incomeRows.length > 1}
+                  <button
+                    type="button"
+                    onclick={() => removeIncomeRow(row.key)}
+                    class="mb-0.5 {removeBtnClass}"
+                    aria-label="Remove income"
+                  >
+                    ×
+                  </button>
+                {/if}
+              </div>
+            {/each}
 
-        {#each incomeRows as row (row.key)}
-          <div class="flex items-end gap-2">
-            <label class="min-w-0 flex-1 space-y-1">
-              <span class="text-[11px] text-zinc-500">Source</span>
-              <input
-                type="text"
-                bind:value={row.source}
-                placeholder="e.g. Gaji, Bonus"
-                class="w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
-              />
-            </label>
-            <label class="w-32 shrink-0 space-y-1">
-              <span class="text-[11px] text-zinc-500">Amount</span>
-              <AmountInput bind:value={row.amount} class="text-right" />
-            </label>
-            {#if incomeRows.length > 1}
-              <button
-                type="button"
-                onclick={() => removeIncomeRow(row.key)}
-                class="mb-0.5 {removeBtnClass}"
-                aria-label="Remove income"
-              >
-                ×
-              </button>
-            {/if}
+            <button
+              type="button"
+              onclick={addIncomeRow}
+              class="w-full border border-dashed border-zinc-300 py-2 text-xs text-zinc-500 dark:border-zinc-700"
+            >
+              + Add income
+            </button>
+
+            <p class="text-right text-xs text-zinc-500">
+              Total Income:
+              <span class="font-mono text-black dark:text-white">{formatCurrency(totalIncome)}</span>
+            </p>
           </div>
-        {/each}
-
-        <button
-          type="button"
-          onclick={addIncomeRow}
-          class="w-full border border-dashed border-zinc-300 py-2 text-xs text-zinc-500 dark:border-zinc-700"
-        >
-          + Add income
-        </button>
-
-        <p class="text-right text-xs text-zinc-500">
-          Total Income:
-          <span class="font-mono text-black dark:text-white">{formatCurrency(totalIncome)}</span>
-        </p>
+        </div>
       </fieldset>
 
       <fieldset class="space-y-2 border border-zinc-200 p-3 dark:border-zinc-800">
@@ -451,8 +454,8 @@
               <span class="min-w-0 text-center">Category</span>
               <span class="min-w-0 text-center">Budget</span>
               <span class="min-w-0 text-center">PIC</span>
-              <span class="min-w-0 text-center">Pocket</span>
-              <span class="min-w-0 text-center">Action</span>
+              <span class="min-w-0 text-center">Src</span>
+              <span class="min-w-0 text-center" title="Action">×</span>
             </div>
 
             {#each categories as cat (cat.id)}
@@ -469,7 +472,7 @@
                   <div class="flex justify-center">
                     <select
                       bind:value={picInputs[cat.id]}
-                      class="h-8 w-full border border-zinc-200 bg-white px-0 text-center text-[10px] font-semibold leading-8 dark:border-zinc-800 dark:bg-black"
+                      class="h-8 w-full border border-zinc-200 bg-white px-0 text-center text-[9px] font-semibold leading-8 dark:border-zinc-800 dark:bg-black"
                       aria-label="PIC for {cat.name}"
                       title={picInputs[cat.id]}
                     >
@@ -481,7 +484,7 @@
                   <div class="min-w-0">
                     <select
                       bind:value={pocketInputs[cat.id]}
-                      class="h-8 w-full border border-zinc-200 bg-white px-1 text-[9px] md:text-[10px] dark:border-zinc-800 dark:bg-black"
+                      class="h-8 w-full border border-zinc-200 bg-white px-0.5 text-[8px] md:px-1 md:text-[10px] dark:border-zinc-800 dark:bg-black"
                       aria-label="Pocket for {cat.name}"
                     >
                       {#each POCKETS as pocket}
@@ -513,7 +516,7 @@
                     <div class="flex justify-center">
                       <select
                         bind:value={sub.pic}
-                        class="h-8 w-full border border-zinc-200 bg-white px-0 text-center text-[10px] font-semibold leading-8 dark:border-zinc-800 dark:bg-black"
+                        class="h-8 w-full border border-zinc-200 bg-white px-0 text-center text-[9px] font-semibold leading-8 dark:border-zinc-800 dark:bg-black"
                         aria-label="PIC for sub category"
                         title={sub.pic}
                       >
@@ -525,7 +528,7 @@
                     <div class="min-w-0">
                       <select
                         bind:value={sub.pocket}
-                        class="h-8 w-full border border-zinc-200 bg-white px-1 text-[9px] md:text-[10px] dark:border-zinc-800 dark:bg-black"
+                        class="h-8 w-full border border-zinc-200 bg-white px-0.5 text-[8px] md:px-1 md:text-[10px] dark:border-zinc-800 dark:bg-black"
                         aria-label="Pocket for sub category"
                       >
                         {#each POCKETS as pocket}
@@ -603,44 +606,48 @@
         <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">
           Per PIC
         </legend>
-        <p class="text-[10px] text-zinc-500">
-          Balancing = Income − Plan. A negative balance means that PIC needs more from the other.
-        </p>
+        <div class="overflow-x-auto">
+          <div class="min-w-[22rem] space-y-2 md:min-w-0">
+            <p class="text-[10px] text-zinc-500">
+              Balancing = Income − Plan. A negative balance means that PIC needs more from the other.
+            </p>
 
-        <div
-          class="grid grid-cols-[minmax(0,4.5rem)_1fr_1fr] items-center gap-x-2 gap-y-2 border-b border-zinc-200 pb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-500 md:grid-cols-[minmax(0,4.5rem)_1fr_1fr_1fr] dark:border-zinc-800"
-        >
-          <span>PIC</span>
-          <span class="hidden text-right md:block">Income</span>
-          <span class="text-right">Plan</span>
-          <span class="text-right">Balancing</span>
-        </div>
-
-        {#each picSummary as row (row.pic)}
-          <div
-            class="grid grid-cols-[minmax(0,4.5rem)_1fr_1fr] items-center gap-x-2 text-xs md:grid-cols-[minmax(0,4.5rem)_1fr_1fr_1fr]"
-          >
-            <PicBadge name={row.pic} />
-            <span class="hidden font-mono text-right tabular-nums md:block">{formatCurrency(row.income)}</span>
-            <span class="font-mono text-right tabular-nums">{formatCurrency(row.plan)}</span>
-            <span
-              class="font-mono text-right tabular-nums
-                {row.balancing > 0
-                ? 'text-emerald-600 dark:text-emerald-400'
-                : row.balancing < 0
-                  ? 'text-amber-600 dark:text-amber-400'
-                  : 'text-zinc-500'}"
+            <div
+              class="grid grid-cols-[minmax(0,4.5rem)_1fr_1fr] items-center gap-x-2 gap-y-2 border-b border-zinc-200 pb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-500 md:grid-cols-[minmax(0,4.5rem)_1fr_1fr_1fr] dark:border-zinc-800"
             >
-              {formatCurrency(row.balancing)}
-            </span>
-          </div>
-        {/each}
+              <span>PIC</span>
+              <span class="hidden text-right md:block">Income</span>
+              <span class="text-right">Plan</span>
+              <span class="text-right">Balancing</span>
+            </div>
 
-        {#if transferNote}
-          <p class="border-t border-zinc-200 pt-2 text-[11px] text-amber-700 dark:border-zinc-800 dark:text-amber-400">
-            {transferNote}
-          </p>
-        {/if}
+            {#each picSummary as row (row.pic)}
+              <div
+                class="grid grid-cols-[minmax(0,4.5rem)_1fr_1fr] items-center gap-x-2 text-xs md:grid-cols-[minmax(0,4.5rem)_1fr_1fr_1fr]"
+              >
+                <PicBadge name={row.pic} />
+                <span class="hidden font-mono text-right tabular-nums md:block">{formatCurrency(row.income)}</span>
+                <span class="font-mono text-right tabular-nums">{formatCurrency(row.plan)}</span>
+                <span
+                  class="font-mono text-right tabular-nums
+                    {row.balancing > 0
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : row.balancing < 0
+                      ? 'text-amber-600 dark:text-amber-400'
+                      : 'text-zinc-500'}"
+                >
+                  {formatCurrency(row.balancing)}
+                </span>
+              </div>
+            {/each}
+
+            {#if transferNote}
+              <p class="border-t border-zinc-200 pt-2 text-[11px] text-amber-700 dark:border-zinc-800 dark:text-amber-400">
+                {transferNote}
+              </p>
+            {/if}
+          </div>
+        </div>
       </fieldset>
 
       {#if error}
