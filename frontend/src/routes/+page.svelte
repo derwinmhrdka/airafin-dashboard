@@ -2,7 +2,6 @@
   import { page } from '$app/state';
   import { categoryChartFill } from '$lib/chart-colors';
   import CategoryProgress from '$lib/components/CategoryProgress.svelte';
-  import PocketProgress from '$lib/components/PocketProgress.svelte';
   import PieChart from '$lib/components/PieChart.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
   import StatCard from '$lib/components/StatCard.svelte';
@@ -67,19 +66,15 @@
       })),
   );
 
-  const pocketItems = $derived.by(() =>
+  const pocketGroups = $derived.by(() =>
     (summary?.picPocketTotals ?? [])
-      .flatMap((row) =>
-        row.pockets.map((pocket) => ({
-          key: `${row.pic}\0${pocket.pocket}`,
-          label: `${picInitial(row.pic)} · ${pocket.pocket}`,
-          planned: pocket.total,
-          spent: pocket.spent,
-          sisa: pocket.sisa,
-        })),
-      )
-      .filter((row) => row.planned > 0 || row.spent > 0)
-      .sort((a, b) => b.planned - a.planned),
+      .map((row) => ({
+        pic: row.pic,
+        pockets: row.pockets
+          .filter((p) => p.total > 0 || p.spent > 0)
+          .sort((a, b) => b.total - a.total),
+      }))
+      .filter((row) => row.pockets.length > 0),
   );
 
   /** Plan owner → who paid: how much is still owed per directed pair. */
@@ -308,12 +303,55 @@
       </div>
     </div>
 
-    {#if pocketItems.length > 0}
+    {#if pocketGroups.length > 0}
       <div class="space-y-2 md:space-y-3">
         <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Pocket</h2>
-        <div class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {#each pocketItems as item, i (item.key)}
-            <PocketProgress {item} index={i} />
+        <div class="space-y-2">
+          {#each pocketGroups as group (group.pic)}
+            <details class="border border-zinc-200 p-3 dark:border-zinc-800" open>
+              <summary class="flex cursor-pointer list-none items-center justify-between gap-2">
+                <PicBadge name={group.pic} />
+                <span class="text-[10px] uppercase tracking-wider text-zinc-500">
+                  {group.pockets.length} pockets
+                </span>
+              </summary>
+              <div class="mt-2 space-y-2">
+                {#each group.pockets as pocket}
+                  {@const pct = pocket.total > 0 ? Math.min((pocket.spent / pocket.total) * 100, 100) : 0}
+                  {@const overBudget = pocket.sisa < 0}
+                  <div class="border border-zinc-200 p-2 dark:border-zinc-800">
+                    <div class="mb-2 flex items-center justify-between gap-2">
+                      <span class="rounded bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+                        {pocket.pocket}
+                      </span>
+                      <span class="font-mono text-xs tabular-nums text-zinc-500">{pct.toFixed(0)}%</span>
+                    </div>
+                    <div class="mb-2 h-1.5 overflow-hidden bg-zinc-100 dark:bg-zinc-900">
+                      <div
+                        class="h-full transition-all duration-700 ease-out {overBudget ? 'bg-red-600' : 'bg-zinc-700 dark:bg-zinc-300'}"
+                        style="width: {pct}%"
+                      ></div>
+                    </div>
+                    <div class="grid min-w-0 grid-cols-3 gap-1">
+                      <div class="min-w-0">
+                        <p class="text-[10px] text-zinc-500">Spent</p>
+                        <p class="stat-amount font-mono tabular-nums">{formatCurrency(pocket.spent)}</p>
+                      </div>
+                      <div class="min-w-0">
+                        <p class="text-[10px] text-zinc-500">Plan</p>
+                        <p class="stat-amount font-mono tabular-nums">{formatCurrency(pocket.total)}</p>
+                      </div>
+                      <div class="min-w-0 text-right">
+                        <p class="text-[10px] text-zinc-500">SISA</p>
+                        <p class="stat-amount font-mono tabular-nums {overBudget ? 'text-red-600 dark:text-red-400' : ''}">
+                          {formatCurrency(pocket.sisa)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            </details>
           {/each}
         </div>
       </div>

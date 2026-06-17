@@ -395,8 +395,7 @@
         <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">
           Income — {period}
         </legend>
-        <div class="-mx-3 overflow-x-auto px-3">
-          <div class="min-w-[24rem] space-y-2 md:min-w-0">
+        <div class="space-y-2">
             {#each incomeRows as row (row.key)}
               <div class="flex items-end gap-2">
                 <label class="min-w-0 flex-1 space-y-1">
@@ -437,7 +436,6 @@
               Total Income:
               <span class="font-mono text-black dark:text-white">{formatCurrency(totalIncome)}</span>
             </p>
-          </div>
         </div>
       </fieldset>
 
@@ -607,8 +605,7 @@
         <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">
           Per PIC
         </legend>
-        <div class="-mx-3 overflow-x-auto px-3">
-          <div class="min-w-[24rem] space-y-2 md:min-w-0">
+        <div class="space-y-2">
             <p class="text-[10px] text-zinc-500">
               Balancing = Income − Plan. A negative balance means that PIC needs more from the other.
             </p>
@@ -647,7 +644,6 @@
                 {transferNote}
               </p>
             {/if}
-          </div>
         </div>
       </fieldset>
 
