@@ -311,7 +311,7 @@
 
     {#if (summary.picPocketTotals?.length ?? 0) > 0}
       <div class="space-y-2 md:space-y-3">
-        <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Per PIC · Pocket</h2>
+        <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Pocket</h2>
         <div class="overflow-x-auto border border-zinc-200 dark:border-zinc-800">
           <table class="w-full min-w-[30rem] border-collapse text-[11px]">
             <thead class="bg-zinc-50 text-[10px] uppercase tracking-wider text-zinc-500 dark:bg-zinc-900">
@@ -326,9 +326,6 @@
                     {pocket}
                   </th>
                 {/each}
-                <th class="border-b border-zinc-200 px-2 py-2 text-right font-medium dark:border-zinc-800">
-                  Remaining
-                </th>
               </tr>
             </thead>
             <tbody>
@@ -340,14 +337,8 @@
                   {#each pocketColumns as pocket}
                     <td class="px-2 py-2 text-right font-mono tabular-nums">
                       <span class="font-medium">{formatCurrency(pocketTotalFor(row, pocket).sisa)}</span>
-                      <span class="block text-[10px] text-zinc-500">
-                        plan {formatCurrency(pocketTotalFor(row, pocket).total)}
-                      </span>
                     </td>
                   {/each}
-                  <td class="px-2 py-2 text-right font-mono font-medium tabular-nums">
-                    {formatCurrency(row.sisa)}
-                  </td>
                 </tr>
               {/each}
             </tbody>
