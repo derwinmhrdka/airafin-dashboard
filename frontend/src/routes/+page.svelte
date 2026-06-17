@@ -339,10 +339,9 @@
                   </td>
                   {#each pocketColumns as pocket}
                     <td class="px-2 py-2 text-right font-mono tabular-nums">
-                      {@const pocketStats = pocketTotalFor(row, pocket)}
-                      <span class="font-medium">{formatCurrency(pocketStats.sisa)}</span>
+                      <span class="font-medium">{formatCurrency(pocketTotalFor(row, pocket).sisa)}</span>
                       <span class="block text-[10px] text-zinc-500">
-                        plan {formatCurrency(pocketStats.total)}
+                        plan {formatCurrency(pocketTotalFor(row, pocket).total)}
                       </span>
                     </td>
                   {/each}
