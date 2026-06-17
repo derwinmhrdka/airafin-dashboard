@@ -162,8 +162,14 @@ export function syncSheetToDb(period: string): Promise<SyncResult> {
 export function savePlan(body: {
   period: string;
   incomes?: { source: string; amount: number }[];
-  budgets?: { categoryId: number; allocatedAmount: number; pic?: string }[];
-  subcategories?: { categoryId: number; name: string; allocatedAmount?: number; pic?: string }[];
+  budgets?: { categoryId: number; allocatedAmount: number; pic?: string; pocket?: string }[];
+  subcategories?: {
+    categoryId: number;
+    name: string;
+    allocatedAmount?: number;
+    pic?: string;
+    pocket?: string;
+  }[];
 }): Promise<{ ok: boolean; period?: string }> {
   return fetchJson('/api/budgets', {
     method: 'POST',

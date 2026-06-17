@@ -13,6 +13,7 @@ interface BudgetInput {
   categoryId: number;
   allocatedAmount: number;
   pic?: string;
+  pocket?: string;
 }
 
 interface SubcategoryInput {
@@ -20,6 +21,7 @@ interface SubcategoryInput {
   name: string;
   allocatedAmount?: number;
   pic?: string;
+  pocket?: string;
 }
 
 interface PlanBody {
@@ -27,6 +29,12 @@ interface PlanBody {
   incomes?: IncomeInput[];
   budgets?: BudgetInput[];
   subcategories?: SubcategoryInput[];
+}
+
+const VALID_POCKET = ['BCA', 'MANDIRI', 'SUPA', 'DANA', 'OVO', 'CASH', 'BIBIT'] as const;
+
+function isValidPocket(value: string): value is (typeof VALID_POCKET)[number] {
+  return (VALID_POCKET as readonly string[]).includes(value);
 }
 
 export async function budgetRoutes(app: FastifyInstance): Promise<void> {
@@ -48,6 +56,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
           categoryName: categories.name,
           allocatedAmount: budgets.allocatedAmount,
           pic: budgets.pic,
+          pocket: budgets.pocket,
           period: budgets.period,
         })
         .from(budgets)
@@ -62,6 +71,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
           name: budgetSubcategories.name,
           allocatedAmount: budgetSubcategories.allocatedAmount,
           pic: budgetSubcategories.pic,
+          pocket: budgetSubcategories.pocket,
           period: budgetSubcategories.period,
         })
         .from(budgetSubcategories)
@@ -128,6 +138,10 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
         if (pic && !isValidPic(pic)) {
           return reply.code(400).send({ error: 'Invalid pic value' });
         }
+        const pocket = budget.pocket?.trim() ?? '';
+        if (pocket && !isValidPocket(pocket)) {
+          return reply.code(400).send({ error: 'Invalid pocket value' });
+        }
 
         const amount = String(Math.round(budget.allocatedAmount));
 
@@ -137,11 +151,12 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
             categoryId: budget.categoryId,
             allocatedAmount: amount,
             pic,
+            pocket,
             period: trimmedPeriod,
           })
           .onConflictDoUpdate({
             target: [budgets.categoryId, budgets.period],
-            set: { allocatedAmount: amount, pic },
+            set: { allocatedAmount: amount, pic, pocket },
           });
       }
     }
@@ -167,6 +182,10 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
         if (pic && !isValidPic(pic)) {
           return reply.code(400).send({ error: 'Invalid pic value' });
         }
+        const pocket = sub.pocket?.trim() ?? '';
+        if (pocket && !isValidPocket(pocket)) {
+          return reply.code(400).send({ error: 'Invalid pocket value' });
+        }
 
         const amount = String(Math.round(sub.allocatedAmount ?? 0));
 
@@ -176,6 +195,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
           name,
           allocatedAmount: amount,
           pic,
+          pocket,
         });
       }
     }

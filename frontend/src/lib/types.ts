@@ -25,6 +25,11 @@ export interface DashboardSummary {
   totalBudgetAllocated: number;
   totalSpent: number;
   totalSisa: number;
+  picPocketTotals: {
+    pic: string;
+    pockets: { pocket: string; total: number }[];
+    total: number;
+  }[];
   categories: CategorySummary[];
 }
 
@@ -58,6 +63,7 @@ export interface PlanBudget {
   categoryName: string;
   allocatedAmount: string;
   pic: string;
+  pocket: string;
   period: string;
 }
 
@@ -67,6 +73,7 @@ export interface PlanSubcategory {
   name: string;
   allocatedAmount: string;
   pic: string;
+  pocket: string;
   period: string;
 }
 

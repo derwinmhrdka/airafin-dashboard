@@ -66,6 +66,23 @@
       })),
   );
 
+  const pocketColumns = $derived.by(() => {
+    const set = new Set<string>();
+    for (const row of summary?.picPocketTotals ?? []) {
+      for (const item of row.pockets) {
+        if (item.pocket) set.add(item.pocket);
+      }
+    }
+    return [...set];
+  });
+
+  function pocketTotalFor(
+    row: { pockets: { pocket: string; total: number }[] },
+    pocket: string,
+  ): number {
+    return row.pockets.find((p) => p.pocket === pocket)?.total ?? 0;
+  }
+
   /** Plan owner → who paid: how much is still owed per directed pair. */
   const reimbursementTotals = $derived.by(() => {
     const byPair = new Map<string, number>();
@@ -291,6 +308,37 @@
       {/each}
       </div>
     </div>
+
+    {#if (summary.picPocketTotals?.length ?? 0) > 0}
+      <div class="space-y-2 md:space-y-3">
+        <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Per PIC · Pocket</h2>
+        <div class="space-y-2">
+          {#each summary.picPocketTotals as row (row.pic)}
+            <article class="space-y-2 border border-zinc-200 p-3 dark:border-zinc-800">
+              <div class="flex items-center justify-between gap-2">
+                <PicBadge name={row.pic} />
+                <span class="font-mono text-xs tabular-nums">{formatCurrency(row.total)}</span>
+              </div>
+              <div class="overflow-x-auto">
+                <div
+                  class="grid min-w-[28rem] gap-1"
+                  style="grid-template-columns: repeat({Math.max(pocketColumns.length, 1)}, minmax(5rem, 1fr));"
+                >
+                  {#each pocketColumns as pocket}
+                    <div class="border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-center dark:border-zinc-800 dark:bg-zinc-900">
+                      <p class="text-[10px] uppercase tracking-wider text-zinc-500">{pocket}</p>
+                      <p class="font-mono text-[11px] tabular-nums">
+                        {formatCurrency(pocketTotalFor(row, pocket))}
+                      </p>
+                    </div>
+                  {/each}
+                </div>
+              </div>
+            </article>
+          {/each}
+        </div>
+      </div>
+    {/if}
 
     <div class="space-y-2">
       <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Reimbursements</h2>

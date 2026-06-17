@@ -9,6 +9,8 @@ import {
 import { isValidPic } from '../lib/pic.js';
 import { roundMoney, toNumber } from '../lib/money.js';
 
+const DEFAULT_POCKET = 'UNSET';
+
 export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Querystring: { period?: string } }>(
     '/api/dashboard/summary',
@@ -74,6 +76,46 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       const totalBudgetAllocated = roundMoney(toNumber(budgetRow?.total));
       const totalSpent = roundMoney(toNumber(spentRow?.total));
       const totalSisa = roundMoney(totalBudgetAllocated - totalSpent);
+      const subTotalsByCategory = new Map<number, number>();
+      for (const sub of periodSubcategories) {
+        subTotalsByCategory.set(
+          sub.categoryId,
+          (subTotalsByCategory.get(sub.categoryId) ?? 0) + toNumber(sub.allocatedAmount),
+        );
+      }
+
+      const pocketByPic = new Map<string, Map<string, number>>();
+      const addToPocket = (picRaw: string, pocketRaw: string, amount: number) => {
+        const pic = picRaw?.trim() ?? '';
+        if (!pic || !isValidPic(pic) || amount <= 0) return;
+        const pocket = pocketRaw?.trim().toUpperCase() || DEFAULT_POCKET;
+        const byPocket = pocketByPic.get(pic) ?? new Map<string, number>();
+        byPocket.set(pocket, (byPocket.get(pocket) ?? 0) + amount);
+        pocketByPic.set(pic, byPocket);
+      };
+
+      for (const budget of periodBudgets) {
+        const total = toNumber(budget.allocatedAmount);
+        const subTotal = subTotalsByCategory.get(budget.categoryId) ?? 0;
+        const mainAmount = Math.max(0, total - subTotal);
+        addToPocket(budget.pic, budget.pocket, mainAmount);
+      }
+      for (const sub of periodSubcategories) {
+        addToPocket(sub.pic, sub.pocket, toNumber(sub.allocatedAmount));
+      }
+
+      const picPocketTotals = [...pocketByPic.entries()]
+        .map(([pic, byPocket]) => {
+          const pockets = [...byPocket.entries()]
+            .map(([pocket, total]) => ({ pocket, total: roundMoney(total) }))
+            .sort((a, b) => b.total - a.total);
+          return {
+            pic,
+            pockets,
+            total: roundMoney(pockets.reduce((sum, item) => sum + item.total, 0)),
+          };
+        })
+        .sort((a, b) => b.total - a.total);
 
       const categoriesSummary = allCategories.map((cat) => {
         const allocated = roundMoney(allocatedByCategory.get(cat.id) ?? 0);
@@ -126,6 +168,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         totalBudgetAllocated,
         totalSpent,
         totalSisa,
+        picPocketTotals,
         categories: categoriesSummary,
       };
     },
