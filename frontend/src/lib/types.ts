@@ -6,6 +6,7 @@ export interface Category {
 export interface PocketSetting {
   id: number;
   name: string;
+  color: string;
 }
 
 export interface SubcategorySummary {
@@ -32,7 +33,7 @@ export interface DashboardSummary {
   totalSisa: number;
   picPocketTotals: {
     pic: string;
-    pockets: { pocket: string; total: number; spent: number; sisa: number }[];
+    pockets: { pocket: string; color: string; total: number; spent: number; sisa: number }[];
     total: number;
     spent: number;
     sisa: number;

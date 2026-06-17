@@ -63,10 +63,20 @@ export function getPockets(): Promise<{ pockets: PocketSetting[] }> {
   return fetchJson('/api/settings/pockets');
 }
 
-export function createPocket(name: string): Promise<{ pocket: PocketSetting | null; created: boolean }> {
+export function createPocket(
+  name: string,
+  color?: string,
+): Promise<{ pocket: PocketSetting | null; created: boolean }> {
   return fetchJson('/api/settings/pockets', {
     method: 'POST',
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, color }),
+  });
+}
+
+export function updatePocketColor(id: number, color: string): Promise<{ pocket: PocketSetting }> {
+  return fetchJson(`/api/settings/pockets/${id}/color`, {
+    method: 'PATCH',
+    body: JSON.stringify({ color }),
   });
 }
 

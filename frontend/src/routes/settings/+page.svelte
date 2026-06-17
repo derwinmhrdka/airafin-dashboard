@@ -1,6 +1,13 @@
 <script lang="ts">
   import { page } from '$app/state';
-  import { createPocket, deletePocket, getPockets, syncDbToSheet, syncSheetToDb } from '$lib/api';
+  import {
+    createPocket,
+    deletePocket,
+    getPockets,
+    syncDbToSheet,
+    syncSheetToDb,
+    updatePocketColor,
+  } from '$lib/api';
   import { periodFromUrl } from '$lib/period';
   import type { PocketSetting } from '$lib/types';
 
@@ -8,8 +15,10 @@
 
   let pockets = $state<PocketSetting[]>([]);
   let pocketName = $state('');
+  let pocketColor = $state('#3b82f6');
   let loading = $state(true);
   let pocketBusy = $state(false);
+  let colorBusyId = $state<number | null>(null);
   let syncing = $state<'db-to-sheet' | 'sheet-to-db' | null>(null);
   let success = $state('');
   let error = $state('');
@@ -37,8 +46,9 @@
     success = '';
     error = '';
     try {
-      await createPocket(name);
+      await createPocket(name, pocketColor);
       pocketName = '';
+      pocketColor = '#3b82f6';
       await loadPockets();
       success = `Pocket ${name} saved`;
     } catch (e) {
@@ -106,6 +116,21 @@
       syncing = null;
     }
   }
+
+  async function handleUpdatePocketColor(item: PocketSetting, nextColor: string) {
+    colorBusyId = item.id;
+    success = '';
+    error = '';
+    try {
+      const { pocket } = await updatePocketColor(item.id, nextColor);
+      pockets = pockets.map((p) => (p.id === item.id ? pocket : p));
+      success = `Pocket ${item.name} color updated`;
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to update pocket color';
+    } finally {
+      colorBusyId = null;
+    }
+  }
 </script>
 
 <section class="space-y-4">
@@ -144,6 +169,10 @@
         placeholder="Pocket name (e.g. BCA)"
         class="min-w-0 flex-1 border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
       />
+      <label class="flex items-center gap-1 border border-zinc-200 px-2 dark:border-zinc-800">
+        <span class="text-[10px] text-zinc-500">Color</span>
+        <input type="color" bind:value={pocketColor} class="h-7 w-7 cursor-pointer bg-transparent p-0" />
+      </label>
       <button
         type="button"
         onclick={handleAddPocket}
@@ -162,15 +191,28 @@
       <div class="space-y-1">
         {#each pockets as item (item.id)}
           <div class="flex items-center justify-between border border-zinc-200 px-2 py-1.5 dark:border-zinc-800">
-            <span class="text-sm">{item.name}</span>
-            <button
-              type="button"
-              onclick={() => handleDeletePocket(item)}
-              disabled={pocketBusy}
-              class="border border-red-200 px-2 py-1 text-[10px] text-red-600 disabled:opacity-50 dark:border-red-900 dark:text-red-400"
-            >
-              Delete
-            </button>
+            <div class="flex items-center gap-2">
+              <span class="h-3 w-3 rounded-full border border-zinc-300 dark:border-zinc-700" style="background-color: {item.color}"></span>
+              <span class="text-sm">{item.name}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <input
+                type="color"
+                value={item.color}
+                disabled={colorBusyId === item.id}
+                onchange={(e) => handleUpdatePocketColor(item, (e.currentTarget as HTMLInputElement).value)}
+                class="h-7 w-7 cursor-pointer bg-transparent p-0 disabled:opacity-50"
+                aria-label="Change color for {item.name}"
+              />
+              <button
+                type="button"
+                onclick={() => handleDeletePocket(item)}
+                disabled={pocketBusy || colorBusyId === item.id}
+                class="border border-red-200 px-2 py-1 text-[10px] text-red-600 disabled:opacity-50 dark:border-red-900 dark:text-red-400"
+              >
+                Delete
+              </button>
+            </div>
           </div>
         {/each}
       </div>

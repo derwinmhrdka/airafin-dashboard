@@ -5,6 +5,15 @@ import { budgetSubcategories, budgets, pockets } from '../db/schema.js';
 
 interface PocketBody {
   name?: string;
+  color?: string;
+}
+
+function normalizePocketColor(input?: string): string {
+  const color = input?.trim() || '#71717a';
+  if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
+    throw new Error('Invalid color format (expected #RRGGBB)');
+  }
+  return color.toLowerCase();
 }
 
 export async function settingsRoutes(app: FastifyInstance): Promise<void> {
@@ -16,10 +25,16 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Body: PocketBody }>('/api/settings/pockets', async (request, reply) => {
     const name = request.body?.name?.trim().toUpperCase();
     if (!name) return reply.code(400).send({ error: 'name is required' });
+    let color = '#71717a';
+    try {
+      color = normalizePocketColor(request.body?.color);
+    } catch (e) {
+      return reply.code(400).send({ error: e instanceof Error ? e.message : 'Invalid color' });
+    }
 
     const [created] = await db
       .insert(pockets)
-      .values({ name })
+      .values({ name, color })
       .onConflictDoNothing()
       .returning();
 
@@ -29,6 +44,30 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     }
     return { pocket: created, created: true };
   });
+
+  app.patch<{ Params: { id: string }; Body: Pick<PocketBody, 'color'> }>(
+    '/api/settings/pockets/:id/color',
+    async (request, reply) => {
+      const id = Number.parseInt(request.params.id, 10);
+      if (!Number.isFinite(id) || id <= 0) return reply.code(400).send({ error: 'Invalid id' });
+
+      let color: string;
+      try {
+        color = normalizePocketColor(request.body?.color);
+      } catch (e) {
+        return reply.code(400).send({ error: e instanceof Error ? e.message : 'Invalid color' });
+      }
+
+      const [updated] = await db
+        .update(pockets)
+        .set({ color })
+        .where(eq(pockets.id, id))
+        .returning();
+      if (!updated) return reply.code(404).send({ error: 'Pocket not found' });
+
+      return { pocket: updated };
+    },
+  );
 
   app.delete<{ Params: { id: string } }>('/api/settings/pockets/:id', async (request, reply) => {
     const id = Number.parseInt(request.params.id, 10);

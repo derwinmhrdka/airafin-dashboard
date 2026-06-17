@@ -6,7 +6,7 @@
     { href: '/', label: 'Overview' },
     { href: '/detail', label: 'Detail' },
     { href: '/plan', label: 'Plan' },
-    { href: '/settings', label: 'Settings', icon: '⚙' },
+    { href: '/settings', label: 'Settings', iconOnly: true },
   ];
 
   const period = $derived(periodFromUrl(page.url.searchParams));
@@ -23,9 +23,20 @@
         ? 'border-black text-black dark:border-white dark:text-white'
         : 'border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}"
     >
-      {#if tab.icon}
-        <span aria-hidden="true" class="text-sm leading-none">{tab.icon}</span>
-        <span class="ml-1">{tab.label}</span>
+      {#if tab.iconOnly}
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 32 32"
+          class="h-4 w-4 md:h-5 md:w-5"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M16 7L24 25h-3.2l-1.6-4H12.8l-1.6 4H8L16 7z" />
+          <path d="M16 13.4L13.4 17h5.2L16 13.4z" />
+        </svg>
       {:else}
         {tab.label}
       {/if}

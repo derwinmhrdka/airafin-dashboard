@@ -50,6 +50,13 @@
       "when": 1750150000000,
       "tag": "0006_settings_pockets",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1750153600000,
+      "tag": "0007_pocket_colors",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,7 @@
 import { and, desc, eq, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/index.js';
-import { budgetSubcategories, budgets, categories, incomes, transactions } from '../db/schema.js';
+import { budgetSubcategories, budgets, categories, incomes, pockets, transactions } from '../db/schema.js';
 import {
   resolvePlanPicFromMaps,
   subcategoryPicKey,
@@ -10,6 +10,7 @@ import { isValidPic } from '../lib/pic.js';
 import { roundMoney, toNumber } from '../lib/money.js';
 
 const DEFAULT_POCKET = 'UNSET';
+const DEFAULT_POCKET_COLOR = '#71717a';
 
 export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Querystring: { period?: string } }>(
@@ -46,6 +47,10 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         .select()
         .from(transactions)
         .where(eq(transactions.period, period));
+      const pocketRows = await db.select({ name: pockets.name, color: pockets.color }).from(pockets);
+      const pocketColorByName = new Map(
+        pocketRows.map((row) => [row.name.trim().toUpperCase(), row.color || DEFAULT_POCKET_COLOR]),
+      );
 
       const allocatedByCategory = new Map(
         periodBudgets.map((b) => [b.categoryId, toNumber(b.allocatedAmount)]),
@@ -139,6 +144,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
               const spentTotal = roundMoney(spent.get(pocket) ?? 0);
               return {
                 pocket,
+                color: pocketColorByName.get(pocket) ?? DEFAULT_POCKET_COLOR,
                 total: plannedTotal,
                 spent: spentTotal,
                 sisa: roundMoney(plannedTotal - spentTotal),

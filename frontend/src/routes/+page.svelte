@@ -321,7 +321,10 @@
                   {@const overBudget = pocket.sisa < 0}
                   <div class="border border-zinc-200 p-2 dark:border-zinc-800">
                     <div class="mb-2 flex items-center justify-between gap-2">
-                      <span class="rounded bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+                      <span
+                        class="rounded px-2 py-0.5 text-xs font-medium text-white"
+                        style="background-color: {pocket.color}"
+                      >
                         {pocket.pocket}
                       </span>
                       <span class="font-mono text-xs tabular-nums text-zinc-500">{pct.toFixed(0)}%</span>

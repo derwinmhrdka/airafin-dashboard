@@ -16,6 +16,7 @@ export const categories = pgTable('categories', {
 export const pockets = pgTable('pockets', {
   id: serial('id').primaryKey(),
   name: text('name').notNull().unique(),
+  color: text('color').notNull().default('#71717a'),
 });
 
 export const incomes = pgTable(
