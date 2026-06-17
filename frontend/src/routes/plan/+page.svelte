@@ -446,9 +446,9 @@
           Budget per Category
         </legend>
 
-        <div class="space-y-2 text-[11px]">
+        <div class="space-y-2 text-[11px] md:text-sm">
           <div
-            class="grid grid-cols-[minmax(0,1fr)_5.2rem_1.8rem_3.4rem_1rem] items-center gap-x-1 border-b border-zinc-200 pb-2 text-[9px] font-medium uppercase tracking-wider text-zinc-500 dark:border-zinc-800"
+            class="grid grid-cols-[minmax(0,1fr)_5.2rem_1.8rem_3.4rem_1rem] items-center gap-x-1 border-b border-zinc-200 pb-2 text-[9px] font-medium uppercase tracking-wider text-zinc-500 md:text-[11px] dark:border-zinc-800"
           >
             <span class="text-center">Category</span>
             <span class="text-center">Budget</span>
@@ -460,17 +460,17 @@
           {#each categories as cat (cat.id)}
             <div class="space-y-1.5 border-l-2 border-zinc-300 pl-1 dark:border-zinc-700">
               <div class="grid grid-cols-[minmax(0,1fr)_5.2rem_1.8rem_3.4rem_1rem] items-center gap-x-1 rounded-sm bg-zinc-50/80 px-1 py-1 dark:bg-zinc-900/60">
-                <p class="min-w-0 truncate text-[10px] font-semibold sm:text-xs">{cat.name}</p>
+                <p class="min-w-0 truncate text-[10px] font-semibold sm:text-xs md:text-sm">{cat.name}</p>
                 <div class="min-w-0">
                   <AmountInput
                     bind:value={budgetInputs[cat.id]}
                     aria-label="Budget for {cat.name}"
-                      class="w-full px-1 py-1 text-right text-[11px]"
+                      class="w-full px-1 py-1 text-right text-[11px] md:text-sm"
                   />
                 </div>
                 <select
                   bind:value={picInputs[cat.id]}
-                      class="h-7 w-full border border-zinc-200 bg-white px-0 text-center text-[8px] font-semibold dark:border-zinc-800 dark:bg-black"
+                      class="h-7 w-full border border-zinc-200 bg-white px-0 text-center text-[8px] font-semibold md:h-8 md:text-[11px] dark:border-zinc-800 dark:bg-black"
                   aria-label="PIC for {cat.name}"
                 >
                   {#each PICS as p}
@@ -479,7 +479,7 @@
                 </select>
                 <select
                   bind:value={pocketInputs[cat.id]}
-                      class="h-7 w-full border border-zinc-200 bg-white px-0.5 text-[8px] dark:border-zinc-800 dark:bg-black"
+                      class="h-7 w-full border border-zinc-200 bg-white px-0.5 text-[8px] md:h-8 md:px-1 md:text-[11px] dark:border-zinc-800 dark:bg-black"
                   aria-label="Pocket for {cat.name}"
                 >
                   {#each pocketOptions as pocket}
@@ -496,18 +496,18 @@
                       type="text"
                       bind:value={sub.name}
                       placeholder="Sub category"
-                        class="w-full border border-zinc-200 bg-white px-2 py-1.5 text-[10px] dark:border-zinc-800 dark:bg-black"
+                        class="w-full border border-zinc-200 bg-white px-2 py-1.5 text-[10px] md:text-sm dark:border-zinc-800 dark:bg-black"
                       aria-label="Sub category for {cat.name}"
                     />
                   </div>
                   <AmountInput
                     bind:value={sub.amount}
                     aria-label="Budget for sub category {sub.name || 'new'}"
-                      class="w-full px-1 py-1 text-right text-[11px]"
+                      class="w-full px-1 py-1 text-right text-[11px] md:text-sm"
                   />
                   <select
                     bind:value={sub.pic}
-                          class="h-7 w-full border border-zinc-200 bg-white px-0 text-center text-[8px] font-semibold dark:border-zinc-800 dark:bg-black"
+                          class="h-7 w-full border border-zinc-200 bg-white px-0 text-center text-[8px] font-semibold md:h-8 md:text-[11px] dark:border-zinc-800 dark:bg-black"
                     aria-label="PIC for sub category"
                   >
                     {#each PICS as p}
@@ -516,7 +516,7 @@
                   </select>
                   <select
                     bind:value={sub.pocket}
-                          class="h-7 w-full border border-zinc-200 bg-white px-0.5 text-[8px] dark:border-zinc-800 dark:bg-black"
+                          class="h-7 w-full border border-zinc-200 bg-white px-0.5 text-[8px] md:h-8 md:px-1 md:text-[11px] dark:border-zinc-800 dark:bg-black"
                     aria-label="Pocket for sub category"
                   >
                     {#each pocketOptions as pocket}
@@ -539,7 +539,7 @@
               <button
                 type="button"
                 onclick={() => addSubcategory(cat.id)}
-                class="ml-2 border border-dashed border-zinc-300 px-2 py-1 text-[9px] text-zinc-500 dark:border-zinc-700"
+                class="ml-2 border border-dashed border-zinc-300 px-2 py-1 text-[9px] md:text-[11px] text-zinc-500 dark:border-zinc-700"
               >
                 + Sub category
               </button>
@@ -549,14 +549,14 @@
                 {@const mainRemainder = mainCategoryRemainder(budgetInputs[cat.id] || '', subs)}
                 {@const overSub = subExceedsCategory(budgetInputs[cat.id] || '', subs)}
                 <div class="grid grid-cols-[minmax(0,1fr)_5.2rem_1.8rem_3.4rem_1rem] items-center gap-x-1 border-t border-dashed border-zinc-200 pt-1 text-zinc-500 dark:border-zinc-800">
-                  <p class="text-xs italic">Main</p>
-                  <span class="font-mono text-right text-xs tabular-nums">{formatCurrency(mainRemainder)}</span>
-                  <span class="text-center text-[9px]">{picInitial(picInputs[cat.id] ?? DEFAULT_PIC)}</span>
-                  <span class="truncate text-center text-[9px]">{pocketInputs[cat.id] ?? DEFAULT_POCKET}</span>
+                  <p class="text-xs italic md:text-sm">Main</p>
+                  <span class="font-mono text-right text-xs tabular-nums md:text-sm">{formatCurrency(mainRemainder)}</span>
+                  <span class="text-center text-[9px] md:text-[11px]">{picInitial(picInputs[cat.id] ?? DEFAULT_PIC)}</span>
+                  <span class="truncate text-center text-[9px] md:text-[11px]">{pocketInputs[cat.id] ?? DEFAULT_POCKET}</span>
                   <span></span>
                 </div>
                 {#if overSub}
-                  <p class="ml-2 text-[9px] text-red-600 dark:text-red-400">
+                  <p class="ml-2 text-[9px] md:text-[11px] text-red-600 dark:text-red-400">
                     Sub total {formatCurrency(subAmountTotal(subs))} exceeds category {formatCurrency(parseAmountInput(budgetInputs[cat.id] || ''))}.
                   </p>
                 {/if}
