@@ -149,7 +149,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
         .from(transactions)
         .innerJoin(categories, eq(transactions.categoryId, categories.id))
         .where(where)
-        .orderBy(desc(transactions.id))
+        .orderBy(desc(transactions.date), desc(transactions.id))
         .limit(limit)
         .offset(offset);
 
