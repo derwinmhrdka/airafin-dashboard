@@ -308,7 +308,7 @@
         <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Pocket</h2>
         <div class="space-y-2">
           {#each pocketGroups as group (group.pic)}
-            <details class="border border-zinc-200 p-3 dark:border-zinc-800" open>
+            <details class="border border-zinc-200 p-3 dark:border-zinc-800">
               <summary class="flex cursor-pointer list-none items-center justify-between gap-2">
                 <PicBadge name={group.pic} />
                 <span class="text-[10px] uppercase tracking-wider text-zinc-500">

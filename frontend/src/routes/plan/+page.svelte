@@ -28,8 +28,8 @@
 
   const period = $derived(periodFromUrl(page.url.searchParams));
 
-  const budgetGrid =
-    'grid grid-cols-[minmax(7.5rem,1fr)_5.2rem_1.9rem_3.9rem_1.1rem] items-center gap-x-1 md:grid-cols-[minmax(12rem,1fr)_8rem_3rem_6.5rem_2.5rem] md:gap-x-3';
+  const budgetLeftGrid = 'grid grid-cols-[minmax(0,1fr)_5.4rem] items-center gap-x-1';
+  const budgetRightGrid = 'grid grid-cols-[2.1rem_4rem_1.2rem] items-center gap-x-1';
 
   const removeBtnClass =
     'flex h-6 w-6 shrink-0 items-center justify-center bg-transparent text-base leading-none font-light text-red-600 dark:bg-transparent dark:text-red-500 md:h-8 md:w-8 md:text-xl';
@@ -444,30 +444,34 @@
           Budget per Category
         </legend>
 
-        <div class="-mx-3 overflow-x-auto px-3">
-          <div class="min-w-[24rem] space-y-2 md:min-w-0">
-            <div
-              class="{budgetGrid} gap-y-1 border-b border-zinc-200 pb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-500 dark:border-zinc-800"
-            >
-              <span class="min-w-0 text-center">Category</span>
-              <span class="min-w-0 text-center">Budget</span>
-              <span class="min-w-0 text-center">PIC</span>
-              <span class="min-w-0 text-center">Src</span>
-              <span class="min-w-0 text-center" title="Action">×</span>
+        <div class="space-y-2">
+          <div
+            class="grid grid-cols-[minmax(0,1fr)_5.4rem_minmax(0,7.6rem)] items-center gap-x-1 border-b border-zinc-200 pb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-500 dark:border-zinc-800"
+          >
+            <span class="text-center">Category</span>
+            <span class="text-center">Budget</span>
+            <div class="overflow-x-auto">
+              <div class="{budgetRightGrid} min-w-[7.6rem]">
+                <span class="text-center">PIC</span>
+                <span class="text-center">Src</span>
+                <span class="text-center" title="Action">×</span>
+              </div>
             </div>
+          </div>
 
-            {#each categories as cat (cat.id)}
-              <div class="space-y-1.5 border-l-2 border-zinc-300 pl-1 dark:border-zinc-700">
-                <div class="{budgetGrid} rounded-sm bg-zinc-50/80 px-1 py-1 dark:bg-zinc-900/60">
-                  <span class="min-w-0 truncate text-[11px] font-semibold sm:text-sm">{cat.name}</span>
-                  <div class="min-w-0">
-                    <AmountInput
-                      bind:value={budgetInputs[cat.id]}
-                      aria-label="Budget for {cat.name}"
-                      class="w-full px-1.5 py-1.5 text-right"
-                    />
-                  </div>
-                  <div class="flex justify-center">
+          {#each categories as cat (cat.id)}
+            <div class="space-y-1.5 border-l-2 border-zinc-300 pl-1 dark:border-zinc-700">
+              <div class="grid grid-cols-[minmax(0,1fr)_5.4rem_minmax(0,7.6rem)] items-center gap-x-1 rounded-sm bg-zinc-50/80 px-1 py-1 dark:bg-zinc-900/60">
+                <span class="min-w-0 truncate text-[11px] font-semibold sm:text-sm">{cat.name}</span>
+                <div class="min-w-0">
+                  <AmountInput
+                    bind:value={budgetInputs[cat.id]}
+                    aria-label="Budget for {cat.name}"
+                    class="w-full px-1.5 py-1.5 text-right"
+                  />
+                </div>
+                <div class="overflow-x-auto">
+                  <div class="{budgetRightGrid} min-w-[7.6rem]">
                     <select
                       bind:value={picInputs[cat.id]}
                       class="h-8 w-full border border-zinc-200 bg-white px-0 text-center text-[9px] font-semibold leading-8 dark:border-zinc-800 dark:bg-black"
@@ -478,8 +482,6 @@
                         <option value={p}>{picInitial(p)}</option>
                       {/each}
                     </select>
-                  </div>
-                  <div class="min-w-0">
                     <select
                       bind:value={pocketInputs[cat.id]}
                       class="h-8 w-full border border-zinc-200 bg-white px-0.5 text-[8px] md:px-1 md:text-[10px] dark:border-zinc-800 dark:bg-black"
@@ -489,30 +491,32 @@
                         <option value={pocket}>{pocket}</option>
                       {/each}
                     </select>
+                    <span class="block min-h-8" aria-hidden="true"></span>
                   </div>
-                  <span class="block min-h-8" aria-hidden="true"></span>
                 </div>
+              </div>
 
-                {#each subcategoryInputs[cat.id] ?? [] as sub (sub.key)}
-                  <div class={budgetGrid}>
-                    <div class="min-w-0 pl-3">
-                      <p class="mb-1 text-[9px] uppercase tracking-wider text-zinc-400">Sub</p>
-                      <input
-                        type="text"
-                        bind:value={sub.name}
-                        placeholder="Sub category"
-                        class="w-full border border-zinc-200 bg-white px-2 py-1.5 text-xs dark:border-zinc-800 dark:bg-black"
-                        aria-label="Sub category for {cat.name}"
-                      />
-                    </div>
-                    <div class="min-w-0">
-                      <AmountInput
-                        bind:value={sub.amount}
-                        aria-label="Budget for sub category {sub.name || 'new'}"
-                        class="w-full px-1.5 py-1.5 text-right"
-                      />
-                    </div>
-                    <div class="flex justify-center">
+              {#each subcategoryInputs[cat.id] ?? [] as sub (sub.key)}
+                <div class="grid grid-cols-[minmax(0,1fr)_5.4rem_minmax(0,7.6rem)] items-center gap-x-1">
+                  <div class="min-w-0 pl-3">
+                    <p class="mb-1 text-[9px] uppercase tracking-wider text-zinc-400">Sub</p>
+                    <input
+                      type="text"
+                      bind:value={sub.name}
+                      placeholder="Sub category"
+                      class="w-full border border-zinc-200 bg-white px-2 py-1.5 text-xs dark:border-zinc-800 dark:bg-black"
+                      aria-label="Sub category for {cat.name}"
+                    />
+                  </div>
+                  <div class="min-w-0">
+                    <AmountInput
+                      bind:value={sub.amount}
+                      aria-label="Budget for sub category {sub.name || 'new'}"
+                      class="w-full px-1.5 py-1.5 text-right"
+                    />
+                  </div>
+                  <div class="overflow-x-auto">
+                    <div class="{budgetRightGrid} min-w-[7.6rem]">
                       <select
                         bind:value={sub.pic}
                         class="h-8 w-full border border-zinc-200 bg-white px-0 text-center text-[9px] font-semibold leading-8 dark:border-zinc-800 dark:bg-black"
@@ -523,8 +527,6 @@
                           <option value={p}>{picInitial(p)}</option>
                         {/each}
                       </select>
-                    </div>
-                    <div class="min-w-0">
                       <select
                         bind:value={sub.pocket}
                         class="h-8 w-full border border-zinc-200 bg-white px-0.5 text-[8px] md:px-1 md:text-[10px] dark:border-zinc-800 dark:bg-black"
@@ -534,48 +536,52 @@
                           <option value={pocket}>{pocket}</option>
                         {/each}
                       </select>
-                    </div>
-                    <div class="flex justify-center">
-                      <button
-                        type="button"
-                        onclick={() => removeSubcategory(cat.id, sub.key)}
-                        class={removeBtnClass}
-                        aria-label="Remove sub category"
-                      >
-                        ×
-                      </button>
+                      <div class="flex justify-center">
+                        <button
+                          type="button"
+                          onclick={() => removeSubcategory(cat.id, sub.key)}
+                          class={removeBtnClass}
+                          aria-label="Remove sub category"
+                        >
+                          ×
+                        </button>
+                      </div>
                     </div>
                   </div>
-                {/each}
+                </div>
+              {/each}
 
-                <button
-                  type="button"
-                  onclick={() => addSubcategory(cat.id)}
-                  class="ml-3 border border-dashed border-zinc-300 px-2 py-1 text-[10px] text-zinc-500 dark:border-zinc-700"
-                >
-                  + Sub category
-                </button>
+              <button
+                type="button"
+                onclick={() => addSubcategory(cat.id)}
+                class="ml-3 border border-dashed border-zinc-300 px-2 py-1 text-[10px] text-zinc-500 dark:border-zinc-700"
+              >
+                + Sub category
+              </button>
 
-                {#if (subcategoryInputs[cat.id] ?? []).length > 0}
-                  {@const subs = subcategoryInputs[cat.id] ?? []}
-                  {@const mainRemainder = mainCategoryRemainder(budgetInputs[cat.id] || '', subs)}
-                  {@const overSub = subExceedsCategory(budgetInputs[cat.id] || '', subs)}
-                  <div class="{budgetGrid} border-t border-dashed border-zinc-200 pt-1 text-zinc-500 dark:border-zinc-800">
-                    <span class="min-w-0 pl-3 text-xs italic">Main (remaining)</span>
-                    <span class="font-mono text-right text-xs tabular-nums">{formatCurrency(mainRemainder)}</span>
-                    <span class="text-center text-[10px]">{picInitial(picInputs[cat.id] ?? DEFAULT_PIC)}</span>
-                    <span class="truncate text-center text-[10px]">{pocketInputs[cat.id] ?? DEFAULT_POCKET}</span>
-                    <span></span>
+              {#if (subcategoryInputs[cat.id] ?? []).length > 0}
+                {@const subs = subcategoryInputs[cat.id] ?? []}
+                {@const mainRemainder = mainCategoryRemainder(budgetInputs[cat.id] || '', subs)}
+                {@const overSub = subExceedsCategory(budgetInputs[cat.id] || '', subs)}
+                <div class="grid grid-cols-[minmax(0,1fr)_5.4rem_minmax(0,7.6rem)] items-center gap-x-1 border-t border-dashed border-zinc-200 pt-1 text-zinc-500 dark:border-zinc-800">
+                  <span class="min-w-0 pl-3 text-xs italic">Main (remaining)</span>
+                  <span class="font-mono text-right text-xs tabular-nums">{formatCurrency(mainRemainder)}</span>
+                  <div class="overflow-x-auto">
+                    <div class="{budgetRightGrid} min-w-[7.6rem]">
+                      <span class="text-center text-[10px]">{picInitial(picInputs[cat.id] ?? DEFAULT_PIC)}</span>
+                      <span class="truncate text-center text-[10px]">{pocketInputs[cat.id] ?? DEFAULT_POCKET}</span>
+                      <span></span>
+                    </div>
                   </div>
-                  {#if overSub}
-                    <p class="ml-3 text-[10px] text-red-600 dark:text-red-400">
-                      Sub total {formatCurrency(subAmountTotal(subs))} exceeds category {formatCurrency(parseAmountInput(budgetInputs[cat.id] || ''))}.
-                    </p>
-                  {/if}
+                </div>
+                {#if overSub}
+                  <p class="ml-3 text-[10px] text-red-600 dark:text-red-400">
+                    Sub total {formatCurrency(subAmountTotal(subs))} exceeds category {formatCurrency(parseAmountInput(budgetInputs[cat.id] || ''))}.
+                  </p>
                 {/if}
-              </div>
-            {/each}
-          </div>
+              {/if}
+            </div>
+          {/each}
         </div>
 
         <div class="flex gap-2 pt-1">
