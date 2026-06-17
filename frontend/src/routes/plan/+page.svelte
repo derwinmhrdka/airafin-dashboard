@@ -328,7 +328,7 @@
     </div>
 
     {#if copyOpen}
-      <div class="space-y-3 border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
+      <div class="space-y-3 rounded-sm border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
         <p class="text-xs font-medium text-zinc-700 dark:text-zinc-300">
           Copy plan into <span class="font-mono">{period}</span> from
         </p>
@@ -390,13 +390,13 @@
       </div>
     {/if}
 
-    <form onsubmit={handleSubmit} class="space-y-4">
-      <fieldset class="space-y-2 border border-zinc-200 p-3 dark:border-zinc-800">
+    <form onsubmit={handleSubmit} class="space-y-3 md:space-y-4">
+      <fieldset class="space-y-3 rounded-sm border border-zinc-200 p-3 dark:border-zinc-800">
         <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">
           Income — {period}
         </legend>
-        <div class="overflow-x-auto">
-          <div class="min-w-[22rem] space-y-2 md:min-w-0">
+        <div class="-mx-3 overflow-x-auto px-3">
+          <div class="min-w-[24rem] space-y-2 md:min-w-0">
             {#each incomeRows as row (row.key)}
               <div class="flex items-end gap-2">
                 <label class="min-w-0 flex-1 space-y-1">
@@ -441,13 +441,13 @@
         </div>
       </fieldset>
 
-      <fieldset class="space-y-2 border border-zinc-200 p-3 dark:border-zinc-800">
+      <fieldset class="space-y-3 rounded-sm border border-zinc-200 p-3 dark:border-zinc-800">
         <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">
           Budget per Category
         </legend>
 
-        <div class="overflow-x-auto">
-          <div class="min-w-0 space-y-2">
+        <div class="-mx-3 overflow-x-auto px-3">
+          <div class="min-w-[24rem] space-y-2 md:min-w-0">
             <div
               class="{budgetGrid} gap-y-1 border-b border-zinc-200 pb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-500 dark:border-zinc-800"
             >
@@ -459,9 +459,9 @@
             </div>
 
             {#each categories as cat (cat.id)}
-              <div class="space-y-1.5">
-                <div class={budgetGrid}>
-                  <span class="min-w-0 truncate text-[11px] sm:text-sm">{cat.name}</span>
+              <div class="space-y-1.5 border-l-2 border-zinc-300 pl-1 dark:border-zinc-700">
+                <div class="{budgetGrid} rounded-sm bg-zinc-50/80 px-1 py-1 dark:bg-zinc-900/60">
+                  <span class="min-w-0 truncate text-[11px] font-semibold sm:text-sm">{cat.name}</span>
                   <div class="min-w-0">
                     <AmountInput
                       bind:value={budgetInputs[cat.id]}
@@ -498,6 +498,7 @@
                 {#each subcategoryInputs[cat.id] ?? [] as sub (sub.key)}
                   <div class={budgetGrid}>
                     <div class="min-w-0 pl-3">
+                      <p class="mb-1 text-[9px] uppercase tracking-wider text-zinc-400">Sub</p>
                       <input
                         type="text"
                         bind:value={sub.name}
@@ -561,7 +562,7 @@
                   {@const subs = subcategoryInputs[cat.id] ?? []}
                   {@const mainRemainder = mainCategoryRemainder(budgetInputs[cat.id] || '', subs)}
                   {@const overSub = subExceedsCategory(budgetInputs[cat.id] || '', subs)}
-                  <div class="{budgetGrid} text-zinc-500">
+                  <div class="{budgetGrid} border-t border-dashed border-zinc-200 pt-1 text-zinc-500 dark:border-zinc-800">
                     <span class="min-w-0 pl-3 text-xs italic">Main (remaining)</span>
                     <span class="font-mono text-right text-xs tabular-nums">{formatCurrency(mainRemainder)}</span>
                     <span class="text-center text-[10px]">{picInitial(picInputs[cat.id] ?? DEFAULT_PIC)}</span>
@@ -602,12 +603,12 @@
         </p>
       </fieldset>
 
-      <fieldset class="space-y-2 border border-zinc-200 p-3 dark:border-zinc-800">
+      <fieldset class="space-y-3 rounded-sm border border-zinc-200 p-3 dark:border-zinc-800">
         <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">
           Per PIC
         </legend>
-        <div class="overflow-x-auto">
-          <div class="min-w-[22rem] space-y-2 md:min-w-0">
+        <div class="-mx-3 overflow-x-auto px-3">
+          <div class="min-w-[24rem] space-y-2 md:min-w-0">
             <p class="text-[10px] text-zinc-500">
               Balancing = Income − Plan. A negative balance means that PIC needs more from the other.
             </p>
@@ -623,7 +624,7 @@
 
             {#each picSummary as row (row.pic)}
               <div
-                class="grid grid-cols-[minmax(0,4.5rem)_1fr_1fr] items-center gap-x-2 text-xs md:grid-cols-[minmax(0,4.5rem)_1fr_1fr_1fr]"
+                class="grid grid-cols-[minmax(0,4.5rem)_1fr_1fr] items-center gap-x-2 py-0.5 text-xs md:grid-cols-[minmax(0,4.5rem)_1fr_1fr_1fr]"
               >
                 <PicBadge name={row.pic} />
                 <span class="hidden font-mono text-right tabular-nums md:block">{formatCurrency(row.income)}</span>

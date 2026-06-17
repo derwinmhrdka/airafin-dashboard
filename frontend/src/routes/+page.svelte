@@ -2,6 +2,7 @@
   import { page } from '$app/state';
   import { categoryChartFill } from '$lib/chart-colors';
   import CategoryProgress from '$lib/components/CategoryProgress.svelte';
+  import PocketProgress from '$lib/components/PocketProgress.svelte';
   import PieChart from '$lib/components/PieChart.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
   import StatCard from '$lib/components/StatCard.svelte';
@@ -66,22 +67,20 @@
       })),
   );
 
-  const pocketColumns = $derived.by(() => {
-    const set = new Set<string>();
-    for (const row of summary?.picPocketTotals ?? []) {
-      for (const item of row.pockets) {
-        if (item.pocket) set.add(item.pocket);
-      }
-    }
-    return [...set];
-  });
-
-  function pocketTotalFor(
-    row: { pockets: { pocket: string; total: number; spent: number; sisa: number }[] },
-    pocket: string,
-  ): { total: number; spent: number; sisa: number } {
-    return row.pockets.find((p) => p.pocket === pocket) ?? { total: 0, spent: 0, sisa: 0 };
-  }
+  const pocketItems = $derived.by(() =>
+    (summary?.picPocketTotals ?? [])
+      .flatMap((row) =>
+        row.pockets.map((pocket) => ({
+          key: `${row.pic}\0${pocket.pocket}`,
+          label: `${picInitial(row.pic)} · ${pocket.pocket}`,
+          planned: pocket.total,
+          spent: pocket.spent,
+          sisa: pocket.sisa,
+        })),
+      )
+      .filter((row) => row.planned > 0 || row.spent > 0)
+      .sort((a, b) => b.planned - a.planned),
+  );
 
   /** Plan owner → who paid: how much is still owed per directed pair. */
   const reimbursementTotals = $derived.by(() => {
@@ -309,30 +308,12 @@
       </div>
     </div>
 
-    {#if (summary.picPocketTotals?.length ?? 0) > 0}
+    {#if pocketItems.length > 0}
       <div class="space-y-2 md:space-y-3">
         <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Pocket</h2>
-        <div class="space-y-2">
-          {#each summary.picPocketTotals as row (row.pic)}
-            <article class="space-y-1.5 border border-zinc-200 p-3 dark:border-zinc-800">
-              <div class="flex items-center justify-between gap-2">
-                <PicBadge name={row.pic} />
-                <span class="text-[10px] uppercase tracking-wider text-zinc-500">Pocket</span>
-              </div>
-              {#each pocketColumns as pocket}
-                <div class="flex items-center justify-between gap-2 text-xs">
-                  <span class="text-zinc-500">{pocket}</span>
-                  <div class="text-right">
-                    <p class="font-mono font-medium tabular-nums">
-                      {formatCurrency(pocketTotalFor(row, pocket).sisa)}
-                    </p>
-                    <p class="text-[10px] text-zinc-500">
-                      plan {formatCurrency(pocketTotalFor(row, pocket).total)}
-                    </p>
-                  </div>
-                </div>
-              {/each}
-            </article>
+        <div class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+          {#each pocketItems as item, i (item.key)}
+            <PocketProgress {item} index={i} />
           {/each}
         </div>
       </div>
