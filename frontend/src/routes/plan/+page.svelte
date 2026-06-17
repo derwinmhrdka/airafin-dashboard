@@ -448,8 +448,8 @@
             <span class="text-center">Category</span>
             <span class="text-center">Budget</span>
             <span class="text-center">PIC</span>
-            <span class="text-center">Src</span>
-            <span class="text-center" title="Action">×</span>
+            <span class="text-center">Pocket</span>
+            <span class="text-center" title="Action">✎</span>
           </div>
 
           {#each categories as cat (cat.id)}
@@ -486,7 +486,7 @@
 
               {#each subcategoryInputs[cat.id] ?? [] as sub (sub.key)}
                 <div class="grid grid-cols-[minmax(0,1fr)_5.2rem_1.8rem_3.4rem_1rem] items-center gap-x-1">
-                  <div class="min-w-0 pl-3">
+                  <div class="min-w-0">
                     <input
                       type="text"
                       bind:value={sub.name}
@@ -544,7 +544,7 @@
                 {@const mainRemainder = mainCategoryRemainder(budgetInputs[cat.id] || '', subs)}
                 {@const overSub = subExceedsCategory(budgetInputs[cat.id] || '', subs)}
                 <div class="grid grid-cols-[minmax(0,1fr)_5.2rem_1.8rem_3.4rem_1rem] items-center gap-x-1 border-t border-dashed border-zinc-200 pt-1 text-zinc-500 dark:border-zinc-800">
-                  <p class="pl-3 text-xs italic">Main (remaining)</p>
+                  <p class="text-xs italic">Main</p>
                   <span class="font-mono text-right text-xs tabular-nums">{formatCurrency(mainRemainder)}</span>
                   <span class="text-center text-[9px]">{picInitial(picInputs[cat.id] ?? DEFAULT_PIC)}</span>
                   <span class="truncate text-center text-[9px]">{pocketInputs[cat.id] ?? DEFAULT_POCKET}</span>
