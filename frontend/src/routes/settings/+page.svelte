@@ -12,10 +12,20 @@
   import type { PocketSetting } from '$lib/types';
 
   const period = $derived(periodFromUrl(page.url.searchParams));
+  const SIMPLE_COLORS = [
+    '#00529c', // BCA blue
+    '#f7b600', // Mandiri yellow
+    '#00a859', // DANA/OVO-like green
+    '#ef4444', // Alert red
+    '#7c3aed', // Bibit-like purple
+    '#0ea5e9', // E-wallet sky blue
+    '#6b7280', // Neutral gray
+    '#111827', // Near black
+  ] as const;
 
   let pockets = $state<PocketSetting[]>([]);
   let pocketName = $state('');
-  let pocketColor = $state('#3b82f6');
+  let pocketColor = $state(SIMPLE_COLORS[0]);
   let loading = $state(true);
   let pocketBusy = $state(false);
   let colorBusyId = $state<number | null>(null);
@@ -48,7 +58,7 @@
     try {
       await createPocket(name, pocketColor);
       pocketName = '';
-      pocketColor = '#3b82f6';
+      pocketColor = SIMPLE_COLORS[0];
       await loadPockets();
       success = `Pocket ${name} saved`;
     } catch (e) {
@@ -169,10 +179,21 @@
         placeholder="Pocket name (e.g. BCA)"
         class="min-w-0 flex-1 border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
       />
-      <label class="flex items-center gap-1 border border-zinc-200 px-2 dark:border-zinc-800">
+      <div class="flex items-center gap-1 border border-zinc-200 px-2 dark:border-zinc-800">
         <span class="text-[10px] text-zinc-500">Color</span>
-        <input type="color" bind:value={pocketColor} class="h-7 w-7 cursor-pointer bg-transparent p-0" />
-      </label>
+        <div class="flex items-center gap-1">
+          {#each SIMPLE_COLORS as color}
+            <button
+              type="button"
+              onclick={() => (pocketColor = color)}
+              class="h-5 w-5 rounded-full border {pocketColor === color ? 'border-black dark:border-white' : 'border-zinc-300 dark:border-zinc-700'}"
+              style="background-color: {color}"
+              aria-label="Select color {color}"
+              title={color}
+            ></button>
+          {/each}
+        </div>
+      </div>
       <button
         type="button"
         onclick={handleAddPocket}
@@ -196,14 +217,19 @@
               <span class="text-sm">{item.name}</span>
             </div>
             <div class="flex items-center gap-2">
-              <input
-                type="color"
-                value={item.color}
-                disabled={colorBusyId === item.id}
-                onchange={(e) => handleUpdatePocketColor(item, (e.currentTarget as HTMLInputElement).value)}
-                class="h-7 w-7 cursor-pointer bg-transparent p-0 disabled:opacity-50"
-                aria-label="Change color for {item.name}"
-              />
+              <div class="flex items-center gap-1">
+                {#each SIMPLE_COLORS as color}
+                  <button
+                    type="button"
+                    disabled={colorBusyId === item.id}
+                    onclick={() => handleUpdatePocketColor(item, color)}
+                    class="h-5 w-5 rounded-full border {item.color === color ? 'border-black dark:border-white' : 'border-zinc-300 dark:border-zinc-700'} disabled:opacity-50"
+                    style="background-color: {color}"
+                    aria-label="Set {item.name} color {color}"
+                    title={color}
+                  ></button>
+                {/each}
+              </div>
               <button
                 type="button"
                 onclick={() => handleDeletePocket(item)}
