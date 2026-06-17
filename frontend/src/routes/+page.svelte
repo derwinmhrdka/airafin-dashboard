@@ -77,10 +77,10 @@
   });
 
   function pocketTotalFor(
-    row: { pockets: { pocket: string; total: number }[] },
+    row: { pockets: { pocket: string; total: number; spent: number; sisa: number }[] },
     pocket: string,
-  ): number {
-    return row.pockets.find((p) => p.pocket === pocket)?.total ?? 0;
+  ): { total: number; spent: number; sisa: number } {
+    return row.pockets.find((p) => p.pocket === pocket) ?? { total: 0, spent: 0, sisa: 0 };
   }
 
   /** Plan owner → who paid: how much is still owed per directed pair. */
@@ -312,30 +312,47 @@
     {#if (summary.picPocketTotals?.length ?? 0) > 0}
       <div class="space-y-2 md:space-y-3">
         <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Per PIC · Pocket</h2>
-        <div class="space-y-2">
-          {#each summary.picPocketTotals as row (row.pic)}
-            <article class="space-y-2 border border-zinc-200 p-3 dark:border-zinc-800">
-              <div class="flex items-center justify-between gap-2">
-                <PicBadge name={row.pic} />
-                <span class="font-mono text-xs tabular-nums">{formatCurrency(row.total)}</span>
-              </div>
-              <div class="overflow-x-auto">
-                <div
-                  class="grid min-w-[28rem] gap-1"
-                  style="grid-template-columns: repeat({Math.max(pocketColumns.length, 1)}, minmax(5rem, 1fr));"
-                >
+        <div class="overflow-x-auto border border-zinc-200 dark:border-zinc-800">
+          <table class="w-full min-w-[30rem] border-collapse text-[11px]">
+            <thead class="bg-zinc-50 text-[10px] uppercase tracking-wider text-zinc-500 dark:bg-zinc-900">
+              <tr>
+                <th class="border-b border-zinc-200 px-2 py-2 text-left font-medium dark:border-zinc-800">
+                  PIC
+                </th>
+                {#each pocketColumns as pocket}
+                  <th
+                    class="border-b border-zinc-200 px-2 py-2 text-right font-medium dark:border-zinc-800"
+                  >
+                    {pocket}
+                  </th>
+                {/each}
+                <th class="border-b border-zinc-200 px-2 py-2 text-right font-medium dark:border-zinc-800">
+                  Remaining
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each summary.picPocketTotals as row (row.pic)}
+                <tr class="border-b border-zinc-100 last:border-b-0 dark:border-zinc-900">
+                  <td class="px-2 py-2">
+                    <PicBadge name={row.pic} />
+                  </td>
                   {#each pocketColumns as pocket}
-                    <div class="border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-center dark:border-zinc-800 dark:bg-zinc-900">
-                      <p class="text-[10px] uppercase tracking-wider text-zinc-500">{pocket}</p>
-                      <p class="font-mono text-[11px] tabular-nums">
-                        {formatCurrency(pocketTotalFor(row, pocket))}
-                      </p>
-                    </div>
+                    <td class="px-2 py-2 text-right font-mono tabular-nums">
+                      {@const pocketStats = pocketTotalFor(row, pocket)}
+                      <span class="font-medium">{formatCurrency(pocketStats.sisa)}</span>
+                      <span class="block text-[10px] text-zinc-500">
+                        plan {formatCurrency(pocketStats.total)}
+                      </span>
+                    </td>
                   {/each}
-                </div>
-              </div>
-            </article>
-          {/each}
+                  <td class="px-2 py-2 text-right font-mono font-medium tabular-nums">
+                    {formatCurrency(row.sisa)}
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
         </div>
       </div>
     {/if}

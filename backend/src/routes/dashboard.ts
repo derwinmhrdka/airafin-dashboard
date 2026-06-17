@@ -84,35 +84,73 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         );
       }
 
-      const pocketByPic = new Map<string, Map<string, number>>();
-      const addToPocket = (picRaw: string, pocketRaw: string, amount: number) => {
+      const plannedByPicPocket = new Map<string, Map<string, number>>();
+      const spentByPicPocket = new Map<string, Map<string, number>>();
+      const addToPocket = (
+        target: Map<string, Map<string, number>>,
+        picRaw: string,
+        pocketRaw: string,
+        amount: number,
+      ) => {
         const pic = picRaw?.trim() ?? '';
         if (!pic || !isValidPic(pic) || amount <= 0) return;
         const pocket = pocketRaw?.trim().toUpperCase() || DEFAULT_POCKET;
-        const byPocket = pocketByPic.get(pic) ?? new Map<string, number>();
+        const byPocket = target.get(pic) ?? new Map<string, number>();
         byPocket.set(pocket, (byPocket.get(pocket) ?? 0) + amount);
-        pocketByPic.set(pic, byPocket);
+        target.set(pic, byPocket);
       };
+
+      const mainPlanByCategory = new Map(
+        periodBudgets.map((b) => [b.categoryId, { pic: b.pic, pocket: b.pocket }]),
+      );
+      const subPlanByKey = new Map(
+        periodSubcategories.map((s) => [subcategoryPicKey(s.categoryId, s.name), { pic: s.pic, pocket: s.pocket }]),
+      );
 
       for (const budget of periodBudgets) {
         const total = toNumber(budget.allocatedAmount);
         const subTotal = subTotalsByCategory.get(budget.categoryId) ?? 0;
         const mainAmount = Math.max(0, total - subTotal);
-        addToPocket(budget.pic, budget.pocket, mainAmount);
+        addToPocket(plannedByPicPocket, budget.pic, budget.pocket, mainAmount);
       }
       for (const sub of periodSubcategories) {
-        addToPocket(sub.pic, sub.pocket, toNumber(sub.allocatedAmount));
+        addToPocket(plannedByPicPocket, sub.pic, sub.pocket, toNumber(sub.allocatedAmount));
       }
 
-      const picPocketTotals = [...pocketByPic.entries()]
-        .map(([pic, byPocket]) => {
-          const pockets = [...byPocket.entries()]
-            .map(([pocket, total]) => ({ pocket, total: roundMoney(total) }))
+      for (const tx of periodTransactions) {
+        const amount = toNumber(tx.cost);
+        const sub = tx.subCategory?.trim();
+        const subPlan = sub ? subPlanByKey.get(subcategoryPicKey(tx.categoryId, sub)) : undefined;
+        const mainPlan = mainPlanByCategory.get(tx.categoryId);
+        const plan = subPlan ?? mainPlan;
+        if (!plan) continue;
+        addToPocket(spentByPicPocket, plan.pic, plan.pocket, amount);
+      }
+
+      const picSet = new Set<string>([...plannedByPicPocket.keys(), ...spentByPicPocket.keys()]);
+      const picPocketTotals = [...picSet]
+        .map((pic) => {
+          const planned = plannedByPicPocket.get(pic) ?? new Map<string, number>();
+          const spent = spentByPicPocket.get(pic) ?? new Map<string, number>();
+          const pocketSet = new Set<string>([...planned.keys(), ...spent.keys()]);
+          const pockets = [...pocketSet]
+            .map((pocket) => {
+              const plannedTotal = roundMoney(planned.get(pocket) ?? 0);
+              const spentTotal = roundMoney(spent.get(pocket) ?? 0);
+              return {
+                pocket,
+                total: plannedTotal,
+                spent: spentTotal,
+                sisa: roundMoney(plannedTotal - spentTotal),
+              };
+            })
             .sort((a, b) => b.total - a.total);
           return {
             pic,
             pockets,
             total: roundMoney(pockets.reduce((sum, item) => sum + item.total, 0)),
+            spent: roundMoney(pockets.reduce((sum, item) => sum + item.spent, 0)),
+            sisa: roundMoney(pockets.reduce((sum, item) => sum + item.sisa, 0)),
           };
         })
         .sort((a, b) => b.total - a.total);
