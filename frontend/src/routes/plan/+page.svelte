@@ -1,6 +1,6 @@
 <script lang="ts">
   import { page } from '$app/state';
-  import { createCategory, getCategories, getPlan, savePlan } from '$lib/api';
+  import { createCategory, getCategories, getPlan, getPockets, savePlan } from '$lib/api';
   import AmountInput from '$lib/components/AmountInput.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
   import { formatAmountInput, formatCurrency, parseAmountInput } from '$lib/format';
@@ -22,8 +22,8 @@
   import type { Category, PlanData } from '$lib/types';
 
   const DEFAULT_INCOMES = ['Gaji Derwin', 'Gaji Anggita'] as const;
-  const POCKETS = ['BCA', 'MANDIRI', 'SUPA', 'DANA', 'OVO', 'CASH', 'BIBIT'] as const;
-  type Pocket = (typeof POCKETS)[number];
+  const DEFAULT_POCKETS = ['BCA', 'MANDIRI', 'SUPA', 'DANA', 'OVO', 'CASH', 'BIBIT'] as const;
+  type Pocket = string;
   const DEFAULT_POCKET: Pocket = 'BCA';
 
   const period = $derived(periodFromUrl(page.url.searchParams));
@@ -50,6 +50,7 @@
   let budgetInputs = $state<Record<number, string>>({});
   let picInputs = $state<Record<number, Pic>>({});
   let pocketInputs = $state<Record<number, Pocket>>({});
+  let pocketOptions = $state<Pocket[]>([...DEFAULT_POCKETS]);
   let subcategoryInputs = $state<Record<number, SubcategoryRow[]>>({});
   let newCategoryName = $state('');
   let loading = $state(true);
@@ -111,8 +112,8 @@
       if (b.pic && (PICS as readonly string[]).includes(b.pic)) {
         pics[b.categoryId] = b.pic as Pic;
       }
-      if (b.pocket && (POCKETS as readonly string[]).includes(b.pocket)) {
-        pockets[b.categoryId] = b.pocket as Pocket;
+      if (b.pocket?.trim()) {
+        pockets[b.categoryId] = b.pocket;
       }
     }
     for (const sub of plan.subcategories ?? []) {
@@ -126,9 +127,7 @@
             ? (sub.pic as Pic)
             : DEFAULT_PIC,
         pocket:
-          sub.pocket && (POCKETS as readonly string[]).includes(sub.pocket)
-            ? (sub.pocket as Pocket)
-            : DEFAULT_POCKET,
+          sub.pocket?.trim() ? sub.pocket : DEFAULT_POCKET,
       });
     }
     budgetInputs = inputs;
@@ -181,8 +180,14 @@
     error = '';
     success = '';
     try {
-      const [catRes, plan] = await Promise.all([getCategories(), getPlan(activePeriod)]);
+      const [catRes, plan, pocketRes] = await Promise.all([
+        getCategories(),
+        getPlan(activePeriod),
+        getPockets(),
+      ]);
       categories = catRes.categories;
+      pocketOptions = pocketRes.pockets.map((p) => p.name);
+      if (pocketOptions.length === 0) pocketOptions = [...DEFAULT_POCKETS];
       applyPlanToForm(plan);
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load plan';
@@ -477,7 +482,7 @@
                       class="h-7 w-full border border-zinc-200 bg-white px-0.5 text-[8px] dark:border-zinc-800 dark:bg-black"
                   aria-label="Pocket for {cat.name}"
                 >
-                  {#each POCKETS as pocket}
+                  {#each pocketOptions as pocket}
                     <option value={pocket}>{pocket}</option>
                   {/each}
                 </select>
@@ -514,7 +519,7 @@
                           class="h-7 w-full border border-zinc-200 bg-white px-0.5 text-[8px] dark:border-zinc-800 dark:bg-black"
                     aria-label="Pocket for sub category"
                   >
-                    {#each POCKETS as pocket}
+                    {#each pocketOptions as pocket}
                       <option value={pocket}>{pocket}</option>
                     {/each}
                   </select>

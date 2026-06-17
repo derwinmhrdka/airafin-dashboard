@@ -29,6 +29,27 @@
       "when": 1749900000000,
       "tag": "0003_subcategory_amount",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1750140000000,
+      "tag": "0004_budget_pocket",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1750143600000,
+      "tag": "0005_pocket_backfill_fix",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1750150000000,
+      "tag": "0006_settings_pockets",
+      "breakpoints": true
     }
   ]
 }

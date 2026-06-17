@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { db } from './index.js';
-import { categories } from './schema.js';
+import { categories, pockets } from './schema.js';
 
 const MASTER_CATEGORIES = [
   'Transport',
@@ -14,11 +14,18 @@ const MASTER_CATEGORIES = [
   'Daily',
 ] as const;
 
+const DEFAULT_POCKETS = ['BCA', 'MANDIRI', 'SUPA', 'DANA', 'OVO', 'CASH', 'BIBIT'] as const;
+
 await db
   .insert(categories)
   .values(MASTER_CATEGORIES.map((name) => ({ name })))
   .onConflictDoNothing();
 
-console.log('Categories seeded.');
+await db
+  .insert(pockets)
+  .values(DEFAULT_POCKETS.map((name) => ({ name })))
+  .onConflictDoNothing();
+
+console.log('Categories and pockets seeded.');
 
 process.exit(0);

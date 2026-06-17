@@ -1,5 +1,12 @@
 import { env } from '$env/dynamic/public';
-import type { Category, DashboardSummary, PlanData, ReimbursementItem, Transaction } from './types';
+import type {
+  Category,
+  DashboardSummary,
+  PlanData,
+  PocketSetting,
+  ReimbursementItem,
+  Transaction,
+} from './types';
 
 function apiBase(): string {
   return env.PUBLIC_API_URL ?? '';
@@ -50,6 +57,21 @@ export function createCategory(name: string): Promise<{ category: Category }> {
     method: 'POST',
     body: JSON.stringify({ name }),
   });
+}
+
+export function getPockets(): Promise<{ pockets: PocketSetting[] }> {
+  return fetchJson('/api/settings/pockets');
+}
+
+export function createPocket(name: string): Promise<{ pocket: PocketSetting | null; created: boolean }> {
+  return fetchJson('/api/settings/pockets', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+}
+
+export function deletePocket(id: number): Promise<{ ok: boolean }> {
+  return fetchJson(`/api/settings/pockets/${id}`, { method: 'DELETE' });
 }
 
 export interface TransactionFilters {

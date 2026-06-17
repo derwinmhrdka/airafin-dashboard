@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/index.js';
-import { budgetSubcategories, budgets, categories, incomes } from '../db/schema.js';
+import { budgetSubcategories, budgets, categories, incomes, pockets } from '../db/schema.js';
 import { isValidPic } from '../lib/pic.js';
 
 interface IncomeInput {
@@ -29,12 +29,6 @@ interface PlanBody {
   incomes?: IncomeInput[];
   budgets?: BudgetInput[];
   subcategories?: SubcategoryInput[];
-}
-
-const VALID_POCKET = ['BCA', 'MANDIRI', 'SUPA', 'DANA', 'OVO', 'CASH', 'BIBIT'] as const;
-
-function isValidPocket(value: string): value is (typeof VALID_POCKET)[number] {
-  return (VALID_POCKET as readonly string[]).includes(value);
 }
 
 export async function budgetRoutes(app: FastifyInstance): Promise<void> {
@@ -95,6 +89,8 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const trimmedPeriod = period.trim();
+    const allowedPocketRows = await db.select({ name: pockets.name }).from(pockets);
+    const allowedPockets = new Set(allowedPocketRows.map((row) => row.name.toUpperCase()));
 
     if (incomeInputs?.length) {
       for (const income of incomeInputs) {
@@ -139,7 +135,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
           return reply.code(400).send({ error: 'Invalid pic value' });
         }
         const pocket = budget.pocket?.trim() ?? '';
-        if (pocket && !isValidPocket(pocket)) {
+        if (pocket && !allowedPockets.has(pocket.toUpperCase())) {
           return reply.code(400).send({ error: 'Invalid pocket value' });
         }
 
@@ -151,12 +147,12 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
             categoryId: budget.categoryId,
             allocatedAmount: amount,
             pic,
-            pocket,
+            pocket: pocket.toUpperCase(),
             period: trimmedPeriod,
           })
           .onConflictDoUpdate({
             target: [budgets.categoryId, budgets.period],
-            set: { allocatedAmount: amount, pic, pocket },
+            set: { allocatedAmount: amount, pic, pocket: pocket.toUpperCase() },
           });
       }
     }
@@ -183,7 +179,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
           return reply.code(400).send({ error: 'Invalid pic value' });
         }
         const pocket = sub.pocket?.trim() ?? '';
-        if (pocket && !isValidPocket(pocket)) {
+        if (pocket && !allowedPockets.has(pocket.toUpperCase())) {
           return reply.code(400).send({ error: 'Invalid pocket value' });
         }
 
@@ -195,7 +191,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
           name,
           allocatedAmount: amount,
           pic,
-          pocket,
+          pocket: pocket.toUpperCase(),
         });
       }
     }

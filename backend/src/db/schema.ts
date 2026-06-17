@@ -13,6 +13,11 @@ export const categories = pgTable('categories', {
   name: text('name').notNull().unique(),
 });
 
+export const pockets = pgTable('pockets', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull().unique(),
+});
+
 export const incomes = pgTable(
   'incomes',
   {
@@ -78,6 +83,7 @@ export const transactions = pgTable('transactions', {
 });
 
 export type Category = typeof categories.$inferSelect;
+export type Pocket = typeof pockets.$inferSelect;
 export type Income = typeof incomes.$inferSelect;
 export type Budget = typeof budgets.$inferSelect;
 export type BudgetSubcategory = typeof budgetSubcategories.$inferSelect;

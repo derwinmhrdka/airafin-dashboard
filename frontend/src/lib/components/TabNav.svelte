@@ -6,7 +6,7 @@
     { href: '/', label: 'Overview' },
     { href: '/detail', label: 'Detail' },
     { href: '/plan', label: 'Plan' },
-    { href: '/sync', label: 'Sync' },
+    { href: '/settings', label: 'Settings', icon: '⚙' },
   ];
 
   const period = $derived(periodFromUrl(page.url.searchParams));
@@ -23,7 +23,12 @@
         ? 'border-black text-black dark:border-white dark:text-white'
         : 'border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}"
     >
-      {tab.label}
+      {#if tab.icon}
+        <span aria-hidden="true" class="text-sm leading-none">{tab.icon}</span>
+        <span class="ml-1">{tab.label}</span>
+      {:else}
+        {tab.label}
+      {/if}
     </a>
   {/each}
 </nav>

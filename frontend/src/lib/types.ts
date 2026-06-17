@@ -3,6 +3,11 @@ export interface Category {
   name: string;
 }
 
+export interface PocketSetting {
+  id: number;
+  name: string;
+}
+
 export interface SubcategorySummary {
   name: string;
   allocated: number;
