@@ -8,24 +8,16 @@
     syncSheetToDb,
     updatePocketColor,
   } from '$lib/api';
+  import ColorPicker from '$lib/components/ColorPicker.svelte';
+  import { POCKET_COLORS } from '$lib/pocket-colors';
   import { periodFromUrl } from '$lib/period';
   import type { PocketSetting } from '$lib/types';
 
   const period = $derived(periodFromUrl(page.url.searchParams));
-  const SIMPLE_COLORS = [
-    '#00529c', // BCA blue
-    '#f7b600', // Mandiri yellow
-    '#00a859', // DANA/OVO-like green
-    '#ef4444', // Alert red
-    '#7c3aed', // Bibit-like purple
-    '#0ea5e9', // E-wallet sky blue
-    '#6b7280', // Neutral gray
-    '#111827', // Near black
-  ] as const;
 
   let pockets = $state<PocketSetting[]>([]);
   let pocketName = $state('');
-  let pocketColor = $state(SIMPLE_COLORS[0]);
+  let pocketColor = $state(POCKET_COLORS[0]);
   let loading = $state(true);
   let pocketBusy = $state(false);
   let colorBusyId = $state<number | null>(null);
@@ -58,7 +50,7 @@
     try {
       await createPocket(name, pocketColor);
       pocketName = '';
-      pocketColor = SIMPLE_COLORS[0];
+      pocketColor = POCKET_COLORS[0];
       await loadPockets();
       success = `Pocket ${name} saved`;
     } catch (e) {
@@ -172,36 +164,25 @@
 
   <fieldset class="space-y-2 border border-zinc-200 p-3 dark:border-zinc-800">
     <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">Pocket</legend>
-    <div class="flex gap-2">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
       <input
         type="text"
         bind:value={pocketName}
         placeholder="Pocket name (e.g. BCA)"
         class="min-w-0 flex-1 border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
       />
-      <div class="flex items-center gap-1 border border-zinc-200 px-2 dark:border-zinc-800">
+      <div class="flex items-center gap-2">
         <span class="text-[10px] text-zinc-500">Color</span>
-        <div class="flex items-center gap-1">
-          {#each SIMPLE_COLORS as color}
-            <button
-              type="button"
-              onclick={() => (pocketColor = color)}
-              class="h-5 w-5 rounded-full border {pocketColor === color ? 'border-black dark:border-white' : 'border-zinc-300 dark:border-zinc-700'}"
-              style="background-color: {color}"
-              aria-label="Select color {color}"
-              title={color}
-            ></button>
-          {/each}
-        </div>
+        <ColorPicker bind:value={pocketColor} aria-label="Select pocket color" />
+        <button
+          type="button"
+          onclick={handleAddPocket}
+          disabled={pocketBusy || !pocketName.trim()}
+          class="ml-auto shrink-0 border border-zinc-300 px-3 py-2 text-xs disabled:opacity-50 sm:ml-0 dark:border-zinc-700"
+        >
+          + Add
+        </button>
       </div>
-      <button
-        type="button"
-        onclick={handleAddPocket}
-        disabled={pocketBusy || !pocketName.trim()}
-        class="shrink-0 border border-zinc-300 px-3 py-2 text-xs disabled:opacity-50 dark:border-zinc-700"
-      >
-        + Add
-      </button>
     </div>
 
     {#if loading}
@@ -216,20 +197,15 @@
               <span class="h-3 w-3 rounded-full border border-zinc-300 dark:border-zinc-700" style="background-color: {item.color}"></span>
               <span class="text-sm">{item.name}</span>
             </div>
-            <div class="flex items-center gap-2">
-              <div class="flex items-center gap-1">
-                {#each SIMPLE_COLORS as color}
-                  <button
-                    type="button"
-                    disabled={colorBusyId === item.id}
-                    onclick={() => handleUpdatePocketColor(item, color)}
-                    class="h-5 w-5 rounded-full border {item.color === color ? 'border-black dark:border-white' : 'border-zinc-300 dark:border-zinc-700'} disabled:opacity-50"
-                    style="background-color: {color}"
-                    aria-label="Set {item.name} color {color}"
-                    title={color}
-                  ></button>
-                {/each}
-              </div>
+            <div class="flex shrink-0 items-center gap-2">
+              <ColorPicker
+                value={item.color}
+                size="sm"
+                align="right"
+                disabled={colorBusyId === item.id}
+                aria-label="Set {item.name} color"
+                onchange={(color) => handleUpdatePocketColor(item, color)}
+              />
               <button
                 type="button"
                 onclick={() => handleDeletePocket(item)}
