@@ -201,7 +201,6 @@
               <ColorPicker
                 value={item.color}
                 size="sm"
-                align="right"
                 disabled={colorBusyId === item.id}
                 aria-label="Set {item.name} color"
                 onchange={(color) => handleUpdatePocketColor(item, color)}
