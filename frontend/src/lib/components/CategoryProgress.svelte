@@ -80,7 +80,7 @@
             {@const subOver = sub.sisa < 0}
             <div class="space-y-0.5 border-l border-zinc-200 pl-2 dark:border-zinc-800">
               <p class="truncate text-[9px] text-zinc-500">{sub.name}</p>
-              <div class="grid min-w-0 grid-cols-4 gap-0.5">
+              <div class="grid min-w-0 grid-cols-[1fr_1fr_1fr_auto] gap-0.5">
                 <div class="min-w-0">
                   <p class="truncate text-[8px] text-zinc-400">Spent</p>
                   <p class="font-mono text-[9px] tabular-nums">{formatCurrency(sub.spent)}</p>
@@ -99,14 +99,11 @@
                     {formatCurrency(sub.sisa)}
                   </p>
                 </div>
-                <div class="min-w-0 text-right">
-                  <p class="truncate text-[8px] text-zinc-400">PIC</p>
-                  <div class="flex h-[13px] items-center justify-end">
-                    {#if sub.pic}
-                      <PicBadge name={sub.pic} />
-                    {/if}
+                {#if sub.pic}
+                  <div class="flex items-end pl-1">
+                    <PicBadge name={sub.pic} />
                   </div>
-                </div>
+                {/if}
               </div>
             </div>
           {/each}
