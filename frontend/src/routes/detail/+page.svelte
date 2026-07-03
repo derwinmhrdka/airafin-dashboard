@@ -364,21 +364,31 @@
       {/if}
     </div>
 
-    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-      <label class="min-w-0 space-y-1">
-        <span class="text-[11px] text-zinc-500">Date</span>
-        <input
-          type="date"
-          bind:value={date}
-          required
-          class="box-border w-full min-w-0 max-w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
-        />
-      </label>
-      <label class="min-w-0 space-y-1">
-        <span class="text-[11px] text-zinc-500">Cost</span>
-        <AmountInput bind:value={cost} required />
-      </label>
-    </div>
+    <label class="block space-y-1">
+      <span class="text-[11px] text-zinc-500">Date</span>
+      <input
+        type="date"
+        bind:value={date}
+        required
+        class="box-border w-full min-w-0 max-w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
+      />
+    </label>
+
+    <label class="block space-y-1">
+      <span class="text-[11px] text-zinc-500">Detail</span>
+      <input
+        type="text"
+        bind:value={detail}
+        required
+        placeholder="What was this for?"
+        class="w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
+      />
+    </label>
+
+    <label class="block space-y-1">
+      <span class="text-[11px] text-zinc-500">Cost</span>
+      <AmountInput bind:value={cost} required />
+    </label>
 
     <label class="block space-y-1">
       <span class="text-[11px] text-zinc-500">Category</span>
@@ -407,17 +417,6 @@
         </select>
       </label>
     {/if}
-
-    <label class="block space-y-1">
-      <span class="text-[11px] text-zinc-500">Detail</span>
-      <input
-        type="text"
-        bind:value={detail}
-        required
-        placeholder="What was this for?"
-        class="w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
-      />
-    </label>
 
     <label class="block space-y-1">
       <span class="text-[11px] text-zinc-500">Paid by</span>

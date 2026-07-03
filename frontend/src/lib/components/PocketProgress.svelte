@@ -49,7 +49,7 @@
       <p class="stat-amount font-mono tabular-nums">{formatCurrency(item.planned)}</p>
     </div>
     <div class="min-w-0 text-right">
-      <p class="text-[10px] text-zinc-500">SISA</p>
+      <p class="text-[10px] text-zinc-500">Remaining</p>
       <p class="stat-amount font-mono tabular-nums {overBudget ? 'text-red-600 dark:text-red-400' : ''}">
         {formatCurrency(item.sisa)}
       </p>

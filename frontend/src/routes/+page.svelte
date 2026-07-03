@@ -245,7 +245,7 @@
     <div class="grid min-w-0 grid-cols-3 gap-1 md:gap-3">
       <StatCard label="Income" value={summary.totalIncome} accent="income" />
       <StatCard label="Spent" value={summary.totalSpent} accent="spent" />
-      <StatCard label="SISA" value={summary.totalSisa} accent="sisa" />
+      <StatCard label="Remaining" value={summary.totalSisa} accent="sisa" />
     </div>
 
     <div class="flex min-w-0 items-center justify-between gap-2 border border-zinc-200 px-3 py-2 dark:border-zinc-800">
@@ -346,7 +346,7 @@
                         <p class="stat-amount font-mono tabular-nums">{formatCurrency(pocket.total)}</p>
                       </div>
                       <div class="min-w-0 text-right">
-                        <p class="text-[10px] text-zinc-500">SISA</p>
+                        <p class="text-[10px] text-zinc-500">Remaining</p>
                         <p class="stat-amount font-mono tabular-nums {overBudget ? 'text-red-600 dark:text-red-400' : ''}">
                           {formatCurrency(pocket.sisa)}
                         </p>
@@ -354,7 +354,7 @@
                     </div>
                     {#if usedItems.length > 0}
                       <div class="mt-2 space-y-1 border-t border-zinc-100 pt-2 dark:border-zinc-900">
-                        <p class="text-[9px] uppercase tracking-wider text-zinc-400">Terpakai di</p>
+                        <p class="text-[9px] uppercase tracking-wider text-zinc-400">Spent On</p>
                         {#each usedItems as it (it.name)}
                           <div class="flex items-center justify-between gap-2 text-[10px]">
                             <span class="min-w-0 truncate text-zinc-600 dark:text-zinc-400">{it.name}</span>

@@ -51,7 +51,7 @@
       <p class="stat-amount font-mono tabular-nums">{formatCurrency(item.allocated)}</p>
     </div>
     <div class="min-w-0 text-right">
-      <p class="text-[10px] text-zinc-500">SISA</p>
+      <p class="text-[10px] text-zinc-500">Remaining</p>
       <p class="stat-amount font-mono tabular-nums {overBudget ? 'text-red-600 dark:text-red-400' : ''}">
         {formatCurrency(item.sisa)}
       </p>
@@ -80,25 +80,28 @@
             {@const subOver = sub.sisa < 0}
             <div class="space-y-0.5 border-l border-zinc-200 pl-2 dark:border-zinc-800">
               <p class="truncate text-[9px] text-zinc-500">{sub.name}</p>
-              <div class="grid min-w-0 grid-cols-3 gap-0.5">
+              <div class="grid min-w-0 grid-cols-4 gap-0.5">
                 <div class="min-w-0">
-                  <p class="text-[8px] text-zinc-400">Spent</p>
+                  <p class="truncate text-[8px] text-zinc-400">Spent</p>
                   <p class="font-mono text-[9px] tabular-nums">{formatCurrency(sub.spent)}</p>
                 </div>
                 <div class="min-w-0">
-                  <p class="text-[8px] text-zinc-400">Plan</p>
+                  <p class="truncate text-[8px] text-zinc-400">Plan</p>
                   <p class="font-mono text-[9px] tabular-nums">{formatCurrency(sub.allocated)}</p>
                 </div>
                 <div class="min-w-0 text-right">
-                  <p class="text-[8px] text-zinc-400">SISA</p>
-                  <div class="flex items-center justify-end gap-1">
-                    <p
-                      class="min-w-0 truncate font-mono text-[9px] tabular-nums {subOver
-                        ? 'text-red-600 dark:text-red-400'
-                        : ''}"
-                    >
-                      {formatCurrency(sub.sisa)}
-                    </p>
+                  <p class="truncate text-[8px] text-zinc-400">Remaining</p>
+                  <p
+                    class="font-mono text-[9px] tabular-nums {subOver
+                      ? 'text-red-600 dark:text-red-400'
+                      : ''}"
+                  >
+                    {formatCurrency(sub.sisa)}
+                  </p>
+                </div>
+                <div class="min-w-0 text-right">
+                  <p class="truncate text-[8px] text-zinc-400">PIC</p>
+                  <div class="flex h-[13px] items-center justify-end">
                     {#if sub.pic}
                       <PicBadge name={sub.pic} />
                     {/if}
