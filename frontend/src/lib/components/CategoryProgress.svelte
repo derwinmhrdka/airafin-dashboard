@@ -1,6 +1,7 @@
 <script lang="ts">
   import { categoryStyle } from '$lib/categories';
   import { formatCurrency } from '$lib/format';
+  import PicBadge from '$lib/components/PicBadge.svelte';
   import type { CategorySummary } from '$lib/types';
 
   interface Props {
@@ -78,7 +79,12 @@
           {#each item.subcategories as sub (sub.name)}
             {@const subOver = sub.sisa < 0}
             <div class="space-y-0.5 border-l border-zinc-200 pl-2 dark:border-zinc-800">
-              <p class="truncate text-[9px] text-zinc-500">{sub.name}</p>
+              <div class="flex min-w-0 items-center gap-1">
+                <p class="min-w-0 flex-1 truncate text-[9px] text-zinc-500">{sub.name}</p>
+                {#if sub.pic}
+                  <PicBadge name={sub.pic} />
+                {/if}
+              </div>
               <div class="grid min-w-0 grid-cols-3 gap-0.5">
                 <div class="min-w-0">
                   <p class="text-[8px] text-zinc-400">Spent</p>

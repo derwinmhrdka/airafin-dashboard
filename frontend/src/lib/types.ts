@@ -11,6 +11,7 @@ export interface PocketSetting {
 
 export interface SubcategorySummary {
   name: string;
+  pic: string;
   allocated: number;
   spent: number;
   sisa: number;

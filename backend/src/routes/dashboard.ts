@@ -176,6 +176,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
           );
           return {
             name: sub.name,
+            pic: sub.pic ?? '',
             allocated: subAllocated,
             spent: subSpent,
             sisa: roundMoney(subAllocated - subSpent),
@@ -190,6 +191,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
           const mainSpent = roundMoney(Math.max(0, spent - subSpentSum));
           subcategories.unshift({
             name: 'Main (default)',
+            pic: mainPlanByCategory.get(cat.id)?.pic ?? '',
             allocated: mainAllocated,
             spent: mainSpent,
             sisa: roundMoney(mainAllocated - mainSpent),
