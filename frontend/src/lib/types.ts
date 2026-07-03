@@ -34,7 +34,14 @@ export interface DashboardSummary {
   totalSisa: number;
   picPocketTotals: {
     pic: string;
-    pockets: { pocket: string; color: string; total: number; spent: number; sisa: number }[];
+    pockets: {
+      pocket: string;
+      color: string;
+      total: number;
+      spent: number;
+      sisa: number;
+      items: { name: string; plan: number; spent: number }[];
+    }[];
     total: number;
     spent: number;
     sisa: number;

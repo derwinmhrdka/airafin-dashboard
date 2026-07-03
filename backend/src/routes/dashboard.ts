@@ -89,6 +89,8 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         );
       }
 
+      const categoryNameById = new Map(allCategories.map((c) => [c.id, c.name]));
+
       const plannedByPicPocket = new Map<string, Map<string, number>>();
       const spentByPicPocket = new Map<string, Map<string, number>>();
       const addToPocket = (
@@ -105,6 +107,32 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         target.set(pic, byPocket);
       };
 
+      // pic -> pocket -> lowercased item name -> { name, plan, spent }
+      const breakdownByPicPocket = new Map<
+        string,
+        Map<string, Map<string, { name: string; plan: number; spent: number }>>
+      >();
+      const addBreakdown = (
+        picRaw: string,
+        pocketRaw: string,
+        nameRaw: string,
+        field: 'plan' | 'spent',
+        amount: number,
+      ) => {
+        const pic = picRaw?.trim() ?? '';
+        if (!pic || !isValidPic(pic) || amount <= 0) return;
+        const pocket = pocketRaw?.trim().toUpperCase() || DEFAULT_POCKET;
+        const name = nameRaw?.trim() || 'Main (default)';
+        const key = name.toLowerCase();
+        const byPocket = breakdownByPicPocket.get(pic) ?? new Map();
+        const byName = byPocket.get(pocket) ?? new Map();
+        const entry = byName.get(key) ?? { name, plan: 0, spent: 0 };
+        entry[field] += amount;
+        byName.set(key, entry);
+        byPocket.set(pocket, byName);
+        breakdownByPicPocket.set(pic, byPocket);
+      };
+
       const mainPlanByCategory = new Map(
         periodBudgets.map((b) => [b.categoryId, { pic: b.pic, pocket: b.pocket }]),
       );
@@ -117,9 +145,17 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         const subTotal = subTotalsByCategory.get(budget.categoryId) ?? 0;
         const mainAmount = Math.max(0, total - subTotal);
         addToPocket(plannedByPicPocket, budget.pic, budget.pocket, mainAmount);
+        addBreakdown(
+          budget.pic,
+          budget.pocket,
+          categoryNameById.get(budget.categoryId) ?? 'Main (default)',
+          'plan',
+          mainAmount,
+        );
       }
       for (const sub of periodSubcategories) {
         addToPocket(plannedByPicPocket, sub.pic, sub.pocket, toNumber(sub.allocatedAmount));
+        addBreakdown(sub.pic, sub.pocket, sub.name, 'plan', toNumber(sub.allocatedAmount));
       }
 
       for (const tx of periodTransactions) {
@@ -130,6 +166,9 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         const plan = subPlan ?? mainPlan;
         if (!plan) continue;
         addToPocket(spentByPicPocket, plan.pic, plan.pocket, amount);
+        const itemName =
+          subPlan && sub ? sub : categoryNameById.get(tx.categoryId) ?? 'Main (default)';
+        addBreakdown(plan.pic, plan.pocket, itemName, 'spent', amount);
       }
 
       const picSet = new Set<string>([...plannedByPicPocket.keys(), ...spentByPicPocket.keys()]);
@@ -138,16 +177,26 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
           const planned = plannedByPicPocket.get(pic) ?? new Map<string, number>();
           const spent = spentByPicPocket.get(pic) ?? new Map<string, number>();
           const pocketSet = new Set<string>([...planned.keys(), ...spent.keys()]);
+          const breakdownForPic = breakdownByPicPocket.get(pic);
           const pockets = [...pocketSet]
             .map((pocket) => {
               const plannedTotal = roundMoney(planned.get(pocket) ?? 0);
               const spentTotal = roundMoney(spent.get(pocket) ?? 0);
+              const items = [...(breakdownForPic?.get(pocket)?.values() ?? [])]
+                .map((it) => ({
+                  name: it.name,
+                  plan: roundMoney(it.plan),
+                  spent: roundMoney(it.spent),
+                }))
+                .filter((it) => it.plan > 0 || it.spent > 0)
+                .sort((a, b) => b.spent - a.spent || b.plan - a.plan);
               return {
                 pocket,
                 color: pocketColorByName.get(pocket) ?? DEFAULT_POCKET_COLOR,
                 total: plannedTotal,
                 spent: spentTotal,
                 sisa: roundMoney(plannedTotal - spentTotal),
+                items,
               };
             })
             .sort((a, b) => b.total - a.total);

@@ -319,6 +319,7 @@
                 {#each group.pockets as pocket}
                   {@const pct = pocket.total > 0 ? Math.min((pocket.spent / pocket.total) * 100, 100) : 0}
                   {@const overBudget = pocket.sisa < 0}
+                  {@const usedItems = pocket.items.filter((it) => it.spent > 0)}
                   <div class="border border-zinc-200 p-2 dark:border-zinc-800">
                     <div class="mb-2 flex items-center justify-between gap-2">
                       <span
@@ -351,6 +352,19 @@
                         </p>
                       </div>
                     </div>
+                    {#if usedItems.length > 0}
+                      <div class="mt-2 space-y-1 border-t border-zinc-100 pt-2 dark:border-zinc-900">
+                        <p class="text-[9px] uppercase tracking-wider text-zinc-400">Terpakai di</p>
+                        {#each usedItems as it (it.name)}
+                          <div class="flex items-center justify-between gap-2 text-[10px]">
+                            <span class="min-w-0 truncate text-zinc-600 dark:text-zinc-400">{it.name}</span>
+                            <span class="shrink-0 font-mono tabular-nums text-zinc-700 dark:text-zinc-300">
+                              {formatCurrency(it.spent)}
+                            </span>
+                          </div>
+                        {/each}
+                      </div>
+                    {/if}
                   </div>
                 {/each}
               </div>

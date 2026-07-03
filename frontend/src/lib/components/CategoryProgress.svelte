@@ -79,12 +79,7 @@
           {#each item.subcategories as sub (sub.name)}
             {@const subOver = sub.sisa < 0}
             <div class="space-y-0.5 border-l border-zinc-200 pl-2 dark:border-zinc-800">
-              <div class="flex min-w-0 items-center gap-1">
-                <p class="min-w-0 flex-1 truncate text-[9px] text-zinc-500">{sub.name}</p>
-                {#if sub.pic}
-                  <PicBadge name={sub.pic} />
-                {/if}
-              </div>
+              <p class="truncate text-[9px] text-zinc-500">{sub.name}</p>
               <div class="grid min-w-0 grid-cols-3 gap-0.5">
                 <div class="min-w-0">
                   <p class="text-[8px] text-zinc-400">Spent</p>
@@ -96,13 +91,18 @@
                 </div>
                 <div class="min-w-0 text-right">
                   <p class="text-[8px] text-zinc-400">SISA</p>
-                  <p
-                    class="font-mono text-[9px] tabular-nums {subOver
-                      ? 'text-red-600 dark:text-red-400'
-                      : ''}"
-                  >
-                    {formatCurrency(sub.sisa)}
-                  </p>
+                  <div class="flex items-center justify-end gap-1">
+                    <p
+                      class="min-w-0 truncate font-mono text-[9px] tabular-nums {subOver
+                        ? 'text-red-600 dark:text-red-400'
+                        : ''}"
+                    >
+                      {formatCurrency(sub.sisa)}
+                    </p>
+                    {#if sub.pic}
+                      <PicBadge name={sub.pic} />
+                    {/if}
+                  </div>
                 </div>
               </div>
             </div>
