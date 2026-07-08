@@ -319,7 +319,7 @@
                 {#each group.pockets as pocket}
                   {@const pct = pocket.total > 0 ? Math.min((pocket.spent / pocket.total) * 100, 100) : 0}
                   {@const overBudget = pocket.sisa < 0}
-                  {@const usedItems = pocket.items.filter((it) => it.spent > 0)}
+                  {@const subItems = pocket.items}
                   <div class="border border-zinc-200 p-2 dark:border-zinc-800">
                     <div class="mb-2 flex items-center justify-between gap-2">
                       <span
@@ -352,13 +352,13 @@
                         </p>
                       </div>
                     </div>
-                    {#if usedItems.length > 0}
+                    {#if subItems.length > 0}
                       <div class="mt-2 border-t border-zinc-100 pt-2 dark:border-zinc-900">
                         <div class="grid grid-cols-[minmax(0,1fr)_auto_auto] items-baseline gap-x-2 gap-y-1">
                           <p class="text-[9px] uppercase tracking-wider text-zinc-400">Spent On</p>
                           <p class="text-right text-[9px] uppercase tracking-wider text-zinc-400">Spent</p>
                           <p class="text-right text-[9px] uppercase tracking-wider text-zinc-400">Remaining</p>
-                          {#each usedItems as it (it.name)}
+                          {#each subItems as it (it.name)}
                             {@const itLeft = it.plan - it.spent}
                             <span class="min-w-0 truncate text-[10px] text-zinc-600 dark:text-zinc-400">{it.name}</span>
                             <span class="text-right font-mono text-[10px] tabular-nums text-zinc-700 dark:text-zinc-300">
