@@ -353,16 +353,26 @@
                       </div>
                     </div>
                     {#if usedItems.length > 0}
-                      <div class="mt-2 space-y-1 border-t border-zinc-100 pt-2 dark:border-zinc-900">
-                        <p class="text-[9px] uppercase tracking-wider text-zinc-400">Spent On</p>
-                        {#each usedItems as it (it.name)}
-                          <div class="flex items-center justify-between gap-2 text-[10px]">
-                            <span class="min-w-0 truncate text-zinc-600 dark:text-zinc-400">{it.name}</span>
-                            <span class="shrink-0 font-mono tabular-nums text-zinc-700 dark:text-zinc-300">
+                      <div class="mt-2 border-t border-zinc-100 pt-2 dark:border-zinc-900">
+                        <div class="grid grid-cols-[minmax(0,1fr)_auto_auto] items-baseline gap-x-2 gap-y-1">
+                          <p class="text-[9px] uppercase tracking-wider text-zinc-400">Spent On</p>
+                          <p class="text-right text-[9px] uppercase tracking-wider text-zinc-400">Spent</p>
+                          <p class="text-right text-[9px] uppercase tracking-wider text-zinc-400">Remaining</p>
+                          {#each usedItems as it (it.name)}
+                            {@const itLeft = it.plan - it.spent}
+                            <span class="min-w-0 truncate text-[10px] text-zinc-600 dark:text-zinc-400">{it.name}</span>
+                            <span class="text-right font-mono text-[10px] tabular-nums text-zinc-700 dark:text-zinc-300">
                               {formatCurrency(it.spent)}
                             </span>
-                          </div>
-                        {/each}
+                            <span
+                              class="text-right font-mono text-[10px] tabular-nums {itLeft < 0
+                                ? 'text-red-600 dark:text-red-400'
+                                : 'text-zinc-500'}"
+                            >
+                              {formatCurrency(itLeft)}
+                            </span>
+                          {/each}
+                        </div>
                       </div>
                     {/if}
                   </div>
