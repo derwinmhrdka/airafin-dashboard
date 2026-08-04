@@ -52,7 +52,12 @@
   let editingId = $state<number | null>(null);
   let formEl = $state<HTMLFormElement | null>(null);
 
-  function picForCategory(catId: number): Pic {
+  function defaultPicForSelection(catId: number, sub: string = subCategory): Pic {
+    const trimmed = sub.trim();
+    if (trimmed) {
+      const subPic = subPicByKey[`${catId}|${trimmed.toLowerCase()}`];
+      if (subPic && (PICS as readonly string[]).includes(subPic)) return subPic;
+    }
     const fromPlan = categoryPicById[catId];
     if (fromPlan && (PICS as readonly string[]).includes(fromPlan)) return fromPlan;
     return DEFAULT_PIC;
@@ -91,10 +96,19 @@
   }
 
   function picDiffersFromPlan(tx: Transaction): boolean {
+    if (tx.status === 'Transfer' || tx.status === 'Carryover') return false;
     const planPic = expectedPlanPic(tx);
     const txPic = tx.pic?.trim() ?? '';
     if (!planPic || !txPic) return false;
     return txPic !== planPic;
+  }
+
+  function isBudgetMove(tx: Transaction): boolean {
+    return tx.status === 'Transfer';
+  }
+
+  function isCarryover(tx: Transaction): boolean {
+    return tx.status === 'Carryover';
   }
 
   function resetInsertForm() {
@@ -103,7 +117,7 @@
     subCategory = '';
     detail = '';
     cost = '';
-    pic = picForCategory(categoryId);
+    pic = defaultPicForSelection(categoryId);
   }
 
   function sheetsMessage(sync?: { status: string; error?: string }): string {
@@ -176,7 +190,7 @@
         ]),
       );
       if (!categoryId && categories.length) categoryId = defaultCategoryId(categories);
-      pic = picForCategory(categoryId);
+      pic = defaultPicForSelection(categoryId);
       await loadTransactions(activePeriod, true);
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load data';
@@ -220,13 +234,13 @@
 
   $effect(() => {
     if (!categoryId) return;
-    if (editingId == null) {
-      pic = picForCategory(categoryId);
-    }
     if (subCategoryOptions.length === 0) {
       subCategory = '';
     } else if (subCategory && !subCategoryOptions.includes(subCategory)) {
       subCategory = '';
+    }
+    if (editingId == null) {
+      pic = defaultPicForSelection(categoryId, subCategory);
     }
   });
 
@@ -237,7 +251,9 @@
     subCategory = tx.subCategory ?? '';
     detail = tx.detail;
     cost = formatAmountInput(tx.cost);
-    pic = (PICS as readonly string[]).includes(tx.pic) ? (tx.pic as Pic) : picForCategory(tx.categoryId);
+    pic = (PICS as readonly string[]).includes(tx.pic)
+      ? (tx.pic as Pic)
+      : defaultPicForSelection(tx.categoryId, tx.subCategory ?? '');
     error = '';
     success = '';
     queueMicrotask(() => {
@@ -532,8 +548,12 @@
             {#each transactions as tx}
               {@const style = categoryStyle(tx.categoryName)}
               {@const picMismatch = picDiffersFromPlan(tx)}
+              {@const budgetMove = isBudgetMove(tx)}
+              {@const carryover = isCarryover(tx)}
               <tr
                 class="border-b border-zinc-100 last:border-0 dark:border-zinc-900
+                  {budgetMove ? 'bg-sky-50/70 dark:bg-sky-950/25' : ''}
+                  {carryover ? 'bg-emerald-50/70 dark:bg-emerald-950/25' : ''}
                   {picMismatch ? 'bg-amber-50 dark:bg-amber-950/35' : ''}
                   {editingId === tx.id ? 'ring-1 ring-inset ring-amber-400 dark:ring-amber-600' : ''}"
               >
@@ -547,9 +567,14 @@
                   {tx.subCategory?.trim() || '—'}
                 </td>
                 <td class="max-w-[96px] px-2 py-2 md:max-w-none md:min-w-[10rem]">
+                  {#if budgetMove}
+                    <span class="mr-1 rounded bg-sky-100 px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-sky-700 dark:bg-sky-900/50 dark:text-sky-300">Move</span>
+                  {:else if carryover}
+                    <span class="mr-1 rounded bg-emerald-100 px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">Carry</span>
+                  {/if}
                   <DetailPreview text={tx.detail} />
                 </td>
-                <td class="px-2 py-2 text-right font-mono tabular-nums">
+                <td class="px-2 py-2 text-right font-mono tabular-nums {budgetMove ? 'text-sky-700 dark:text-sky-300' : ''} {carryover ? 'text-emerald-700 dark:text-emerald-300' : ''}">
                   {formatCurrency(tx.cost)}
                 </td>
                 <td class="px-2 py-2 text-center">

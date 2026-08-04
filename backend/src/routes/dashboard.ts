@@ -1,7 +1,8 @@
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, notInArray, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/index.js';
 import { budgetSubcategories, budgets, categories, incomes, pockets, transactions } from '../db/schema.js';
+import { NON_SPEND_STATUSES, isNonSpendTransaction } from '../lib/budget-move.js';
 import {
   resolvePlanPicFromMaps,
   subcategoryPicKey,
@@ -35,7 +36,12 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       const [spentRow] = await db
         .select({ total: sql<string>`coalesce(sum(${transactions.cost}), 0)` })
         .from(transactions)
-        .where(eq(transactions.period, period));
+        .where(
+          and(
+            eq(transactions.period, period),
+            notInArray(transactions.status, [...NON_SPEND_STATUSES]),
+          ),
+        );
 
       const allCategories = await db.select().from(categories).orderBy(categories.id);
       const periodBudgets = await db.select().from(budgets).where(eq(budgets.period, period));
@@ -59,6 +65,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       const spentBySubKey = new Map<string, number>();
 
       for (const tx of periodTransactions) {
+        if (isNonSpendTransaction(tx)) continue;
         const cost = toNumber(tx.cost);
         const current = spentByCategory.get(tx.categoryId) ?? 0;
         spentByCategory.set(tx.categoryId, current + cost);
@@ -159,6 +166,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       }
 
       for (const tx of periodTransactions) {
+        if (isNonSpendTransaction(tx)) continue;
         const amount = toNumber(tx.cost);
         const sub = tx.subCategory?.trim();
         const subPlan = sub ? subPlanByKey.get(subcategoryPicKey(tx.categoryId, sub)) : undefined;
@@ -327,6 +335,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
 
       const reimbursements = txRows
         .map((tx) => {
+          if (isNonSpendTransaction(tx)) return null;
           const txPic = tx.pic?.trim() ?? '';
           if (!txPic || !isValidPic(txPic)) return null;
 

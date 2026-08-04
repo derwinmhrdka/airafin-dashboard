@@ -208,3 +208,39 @@ export function savePlan(body: {
     body: JSON.stringify(body),
   });
 }
+
+export function transferBudget(body: {
+  period: string;
+  amount: number;
+  from: { categoryId: number; subcategoryName?: string };
+  to: { categoryId: number; subcategoryName?: string };
+}): Promise<{ ok: boolean; period: string; amount: number }> {
+  return fetchJson('/api/budgets/transfer', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export interface CloseMonthBucket {
+  categoryId: number;
+  categoryName: string;
+  subcategoryName: string;
+  amount: number;
+  kind: 'surplus' | 'deficit';
+  pic: string;
+}
+
+export interface CloseMonthResult {
+  ok: boolean;
+  fromPeriod: string;
+  toPeriod: string;
+  carried: CloseMonthBucket[];
+  totals: { surplus: number; deficit: number; incomeAdded: number };
+}
+
+export function closeMonth(period: string): Promise<CloseMonthResult> {
+  return fetchJson('/api/budgets/close-month', {
+    method: 'POST',
+    body: JSON.stringify({ period }),
+  });
+}
