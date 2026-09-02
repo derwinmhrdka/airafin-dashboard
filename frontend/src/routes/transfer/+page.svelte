@@ -10,8 +10,7 @@
     type CloseMonthBucket,
   } from '$lib/api';
   import AmountInput from '$lib/components/AmountInput.svelte';
-  import PlanChecklist from '$lib/components/PlanChecklist.svelte';
-  import ReimbursementsPanel from '$lib/components/ReimbursementsPanel.svelte';
+  import TransferPanel from '$lib/components/TransferPanel.svelte';
   import { formatAmountInput, formatCurrency, parseAmountInput } from '$lib/format';
   import { MAIN_SUB_LABEL } from '$lib/plan-allocations';
   import { periodFromUrl, shiftPeriod } from '$lib/period';
@@ -554,12 +553,10 @@
     </div>
   {/if}
 
-  <ReimbursementsPanel {period} />
-
   {#if loading}
     <div class="h-32 animate-pulse border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900"></div>
   {:else}
-    <PlanChecklist
+    <TransferPanel
       {period}
       {categories}
       {subcategoryInputs}
