@@ -13,6 +13,7 @@
   } from '$lib/api';
   import AmountInput from '$lib/components/AmountInput.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
+  import PlanChecklist from '$lib/components/PlanChecklist.svelte';
   import { formatAmountInput, formatCurrency, parseAmountInput } from '$lib/format';
   import {
     MAIN_SUB_LABEL,
@@ -31,7 +32,7 @@
     shiftPeriod,
   } from '$lib/period';
   import { DEFAULT_PIC, PICS, picInitial, type Pic } from '$lib/pics';
-  import type { Category, PlanData } from '$lib/types';
+  import type { Category, PlanChecklistItem, PlanData } from '$lib/types';
 
   const DEFAULT_INCOMES = ['Gaji Derwin', 'Gaji Anggita'] as const;
   const DEFAULT_POCKETS = ['BCA', 'MANDIRI', 'SUPA', 'DANA', 'OVO', 'CASH', 'BIBIT'] as const;
@@ -63,7 +64,9 @@
   let picInputs = $state<Record<number, Pic>>({});
   let pocketInputs = $state<Record<number, Pocket>>({});
   let pocketOptions = $state<Pocket[]>([...DEFAULT_POCKETS]);
+  let pocketColors = $state<Record<string, string>>({});
   let subcategoryInputs = $state<Record<number, SubcategoryRow[]>>({});
+  let checklistItems = $state<PlanChecklistItem[]>([]);
   let newCategoryName = $state('');
   let loading = $state(true);
   let saving = $state(false);
@@ -189,6 +192,16 @@
     picInputs = pics;
     pocketInputs = pockets;
     subcategoryInputs = subs;
+    checklistItems = plan.checklist ?? [];
+  }
+
+  async function reloadChecklist() {
+    try {
+      const plan = await getPlan(period);
+      checklistItems = plan.checklist ?? [];
+    } catch {
+      /* keep current list */
+    }
   }
 
   function defaultCopySourceParts(): { month: number; year: number } {
@@ -425,6 +438,9 @@
       categories = catRes.categories;
       pocketOptions = pocketRes.pockets.map((p) => p.name);
       if (pocketOptions.length === 0) pocketOptions = [...DEFAULT_POCKETS];
+      pocketColors = Object.fromEntries(
+        pocketRes.pockets.map((p) => [p.name.toUpperCase(), p.color || '#71717a']),
+      );
       applyPlanToForm(plan);
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load plan';
@@ -1042,6 +1058,16 @@
           <span class="font-mono text-black dark:text-white">{formatCurrency(totalBudget)}</span>
         </p>
       </fieldset>
+
+      <PlanChecklist
+        {period}
+        {categories}
+        {subcategoryInputs}
+        {pocketOptions}
+        {pocketColors}
+        items={checklistItems}
+        onChange={reloadChecklist}
+      />
 
       <fieldset class="space-y-3 rounded-sm border border-zinc-200 p-3 dark:border-zinc-800">
         <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">

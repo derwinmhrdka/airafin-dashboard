@@ -2,6 +2,7 @@ import { env } from '$env/dynamic/public';
 import type {
   Category,
   DashboardSummary,
+  PlanChecklistItem,
   PlanData,
   PocketSetting,
   ReimbursementItem,
@@ -243,4 +244,33 @@ export function closeMonth(period: string): Promise<CloseMonthResult> {
     method: 'POST',
     body: JSON.stringify({ period }),
   });
+}
+
+export function createChecklistItem(body: {
+  period: string;
+  categoryId: number;
+  subcategoryName: string;
+  amount: number;
+  senderPic: string;
+  receiverPic: string;
+  pocket?: string;
+}): Promise<{ item: PlanChecklistItem }> {
+  return fetchJson('/api/plan/checklist', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateChecklistItem(
+  id: number,
+  done: boolean,
+): Promise<{ item: PlanChecklistItem }> {
+  return fetchJson(`/api/plan/checklist/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ done }),
+  });
+}
+
+export function deleteChecklistItem(id: number): Promise<{ ok: boolean }> {
+  return fetchJson(`/api/plan/checklist/${id}`, { method: 'DELETE' });
 }

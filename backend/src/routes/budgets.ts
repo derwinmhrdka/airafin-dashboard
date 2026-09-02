@@ -6,6 +6,7 @@ import {
   budgets,
   categories,
   incomes,
+  planChecklist,
   pockets,
   transactions,
 } from '../db/schema.js';
@@ -59,6 +60,20 @@ interface TransferEndpoint {
 
 interface CloseMonthBody {
   period: string;
+}
+
+interface ChecklistBody {
+  period: string;
+  categoryId: number;
+  subcategoryName: string;
+  amount: number;
+  senderPic: string;
+  receiverPic: string;
+  pocket?: string;
+}
+
+interface ChecklistPatchBody {
+  done: boolean;
 }
 
 interface CloseMonthBucket {
@@ -133,9 +148,169 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
         .where(eq(budgetSubcategories.period, period))
         .orderBy(budgetSubcategories.categoryId, budgetSubcategories.name);
 
-      return { period, incomes: incomeRows, budgets: budgetRows, subcategories: subcategoryRows };
+      const checklistRows = await db
+        .select({
+          id: planChecklist.id,
+          period: planChecklist.period,
+          categoryId: planChecklist.categoryId,
+          categoryName: categories.name,
+          subcategoryName: planChecklist.subcategoryName,
+          amount: planChecklist.amount,
+          senderPic: planChecklist.senderPic,
+          receiverPic: planChecklist.receiverPic,
+          pocket: planChecklist.pocket,
+          done: planChecklist.done,
+        })
+        .from(planChecklist)
+        .innerJoin(categories, eq(planChecklist.categoryId, categories.id))
+        .where(eq(planChecklist.period, period))
+        .orderBy(planChecklist.id);
+
+      return {
+        period,
+        incomes: incomeRows,
+        budgets: budgetRows,
+        subcategories: subcategoryRows,
+        checklist: checklistRows,
+      };
     },
   );
+
+  app.post<{ Body: ChecklistBody }>('/api/plan/checklist', async (request, reply) => {
+    const body = request.body ?? {};
+    const period = body.period?.trim();
+    const subcategoryName = body.subcategoryName?.trim();
+    const categoryId = Number(body.categoryId);
+    const amount = Math.round(Number(body.amount));
+    const senderPic = body.senderPic?.trim() ?? '';
+    const receiverPic = body.receiverPic?.trim() ?? '';
+    const pocket = body.pocket?.trim().toUpperCase() ?? '';
+
+    if (!period || !subcategoryName || !categoryId) {
+      return reply.code(400).send({ error: 'period, categoryId, and subcategoryName are required' });
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return reply.code(400).send({ error: 'amount must be a positive number' });
+    }
+    if (!isValidPic(senderPic) || !isValidPic(receiverPic)) {
+      return reply.code(400).send({ error: 'Invalid sender or receiver PIC' });
+    }
+    if (senderPic === receiverPic) {
+      return reply.code(400).send({ error: 'Sender and receiver must be different' });
+    }
+
+    const allowedPocketRows = await db.select({ name: pockets.name }).from(pockets);
+    const allowedPockets = new Set(allowedPocketRows.map((row) => row.name.toUpperCase()));
+    if (pocket && !allowedPockets.has(pocket)) {
+      return reply.code(400).send({ error: 'Invalid pocket value' });
+    }
+
+    const [category] = await db
+      .select({ id: categories.id })
+      .from(categories)
+      .where(eq(categories.id, categoryId))
+      .limit(1);
+    if (!category) {
+      return reply.code(400).send({ error: 'Category not found' });
+    }
+
+    const [created] = await db
+      .insert(planChecklist)
+      .values({
+        period,
+        categoryId,
+        subcategoryName,
+        amount: amountStr(amount),
+        senderPic,
+        receiverPic,
+        pocket,
+        done: false,
+      })
+      .returning();
+
+    const [row] = await db
+      .select({
+        id: planChecklist.id,
+        period: planChecklist.period,
+        categoryId: planChecklist.categoryId,
+        categoryName: categories.name,
+        subcategoryName: planChecklist.subcategoryName,
+        amount: planChecklist.amount,
+        senderPic: planChecklist.senderPic,
+        receiverPic: planChecklist.receiverPic,
+        pocket: planChecklist.pocket,
+        done: planChecklist.done,
+      })
+      .from(planChecklist)
+      .innerJoin(categories, eq(planChecklist.categoryId, categories.id))
+      .where(eq(planChecklist.id, created.id))
+      .limit(1);
+
+    return reply.code(201).send({ item: row });
+  });
+
+  app.patch<{ Params: { id: string }; Body: ChecklistPatchBody }>(
+    '/api/plan/checklist/:id',
+    async (request, reply) => {
+      const id = Number.parseInt(request.params.id, 10);
+      if (!Number.isFinite(id)) {
+        return reply.code(400).send({ error: 'Invalid checklist id' });
+      }
+
+      const { done } = request.body ?? {};
+      if (typeof done !== 'boolean') {
+        return reply.code(400).send({ error: 'done must be a boolean' });
+      }
+
+      const [updated] = await db
+        .update(planChecklist)
+        .set({ done })
+        .where(eq(planChecklist.id, id))
+        .returning();
+
+      if (!updated) {
+        return reply.code(404).send({ error: 'Checklist item not found' });
+      }
+
+      const [row] = await db
+        .select({
+          id: planChecklist.id,
+          period: planChecklist.period,
+          categoryId: planChecklist.categoryId,
+          categoryName: categories.name,
+          subcategoryName: planChecklist.subcategoryName,
+          amount: planChecklist.amount,
+          senderPic: planChecklist.senderPic,
+          receiverPic: planChecklist.receiverPic,
+          pocket: planChecklist.pocket,
+          done: planChecklist.done,
+        })
+        .from(planChecklist)
+        .innerJoin(categories, eq(planChecklist.categoryId, categories.id))
+        .where(eq(planChecklist.id, id))
+        .limit(1);
+
+      return { item: row };
+    },
+  );
+
+  app.delete<{ Params: { id: string } }>('/api/plan/checklist/:id', async (request, reply) => {
+    const id = Number.parseInt(request.params.id, 10);
+    if (!Number.isFinite(id)) {
+      return reply.code(400).send({ error: 'Invalid checklist id' });
+    }
+
+    const [deleted] = await db
+      .delete(planChecklist)
+      .where(eq(planChecklist.id, id))
+      .returning({ id: planChecklist.id });
+
+    if (!deleted) {
+      return reply.code(404).send({ error: 'Checklist item not found' });
+    }
+
+    return { ok: true };
+  });
 
   app.post<{ Body: PlanBody }>('/api/budgets', async (request, reply) => {
     const {

@@ -57,6 +57,13 @@
       "when": 1750153600000,
       "tag": "0007_pocket_colors",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1750160000000,
+      "tag": "0008_plan_checklist",
+      "breakpoints": true
     }
   ]
 }

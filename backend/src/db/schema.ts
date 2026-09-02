@@ -1,4 +1,5 @@
 import {
+  boolean,
   date,
   integer,
   numeric,
@@ -83,11 +84,27 @@ export const transactions = pgTable('transactions', {
   status: text('status').notNull(),
 });
 
+/** PIC-to-PIC transfer checklist when a plan is created. */
+export const planChecklist = pgTable('plan_checklist', {
+  id: serial('id').primaryKey(),
+  period: text('period').notNull(),
+  categoryId: integer('category_id')
+    .notNull()
+    .references(() => categories.id),
+  subcategoryName: text('subcategory_name').notNull(),
+  amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
+  senderPic: text('sender_pic').notNull(),
+  receiverPic: text('receiver_pic').notNull(),
+  pocket: text('pocket').notNull().default(''),
+  done: boolean('done').notNull().default(false),
+});
+
 export type Category = typeof categories.$inferSelect;
 export type Pocket = typeof pockets.$inferSelect;
 export type Income = typeof incomes.$inferSelect;
 export type Budget = typeof budgets.$inferSelect;
 export type BudgetSubcategory = typeof budgetSubcategories.$inferSelect;
+export type PlanChecklistItem = typeof planChecklist.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 
 export type NewTransaction = typeof transactions.$inferInsert;

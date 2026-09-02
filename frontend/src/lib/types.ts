@@ -93,9 +93,23 @@ export interface PlanSubcategory {
   period: string;
 }
 
+export interface PlanChecklistItem {
+  id: number;
+  period: string;
+  categoryId: number;
+  categoryName: string;
+  subcategoryName: string;
+  amount: string;
+  senderPic: string;
+  receiverPic: string;
+  pocket: string;
+  done: boolean;
+}
+
 export interface PlanData {
   period: string;
   incomes: PlanIncome[];
   budgets: PlanBudget[];
   subcategories: PlanSubcategory[];
+  checklist?: PlanChecklistItem[];
 }
