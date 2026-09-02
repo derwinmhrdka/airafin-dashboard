@@ -4,6 +4,7 @@
     deleteChecklistItem,
     updateChecklistItem,
   } from '$lib/api';
+  import AmountInput from '$lib/components/AmountInput.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
   import { formatCurrency, parseAmountInput, toAmountNumber } from '$lib/format';
   import { DEFAULT_PIC, PICS, type Pic } from '$lib/pics';
@@ -43,7 +44,9 @@
   }: Props = $props();
 
   let formOpen = $state(false);
-  let selectedKey = $state('');
+  let itemQuery = $state('');
+  let itemFocused = $state(false);
+  let customAmount = $state('');
   let senderPic = $state<Pic>(DEFAULT_PIC);
   let receiverPic = $state<Pic>('Anggita');
   let pocket = $state('');
@@ -57,14 +60,12 @@
       for (const sub of subcategoryInputs[cat.id] ?? []) {
         const name = sub.name.trim();
         if (!name) continue;
-        const amount = parseAmountInput(sub.amount || '');
-        if (amount <= 0) continue;
         opts.push({
           key: `${cat.id}|${name.toLowerCase()}`,
           categoryId: cat.id,
           categoryName: cat.name,
           name,
-          amount,
+          amount: parseAmountInput(sub.amount || ''),
           pic: sub.pic,
           pocket: sub.pocket,
         });
@@ -73,7 +74,32 @@
     return opts.sort((a, b) => a.name.localeCompare(b.name));
   });
 
-  const selectedOption = $derived(subOptions.find((o) => o.key === selectedKey));
+  const filteredOptions = $derived.by(() => {
+    const q = itemQuery.trim().toLowerCase();
+    if (!q) return subOptions;
+    return subOptions.filter(
+      (o) =>
+        o.name.toLowerCase().includes(q) ||
+        o.categoryName.toLowerCase().includes(q),
+    );
+  });
+
+  const matchedOption = $derived.by(() => {
+    const q = itemQuery.trim().toLowerCase();
+    if (!q) return undefined;
+    return subOptions.find((o) => o.name.toLowerCase() === q);
+  });
+
+  const isCustomItem = $derived(Boolean(itemQuery.trim() && !matchedOption));
+
+  const saveAmount = $derived.by(() => {
+    if (matchedOption && matchedOption.amount > 0) return matchedOption.amount;
+    return parseAmountInput(customAmount);
+  });
+
+  const showSuggestions = $derived(
+    formOpen && itemFocused && (filteredOptions.length > 0 || isCustomItem),
+  );
 
   const pocketTotals = $derived.by(() => {
     const byPocket = new Map<string, Map<string, number>>();
@@ -111,31 +137,40 @@
   function openForm() {
     formOpen = true;
     formError = '';
-    selectedKey = subOptions[0]?.key ?? '';
-    applySelectionDefaults();
+    itemQuery = '';
+    customAmount = '';
+    senderPic = DEFAULT_PIC;
+    receiverPic = 'Anggita';
+    pocket = pocketOptions[0] || 'BCA';
   }
 
-  function applySelectionDefaults() {
-    const opt = selectedOption;
-    if (!opt) return;
+  function pickOption(opt: SubOption) {
+    itemQuery = opt.name;
     senderPic = opt.pic;
     receiverPic = otherPic(opt.pic);
     pocket = opt.pocket || pocketOptions[0] || 'BCA';
+    itemFocused = false;
   }
 
   function cancelForm() {
     formOpen = false;
     formError = '';
+    itemFocused = false;
   }
 
   async function handleSave() {
-    const opt = selectedOption;
-    if (!opt) {
-      formError = 'Choose an item';
+    const name = itemQuery.trim();
+    if (!name) {
+      formError = 'Item required';
       return;
     }
     if (senderPic === receiverPic) {
       formError = 'Sender ≠ receiver';
+      return;
+    }
+    const amount = saveAmount;
+    if (amount <= 0) {
+      formError = isCustomItem ? 'Enter amount' : 'Item has no budget amount';
       return;
     }
 
@@ -144,14 +179,15 @@
     try {
       await createChecklistItem({
         period,
-        categoryId: opt.categoryId,
-        subcategoryName: opt.name,
-        amount: opt.amount,
+        categoryId: matchedOption?.categoryId ?? null,
+        subcategoryName: name,
+        amount,
         senderPic,
         receiverPic,
         pocket,
       });
       formOpen = false;
+      itemFocused = false;
       await onChange();
     } catch (e) {
       formError = e instanceof Error ? e.message : 'Failed to save';
@@ -201,8 +237,7 @@
     <button
       type="button"
       onclick={openForm}
-      disabled={subOptions.length === 0}
-      class="flex w-full items-center justify-center gap-2 border border-dashed border-zinc-300 py-2.5 text-xs text-zinc-600 transition-colors hover:border-zinc-400 hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-900"
+      class="flex w-full items-center justify-center gap-2 border border-dashed border-zinc-300 py-2.5 text-xs text-zinc-600 transition-colors hover:border-zinc-400 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-900"
       aria-label="Add transfer"
     >
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
@@ -213,24 +248,62 @@
     </button>
   {:else}
     <div class="space-y-3 rounded-sm border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-950">
-      <label class="block space-y-1">
-        <span class="text-[10px] uppercase tracking-wider text-zinc-400">Item</span>
-        <select
-          bind:value={selectedKey}
-          onchange={applySelectionDefaults}
-          class="w-full border border-zinc-200 bg-white py-2 pl-2 text-sm dark:border-zinc-800 dark:bg-black"
-        >
-          {#each subOptions as opt (opt.key)}
-            <option value={opt.key}>
-              {opt.name} · {formatCurrency(opt.amount)}
-            </option>
-          {/each}
-        </select>
-      </label>
+      <div class="relative">
+        <span class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
+        </span>
+        <input
+          type="text"
+          bind:value={itemQuery}
+          onfocus={() => (itemFocused = true)}
+          onblur={() => setTimeout(() => (itemFocused = false), 150)}
+          placeholder="Search item…"
+          class="w-full border border-zinc-200 bg-white py-2 pl-8 pr-2 text-sm dark:border-zinc-800 dark:bg-black"
+          autocomplete="off"
+        />
+        {#if showSuggestions}
+          <ul
+            class="absolute z-10 mt-1 max-h-40 w-full overflow-y-auto border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-950"
+            role="listbox"
+          >
+            {#each filteredOptions as opt (opt.key)}
+              <li>
+                <button
+                  type="button"
+                  onclick={() => pickOption(opt)}
+                  class="flex w-full items-center gap-2 px-2.5 py-2 text-left text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
+                >
+                  <span class="min-w-0 flex-1 truncate">{opt.name}</span>
+                  <span class="shrink-0 text-[10px] text-zinc-400">{opt.categoryName}</span>
+                </button>
+              </li>
+            {/each}
+            {#if isCustomItem}
+              <li class="border-t border-dashed border-zinc-200 px-2.5 py-2 text-[11px] text-zinc-500 dark:border-zinc-700">
+                <span class="inline-flex items-center gap-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path d="M12 5v14" />
+                    <path d="M5 12h14" />
+                  </svg>
+                  Custom: <strong class="text-zinc-700 dark:text-zinc-300">{itemQuery.trim()}</strong>
+                </span>
+              </li>
+            {/if}
+          </ul>
+        {/if}
+      </div>
 
-      {#if selectedOption}
+      {#if isCustomItem || (matchedOption && matchedOption.amount <= 0)}
+        <div class="space-y-1">
+          <span class="text-[10px] uppercase tracking-wider text-zinc-400">Amount</span>
+          <AmountInput bind:value={customAmount} aria-label="Custom amount" />
+        </div>
+      {:else if matchedOption}
         <p class="text-center font-mono text-lg tabular-nums tracking-tight">
-          {formatCurrency(selectedOption.amount)}
+          {formatCurrency(matchedOption.amount)}
         </p>
       {/if}
 
@@ -346,7 +419,9 @@
           class="flex items-center gap-2 rounded-sm border px-2 py-2 transition
             {item.done
             ? 'border-emerald-200 bg-emerald-50/80 opacity-75 dark:border-emerald-900 dark:bg-emerald-950/30'
-            : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-black'}"
+            : item.isBalancing
+              ? 'border-amber-200 bg-amber-50/60 dark:border-amber-900/60 dark:bg-amber-950/20'
+              : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-black'}"
         >
           <button
             type="button"
@@ -367,6 +442,16 @@
 
           <div class="min-w-0 flex-1 {item.done ? 'pointer-events-none' : ''}">
             <div class="flex items-center gap-2">
+              {#if item.isBalancing}
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true">
+                  <path d="M12 3v18" />
+                  <path d="M3 12h18" />
+                  <circle cx="12" cy="3" r="2" />
+                  <circle cx="12" cy="21" r="2" />
+                  <circle cx="3" cy="12" r="2" />
+                  <circle cx="21" cy="12" r="2" />
+                </svg>
+              {/if}
               <span class="truncate text-sm font-medium {item.done ? 'text-emerald-800 line-through dark:text-emerald-200' : ''}">
                 {item.subcategoryName}
               </span>
@@ -395,7 +480,7 @@
             </div>
           </div>
 
-          {#if !item.done}
+          {#if !item.done && !item.isBalancing}
             <button
               type="button"
               onclick={() => removeItem(item.id)}

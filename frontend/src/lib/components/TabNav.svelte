@@ -5,6 +5,7 @@
   const tabs = [
     { href: '/', label: 'Overview' },
     { href: '/detail', label: 'Detail' },
+    { href: '/transfer', label: 'Transfer' },
     { href: '/plan', label: 'Plan' },
     { href: '/settings', label: 'Settings', iconOnly: true },
   ];
@@ -12,7 +13,7 @@
   const period = $derived(periodFromUrl(page.url.searchParams));
 </script>
 
-<nav class="grid grid-cols-4 border-b border-zinc-200 dark:border-zinc-800">
+<nav class="grid grid-cols-5 border-b border-zinc-200 dark:border-zinc-800">
   {#each tabs as tab}
     <a
       href={withPeriodParam(tab.href, period)}

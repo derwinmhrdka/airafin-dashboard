@@ -1,4 +1,4 @@
-import { and, eq, ilike, or } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, or } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/index.js';
 import {
@@ -22,6 +22,10 @@ import {
   isBudgetMoveTransaction,
 } from '../lib/budget-move.js';
 import { appendTransactionToSheet } from '../lib/google-sheets.js';
+import {
+  BALANCING_ITEM_NAME,
+  computeBalancingTransfer,
+} from '../lib/checklist-balancing.js';
 import { isValidPic } from '../lib/pic.js';
 import { shiftPeriod } from '../lib/period.js';
 
@@ -64,7 +68,7 @@ interface CloseMonthBody {
 
 interface ChecklistBody {
   period: string;
-  categoryId: number;
+  categoryId?: number | null;
   subcategoryName: string;
   amount: number;
   senderPic: string;
@@ -107,6 +111,92 @@ function findSubByName<T extends { name: string }>(
   return rows.find((row) => row.name.trim().toLowerCase() === key);
 }
 
+const checklistSelectFields = {
+  id: planChecklist.id,
+  period: planChecklist.period,
+  categoryId: planChecklist.categoryId,
+  categoryName: categories.name,
+  subcategoryName: planChecklist.subcategoryName,
+  amount: planChecklist.amount,
+  senderPic: planChecklist.senderPic,
+  receiverPic: planChecklist.receiverPic,
+  pocket: planChecklist.pocket,
+  done: planChecklist.done,
+  isBalancing: planChecklist.isBalancing,
+};
+
+async function fetchChecklistForPeriod(period: string) {
+  return db
+    .select(checklistSelectFields)
+    .from(planChecklist)
+    .leftJoin(categories, eq(planChecklist.categoryId, categories.id))
+    .where(eq(planChecklist.period, period))
+    .orderBy(desc(planChecklist.isBalancing), asc(planChecklist.id));
+}
+
+async function fetchChecklistItemById(id: number) {
+  const [row] = await db
+    .select(checklistSelectFields)
+    .from(planChecklist)
+    .leftJoin(categories, eq(planChecklist.categoryId, categories.id))
+    .where(eq(planChecklist.id, id))
+    .limit(1);
+  return row ?? null;
+}
+
+async function syncBalancingChecklist(
+  period: string,
+  incomeRows: typeof incomes.$inferSelect[],
+  budgetRows: typeof budgets.$inferSelect[],
+  subcategoryRows: typeof budgetSubcategories.$inferSelect[],
+): Promise<void> {
+  const transfer = computeBalancingTransfer({
+    incomes: incomeRows,
+    budgets: budgetRows,
+    subcategories: subcategoryRows,
+  });
+
+  const [existing] = await db
+    .select()
+    .from(planChecklist)
+    .where(and(eq(planChecklist.period, period), eq(planChecklist.isBalancing, true)))
+    .limit(1);
+
+  if (!transfer) {
+    if (existing) {
+      await db.delete(planChecklist).where(eq(planChecklist.id, existing.id));
+    }
+    return;
+  }
+
+  if (existing) {
+    if (existing.done) return;
+    await db
+      .update(planChecklist)
+      .set({
+        amount: amountStr(transfer.amount),
+        senderPic: transfer.senderPic,
+        receiverPic: transfer.receiverPic,
+        pocket: transfer.pocket.toUpperCase(),
+        subcategoryName: BALANCING_ITEM_NAME,
+      })
+      .where(eq(planChecklist.id, existing.id));
+    return;
+  }
+
+  await db.insert(planChecklist).values({
+    period,
+    categoryId: null,
+    subcategoryName: BALANCING_ITEM_NAME,
+    amount: amountStr(transfer.amount),
+    senderPic: transfer.senderPic,
+    receiverPic: transfer.receiverPic,
+    pocket: transfer.pocket.toUpperCase(),
+    isBalancing: true,
+    done: false,
+  });
+}
+
 export async function budgetRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Querystring: { period?: string } }>(
     '/api/plan',
@@ -134,6 +224,8 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
         .where(eq(budgets.period, period))
         .orderBy(categories.id);
 
+      const budgetRowsRaw = await db.select().from(budgets).where(eq(budgets.period, period));
+
       const subcategoryRows = await db
         .select({
           id: budgetSubcategories.id,
@@ -148,23 +240,13 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
         .where(eq(budgetSubcategories.period, period))
         .orderBy(budgetSubcategories.categoryId, budgetSubcategories.name);
 
-      const checklistRows = await db
-        .select({
-          id: planChecklist.id,
-          period: planChecklist.period,
-          categoryId: planChecklist.categoryId,
-          categoryName: categories.name,
-          subcategoryName: planChecklist.subcategoryName,
-          amount: planChecklist.amount,
-          senderPic: planChecklist.senderPic,
-          receiverPic: planChecklist.receiverPic,
-          pocket: planChecklist.pocket,
-          done: planChecklist.done,
-        })
-        .from(planChecklist)
-        .innerJoin(categories, eq(planChecklist.categoryId, categories.id))
-        .where(eq(planChecklist.period, period))
-        .orderBy(planChecklist.id);
+      const subcategoryRowsRaw = await db
+        .select()
+        .from(budgetSubcategories)
+        .where(eq(budgetSubcategories.period, period));
+
+      await syncBalancingChecklist(period, incomeRows, budgetRowsRaw, subcategoryRowsRaw);
+      const checklistRows = await fetchChecklistForPeriod(period);
 
       return {
         period,
@@ -180,14 +262,21 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
     const body = request.body ?? {};
     const period = body.period?.trim();
     const subcategoryName = body.subcategoryName?.trim();
-    const categoryId = Number(body.categoryId);
+    const categoryIdRaw = body.categoryId;
+    const categoryId =
+      categoryIdRaw == null || categoryIdRaw === ('' as unknown as number)
+        ? null
+        : Number(categoryIdRaw);
     const amount = Math.round(Number(body.amount));
     const senderPic = body.senderPic?.trim() ?? '';
     const receiverPic = body.receiverPic?.trim() ?? '';
     const pocket = body.pocket?.trim().toUpperCase() ?? '';
 
-    if (!period || !subcategoryName || !categoryId) {
-      return reply.code(400).send({ error: 'period, categoryId, and subcategoryName are required' });
+    if (!period || !subcategoryName) {
+      return reply.code(400).send({ error: 'period and subcategoryName are required' });
+    }
+    if (categoryId != null && (!Number.isFinite(categoryId) || categoryId <= 0)) {
+      return reply.code(400).send({ error: 'Invalid categoryId' });
     }
     if (!Number.isFinite(amount) || amount <= 0) {
       return reply.code(400).send({ error: 'amount must be a positive number' });
@@ -205,47 +294,33 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: 'Invalid pocket value' });
     }
 
-    const [category] = await db
-      .select({ id: categories.id })
-      .from(categories)
-      .where(eq(categories.id, categoryId))
-      .limit(1);
-    if (!category) {
-      return reply.code(400).send({ error: 'Category not found' });
+    if (categoryId != null) {
+      const [category] = await db
+        .select({ id: categories.id })
+        .from(categories)
+        .where(eq(categories.id, categoryId))
+        .limit(1);
+      if (!category) {
+        return reply.code(400).send({ error: 'Category not found' });
+      }
     }
 
     const [created] = await db
       .insert(planChecklist)
       .values({
         period,
-        categoryId,
+        categoryId: categoryId ?? null,
         subcategoryName,
         amount: amountStr(amount),
         senderPic,
         receiverPic,
         pocket,
         done: false,
+        isBalancing: false,
       })
       .returning();
 
-    const [row] = await db
-      .select({
-        id: planChecklist.id,
-        period: planChecklist.period,
-        categoryId: planChecklist.categoryId,
-        categoryName: categories.name,
-        subcategoryName: planChecklist.subcategoryName,
-        amount: planChecklist.amount,
-        senderPic: planChecklist.senderPic,
-        receiverPic: planChecklist.receiverPic,
-        pocket: planChecklist.pocket,
-        done: planChecklist.done,
-      })
-      .from(planChecklist)
-      .innerJoin(categories, eq(planChecklist.categoryId, categories.id))
-      .where(eq(planChecklist.id, created.id))
-      .limit(1);
-
+    const row = await fetchChecklistItemById(created.id);
     return reply.code(201).send({ item: row });
   });
 
@@ -272,24 +347,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(404).send({ error: 'Checklist item not found' });
       }
 
-      const [row] = await db
-        .select({
-          id: planChecklist.id,
-          period: planChecklist.period,
-          categoryId: planChecklist.categoryId,
-          categoryName: categories.name,
-          subcategoryName: planChecklist.subcategoryName,
-          amount: planChecklist.amount,
-          senderPic: planChecklist.senderPic,
-          receiverPic: planChecklist.receiverPic,
-          pocket: planChecklist.pocket,
-          done: planChecklist.done,
-        })
-        .from(planChecklist)
-        .innerJoin(categories, eq(planChecklist.categoryId, categories.id))
-        .where(eq(planChecklist.id, id))
-        .limit(1);
-
+      const row = await fetchChecklistItemById(id);
       return { item: row };
     },
   );
@@ -300,15 +358,20 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: 'Invalid checklist id' });
     }
 
-    const [deleted] = await db
-      .delete(planChecklist)
+    const [existing] = await db
+      .select({ id: planChecklist.id, isBalancing: planChecklist.isBalancing })
+      .from(planChecklist)
       .where(eq(planChecklist.id, id))
-      .returning({ id: planChecklist.id });
+      .limit(1);
 
-    if (!deleted) {
+    if (!existing) {
       return reply.code(404).send({ error: 'Checklist item not found' });
     }
+    if (existing.isBalancing) {
+      return reply.code(400).send({ error: 'Balancing item cannot be deleted' });
+    }
 
+    await db.delete(planChecklist).where(eq(planChecklist.id, id));
     return { ok: true };
   });
 
@@ -431,6 +494,14 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
         });
       }
     }
+
+    const savedIncomes = await db.select().from(incomes).where(eq(incomes.period, trimmedPeriod));
+    const savedBudgets = await db.select().from(budgets).where(eq(budgets.period, trimmedPeriod));
+    const savedSubs = await db
+      .select()
+      .from(budgetSubcategories)
+      .where(eq(budgetSubcategories.period, trimmedPeriod));
+    await syncBalancingChecklist(trimmedPeriod, savedIncomes, savedBudgets, savedSubs);
 
     return reply.code(200).send({ ok: true, period: trimmedPeriod });
   });

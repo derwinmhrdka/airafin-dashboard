@@ -248,7 +248,7 @@ export function closeMonth(period: string): Promise<CloseMonthResult> {
 
 export function createChecklistItem(body: {
   period: string;
-  categoryId: number;
+  categoryId?: number | null;
   subcategoryName: string;
   amount: number;
   senderPic: string;

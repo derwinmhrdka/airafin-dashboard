@@ -64,6 +64,13 @@
       "when": 1750160000000,
       "tag": "0008_plan_checklist",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1750163600000,
+      "tag": "0009_plan_checklist_balancing",
+      "breakpoints": true
     }
   ]
 }

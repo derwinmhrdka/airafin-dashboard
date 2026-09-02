@@ -96,14 +96,15 @@ export interface PlanSubcategory {
 export interface PlanChecklistItem {
   id: number;
   period: string;
-  categoryId: number;
-  categoryName: string;
+  categoryId: number | null;
+  categoryName: string | null;
   subcategoryName: string;
   amount: string;
   senderPic: string;
   receiverPic: string;
   pocket: string;
   done: boolean;
+  isBalancing: boolean;
 }
 
 export interface PlanData {

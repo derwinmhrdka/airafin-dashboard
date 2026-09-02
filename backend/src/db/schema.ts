@@ -88,15 +88,14 @@ export const transactions = pgTable('transactions', {
 export const planChecklist = pgTable('plan_checklist', {
   id: serial('id').primaryKey(),
   period: text('period').notNull(),
-  categoryId: integer('category_id')
-    .notNull()
-    .references(() => categories.id),
+  categoryId: integer('category_id').references(() => categories.id),
   subcategoryName: text('subcategory_name').notNull(),
   amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
   senderPic: text('sender_pic').notNull(),
   receiverPic: text('receiver_pic').notNull(),
   pocket: text('pocket').notNull().default(''),
   done: boolean('done').notNull().default(false),
+  isBalancing: boolean('is_balancing').notNull().default(false),
 });
 
 export type Category = typeof categories.$inferSelect;
