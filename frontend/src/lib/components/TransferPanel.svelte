@@ -776,7 +776,7 @@
                 </div>
                 {#if expandedKey === expandKey}
                   <div class="px-2 pb-2">
-                    <TransferPendingDetails lines={row.lines} />
+                    <TransferPendingDetails lines={row.lines} showPicPair />
                   </div>
                 {/if}
               </div>
@@ -853,7 +853,7 @@
             </div>
             {#if expandedKey === expandKey}
               <div class="px-2 pb-2">
-                <TransferPendingDetails lines={row.lines} />
+                <TransferPendingDetails lines={row.lines} showPicPair />
               </div>
             {/if}
           </div>
