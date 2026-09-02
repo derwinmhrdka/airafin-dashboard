@@ -8,13 +8,20 @@
   } from '$lib/api';
   import AmountInput from '$lib/components/AmountInput.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
-  import { formatCurrency, parseAmountInput, toAmountNumber } from '$lib/format';
+  import TransferChecklistButton from '$lib/components/TransferChecklistButton.svelte';
+  import TransferPendingDetails from '$lib/components/TransferPendingDetails.svelte';
+  import { formatCurrency, parseAmountInput } from '$lib/format';
+  import { groupTransferItems } from '$lib/reimbursements';
   import {
-    computeTransferNetTotals,
-    groupTransferItems,
-    reimbursementPairKey,
-    reimbursementPeoplePairKey,
-  } from '$lib/reimbursements';
+    collectPendingLines,
+    computeDirectedPairRows,
+    computePocketNetRows,
+    computeTransferNetRows,
+    linesForDirectedPair,
+    linesForNetPair,
+    linesForPocketNet,
+    type TransferPendingLine,
+  } from '$lib/transfer-pending';
   import { DEFAULT_PIC, PICS, type Pic } from '$lib/pics';
   import type { Category, PlanChecklistItem, ReimbursementItem } from '$lib/types';
 
@@ -55,9 +62,8 @@
   let reimbLoading = $state(true);
   let error = $state('');
   let payingId = $state<number | null>(null);
-  let payingAllKey = $state<string | null>(null);
-  let payingPocketKey = $state<string | null>(null);
-  let payingPicKey = $state<string | null>(null);
+  let payingBulkKey = $state<string | null>(null);
+  let expandedKey = $state<string | null>(null);
 
   let formOpen = $state(false);
   let itemQuery = $state('');
@@ -70,10 +76,27 @@
   let togglingId = $state<number | null>(null);
   let formError = $state('');
 
-  const transferNetTotals = $derived(
-    computeTransferNetTotals({ checklistItems: items, reimbursements }),
-  );
+  const pendingLines = $derived(collectPendingLines({ checklistItems: items, reimbursements }));
+  const directedPairRows = $derived(computeDirectedPairRows(pendingLines));
+  const pocketNetRows = $derived(computePocketNetRows(pendingLines));
+  const transferNetRows = $derived(computeTransferNetRows(pendingLines));
   const grouped = $derived(groupTransferItems({ checklistItems: items, reimbursements }));
+
+  const pocketNetGroups = $derived.by(() => {
+    const map = new Map<string, typeof pocketNetRows>();
+    for (const row of pocketNetRows) {
+      const list = map.get(row.pocket) ?? [];
+      list.push(row);
+      map.set(row.pocket, list);
+    }
+    return [...map.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([pocket, rows]) => ({
+        pocket,
+        color: pocketColors[pocket] ?? '#71717a',
+        rows,
+      }));
+  });
 
   const subOptions = $derived.by((): SubOption[] => {
     const opts: SubOption[] = [];
@@ -122,65 +145,6 @@
     formOpen && itemFocused && (filteredOptions.length > 0 || isCustomItem),
   );
 
-  const pocketTotals = $derived.by(() => {
-    const byPocket = new Map<string, Map<string, number>>();
-    for (const item of items) {
-      if (item.done) continue;
-      const p = item.pocket?.trim().toUpperCase() || '—';
-      const sender = item.senderPic?.trim() || '?';
-      const amt = toAmountNumber(item.amount);
-      if (!byPocket.has(p)) byPocket.set(p, new Map());
-      const picMap = byPocket.get(p)!;
-      picMap.set(sender, (picMap.get(sender) ?? 0) + amt);
-    }
-    return [...byPocket.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([pocketName, picMap]) => {
-        const pics = [...picMap.entries()]
-          .sort(([a], [b]) => a.localeCompare(b))
-          .map(([pic, total]) => ({ pic, total }));
-        return {
-          pocket: pocketName,
-          color: pocketColors[pocketName] ?? '#71717a',
-          total: pics.reduce((sum, row) => sum + row.total, 0),
-          pics,
-        };
-      });
-  });
-
-  const picTotals = $derived.by(() => {
-    const byPic = new Map<string, Map<string, number>>();
-    for (const item of items) {
-      if (item.done) continue;
-      const sender = item.senderPic?.trim() || '?';
-      const receiver = item.receiverPic?.trim() || '?';
-      const amt = toAmountNumber(item.amount);
-      if (!byPic.has(sender)) byPic.set(sender, new Map());
-      const recvMap = byPic.get(sender)!;
-      recvMap.set(receiver, (recvMap.get(receiver) ?? 0) + amt);
-    }
-    for (const item of reimbursements) {
-      const planPic = item.planPic?.trim() || '?';
-      const paidBy = item.pic?.trim() || '?';
-      const amt = Number.parseFloat(item.cost) || 0;
-      if (!byPic.has(planPic)) byPic.set(planPic, new Map());
-      const recvMap = byPic.get(planPic)!;
-      recvMap.set(paidBy, (recvMap.get(paidBy) ?? 0) + amt);
-    }
-    return [...byPic.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([pic, recvMap]) => {
-        const receivers = [...recvMap.entries()]
-          .sort(([a], [b]) => a.localeCompare(b))
-          .map(([receiver, total]) => ({ receiver, total }));
-        return {
-          pic,
-          total: receivers.reduce((sum, row) => sum + row.total, 0),
-          receivers,
-        };
-      });
-  });
-
   const pendingCount = $derived(
     items.filter((i) => !i.done).length + reimbursements.length,
   );
@@ -199,6 +163,101 @@
 
   function pocketDotColor(name: string): string {
     return pocketColors[name?.trim().toUpperCase()] ?? '#71717a';
+  }
+
+  function toggleExpanded(key: string) {
+    expandedKey = expandedKey === key ? null : key;
+  }
+
+  async function settleLines(toSettle: TransferPendingLine[]) {
+    const checklistIds = new Set(
+      toSettle.filter((l) => l.checklistId != null).map((l) => l.checklistId!),
+    );
+    const reimbIds = new Set(
+      toSettle.filter((l) => l.reimbursementId != null).map((l) => l.reimbursementId!),
+    );
+
+    for (const line of toSettle) {
+      if (line.reimbursementId != null) {
+        await markReimbursementPaid(line.reimbursementId);
+      }
+    }
+    for (const line of toSettle) {
+      if (line.checklistId != null) {
+        await updateChecklistItem(line.checklistId, true);
+      }
+    }
+
+    reimbursements = reimbursements.filter((r) => !reimbIds.has(r.id));
+    if (checklistIds.size > 0) {
+      await onChange();
+    }
+  }
+
+  async function handleSettleDirected(senderPic: string, receiverPic: string, bulkKey: string) {
+    payingBulkKey = bulkKey;
+    error = '';
+    try {
+      await settleLines(linesForDirectedPair(pendingLines, senderPic, receiverPic));
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to settle transfer';
+      try {
+        const reimbRes = await getReimbursements(period);
+        reimbursements = reimbRes.reimbursements;
+        await onChange();
+      } catch {
+        /* keep partial state */
+      }
+    } finally {
+      payingBulkKey = null;
+    }
+  }
+
+  async function handleSettleNet(personA: string, personB: string, bulkKey: string) {
+    payingBulkKey = bulkKey;
+    error = '';
+    try {
+      await settleLines(linesForNetPair(pendingLines, personA, personB));
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to settle net transfer';
+      try {
+        const reimbRes = await getReimbursements(period);
+        reimbursements = reimbRes.reimbursements;
+        await onChange();
+      } catch {
+        /* keep partial state */
+      }
+    } finally {
+      payingBulkKey = null;
+    }
+  }
+
+  async function handleSettlePocketNet(
+    pocket: string,
+    senderPic: string,
+    receiverPic: string,
+    bulkKey: string,
+  ) {
+    payingBulkKey = bulkKey;
+    error = '';
+    try {
+      await settleLines(linesForPocketNet(pendingLines, pocket, senderPic, receiverPic));
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to settle pocket transfer';
+      try {
+        const reimbRes = await getReimbursements(period);
+        reimbursements = reimbRes.reimbursements;
+        await onChange();
+      } catch {
+        /* keep partial state */
+      }
+    } finally {
+      payingBulkKey = null;
+    }
+  }
+
+  function isBulkPaying(): boolean {
+    return payingBulkKey != null || payingId != null;
   }
 
   async function loadReimbursements(activePeriod: string) {
@@ -311,120 +370,6 @@
     } finally {
       payingId = null;
     }
-  }
-
-  async function handlePaidNet(personA: string, personB: string) {
-    const key = reimbursementPeoplePairKey(personA, personB);
-    payingAllKey = key;
-    error = '';
-    const toPay = reimbursements.filter(
-      (r) =>
-        (r.planPic === personA && r.pic === personB) ||
-        (r.planPic === personB && r.pic === personA),
-    );
-    const reimbIds = new Set(toPay.map((item) => item.id));
-    const checklistToDone = items.filter(
-      (i) =>
-        !i.done &&
-        ((i.senderPic === personA && i.receiverPic === personB) ||
-          (i.senderPic === personB && i.receiverPic === personA)),
-    );
-    try {
-      for (const item of toPay) {
-        await markReimbursementPaid(item.id);
-      }
-      for (const item of checklistToDone) {
-        await updateChecklistItem(item.id, true);
-      }
-      reimbursements = reimbursements.filter((r) => !reimbIds.has(r.id));
-      await onChange();
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to mark all as paid';
-      try {
-        const reimbRes = await getReimbursements(period);
-        reimbursements = reimbRes.reimbursements;
-        await onChange();
-      } catch {
-        /* keep partial state */
-      }
-    } finally {
-      payingAllKey = null;
-    }
-  }
-
-  async function handlePaidByPocket(pocketName: string) {
-    const pocketKey = pocketName.trim().toUpperCase() || '—';
-    payingPocketKey = pocketKey;
-    error = '';
-    const toDone = items.filter(
-      (i) => !i.done && (i.pocket?.trim().toUpperCase() || '—') === pocketKey,
-    );
-    try {
-      for (const item of toDone) {
-        await updateChecklistItem(item.id, true);
-      }
-      await onChange();
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to mark pocket as paid';
-    } finally {
-      payingPocketKey = null;
-    }
-  }
-
-  async function handlePaidByPic(pic: string) {
-    payingPicKey = pic;
-    error = '';
-    const toDone = items.filter((i) => !i.done && i.senderPic === pic);
-    const toPay = reimbursements.filter((r) => r.planPic === pic);
-    const reimbIds = new Set(toPay.map((item) => item.id));
-    try {
-      for (const item of toPay) {
-        await markReimbursementPaid(item.id);
-      }
-      for (const item of toDone) {
-        await updateChecklistItem(item.id, true);
-      }
-      reimbursements = reimbursements.filter((r) => !reimbIds.has(r.id));
-      await onChange();
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to mark PIC as paid';
-      try {
-        const reimbRes = await getReimbursements(period);
-        reimbursements = reimbRes.reimbursements;
-        await onChange();
-      } catch {
-        /* keep partial state */
-      }
-    } finally {
-      payingPicKey = null;
-    }
-  }
-
-  async function handlePaidAll(planPic: string, paidBy: string) {
-    const key = reimbursementPairKey(planPic, paidBy);
-    payingAllKey = key;
-    error = '';
-    const toPay = reimbursements.filter((r) => r.planPic === planPic && r.pic === paidBy);
-    const ids = new Set(toPay.map((item) => item.id));
-    try {
-      for (const item of toPay) {
-        await markReimbursementPaid(item.id);
-      }
-      reimbursements = reimbursements.filter((r) => !ids.has(r.id));
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to mark all as paid';
-      try {
-        const reimbRes = await getReimbursements(period);
-        reimbursements = reimbRes.reimbursements;
-      } catch {
-        /* keep partial state */
-      }
-    } finally {
-      payingAllKey = null;
-    }
-  }
-  function isBulkPaying(): boolean {
-    return payingPocketKey != null || payingPicKey != null || payingAllKey != null || payingId != null;
   }
 </script>
 
@@ -692,26 +637,10 @@
 
       {#each grouped.pairs as group (group.key)}
         <div class="space-y-1.5">
-          <div class="flex items-center justify-between gap-2 border-b border-zinc-200 pb-1 dark:border-zinc-800">
-            <div class="flex min-w-0 items-center gap-1.5">
-              <PicBadge name={group.senderPic} />
-              <span class="text-[10px] text-zinc-400">→</span>
-              <PicBadge name={group.receiverPic} />
-            </div>
-            {#if group.reimbursementTotal > 0}
-              {@const pairKey = reimbursementPairKey(group.senderPic, group.receiverPic)}
-              <div class="flex shrink-0 items-center gap-2 text-xs">
-                <span class="font-mono tabular-nums text-zinc-600 dark:text-zinc-400">{formatCurrency(group.reimbursementTotal)}</span>
-                <button
-                  type="button"
-                  disabled={payingAllKey != null || payingId != null}
-                  onclick={() => handlePaidAll(group.senderPic, group.receiverPic)}
-                  class="border border-zinc-300 px-2 py-0.5 text-[10px] font-medium disabled:opacity-50 dark:border-zinc-600"
-                >
-                  {payingAllKey === pairKey ? '…' : 'Paid All'}
-                </button>
-              </div>
-            {/if}
+          <div class="flex items-center gap-1.5 border-b border-zinc-200 pb-1 dark:border-zinc-800">
+            <PicBadge name={group.senderPic} />
+            <span class="text-[10px] text-zinc-400">→</span>
+            <PicBadge name={group.receiverPic} />
           </div>
 
           <ul class="space-y-1.5">
@@ -774,17 +703,12 @@
                 <li
                   class="flex items-center gap-2 rounded-sm border px-2 py-2 transition border-zinc-200 bg-white dark:border-zinc-800 dark:bg-black"
                 >
-                  <button
-                    type="button"
-                    disabled={payingId === item.id || payingAllKey != null}
+                  <TransferChecklistButton
+                    disabled={isBulkPaying()}
+                    loading={payingId === item.id}
+                    label="Mark paid"
                     onclick={() => handlePaid(item)}
-                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-zinc-300 bg-zinc-100 text-transparent transition hover:border-zinc-400 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-800"
-                    aria-label="Mark paid"
-                  >
-                    {#if payingId === item.id}
-                      <span class="text-[10px] font-medium text-zinc-500">…</span>
-                    {/if}
-                  </button>
+                  />
                   <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-2">
                       <span class="truncate text-sm font-medium">{item.detail}</span>
@@ -797,6 +721,11 @@
                       <span class="rounded bg-zinc-100 px-1.5 py-0.5 font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
                         {item.categoryName}
                       </span>
+                      {#if item.subCategory?.trim()}
+                        <span class="rounded bg-zinc-100 px-1.5 py-0.5 font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                          {item.subCategory.trim()}
+                        </span>
+                      {/if}
                     </div>
                   </div>
                 </li>
@@ -810,110 +739,123 @@
     <p class="py-2 text-center text-[11px] text-zinc-400">No pending transfers</p>
   {/if}
 
-  {#if pocketTotals.length > 0}
+  {#if pocketNetGroups.length > 0}
     <div class="space-y-2 border-t border-dashed border-zinc-200 pt-3 dark:border-zinc-800">
       <p class="text-[9px] font-medium uppercase tracking-wider text-zinc-400">Pending by pocket</p>
-      <div class="grid gap-2 sm:grid-cols-2">
-        {#each pocketTotals as group (group.pocket)}
-          <div class="rounded-sm border border-zinc-200 p-2 dark:border-zinc-800">
-            <div class="mb-1.5 flex items-center justify-between gap-2">
-              <div class="flex min-w-0 items-center gap-1.5">
-                <span
-                  class="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style="background-color: {group.color}"
-                  aria-hidden="true"
-                ></span>
-                <span class="text-[11px] font-semibold uppercase tracking-wide">{group.pocket}</span>
-              </div>
-              <div class="flex shrink-0 items-center gap-2">
-                <span class="font-mono text-xs tabular-nums">{formatCurrency(group.total)}</span>
-                <button
-                  type="button"
-                  disabled={isBulkPaying()}
-                  onclick={() => handlePaidByPocket(group.pocket)}
-                  class="border border-zinc-300 px-2 py-0.5 text-[10px] font-medium disabled:opacity-50 dark:border-zinc-600"
-                >
-                  {payingPocketKey === group.pocket ? '…' : 'Paid'}
-                </button>
-              </div>
+      <div class="space-y-3">
+        {#each pocketNetGroups as group (group.pocket)}
+          <div class="space-y-1.5">
+            <div class="flex items-center gap-1.5">
+              <span
+                class="h-2.5 w-2.5 shrink-0 rounded-full"
+                style="background-color: {group.color}"
+                aria-hidden="true"
+              ></span>
+              <span class="text-[11px] font-semibold uppercase tracking-wide">{group.pocket}</span>
             </div>
-            <ul class="space-y-0.5">
-              {#each group.pics as row (row.pic)}
-                <li class="flex items-center justify-between gap-2">
-                  <PicBadge name={row.pic} />
-                  <span class="font-mono text-xs tabular-nums">{formatCurrency(row.total)}</span>
-                </li>
-              {/each}
-            </ul>
+            {#each group.rows as row (row.key)}
+              {@const expandKey = `pocket:${row.key}`}
+              <div class="rounded-sm border border-zinc-200 dark:border-zinc-800">
+                <div class="flex items-center gap-2 px-2 py-2">
+                  <TransferChecklistButton
+                    disabled={isBulkPaying()}
+                    loading={payingBulkKey === row.key}
+                    label="Settle {row.senderPic} to {row.receiverPic} in {row.pocket}"
+                    onclick={() => handleSettlePocketNet(row.pocket, row.senderPic, row.receiverPic, row.key)}
+                  />
+                  <button
+                    type="button"
+                    class="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+                    onclick={() => toggleExpanded(expandKey)}
+                  >
+                    <PicBadge name={row.senderPic} />
+                    <span class="text-[10px] text-zinc-400">→</span>
+                    <PicBadge name={row.receiverPic} />
+                  </button>
+                  <span class="shrink-0 font-mono text-xs tabular-nums">{formatCurrency(row.total)}</span>
+                </div>
+                {#if expandedKey === expandKey}
+                  <div class="px-2 pb-2">
+                    <TransferPendingDetails lines={row.lines} {pocketDotColor} />
+                  </div>
+                {/if}
+              </div>
+            {/each}
           </div>
         {/each}
       </div>
     </div>
   {/if}
 
-  {#if picTotals.length > 0}
+  {#if directedPairRows.length > 0}
     <div class="space-y-2 border-t border-dashed border-zinc-200 pt-3 dark:border-zinc-800">
       <p class="text-[9px] font-medium uppercase tracking-wider text-zinc-400">Pending by PIC</p>
-      <div class="grid gap-2 sm:grid-cols-2">
-        {#each picTotals as group (group.pic)}
-          <div class="rounded-sm border border-zinc-200 p-2 dark:border-zinc-800">
-            <div class="mb-1.5 flex items-center justify-between gap-2">
-              <PicBadge name={group.pic} />
-              <div class="flex shrink-0 items-center gap-2">
-                <span class="font-mono text-xs tabular-nums">{formatCurrency(group.total)}</span>
-                <button
-                  type="button"
-                  disabled={isBulkPaying()}
-                  onclick={() => handlePaidByPic(group.pic)}
-                  class="border border-zinc-300 px-2 py-0.5 text-[10px] font-medium disabled:opacity-50 dark:border-zinc-600"
-                >
-                  {payingPicKey === group.pic ? '…' : 'Paid'}
-                </button>
-              </div>
+      <div class="space-y-1.5">
+        {#each directedPairRows as row (row.key)}
+          {@const expandKey = `pic:${row.key}`}
+          <div class="rounded-sm border border-zinc-200 dark:border-zinc-800">
+            <div class="flex items-center gap-2 px-2 py-2">
+              <TransferChecklistButton
+                disabled={isBulkPaying()}
+                loading={payingBulkKey === row.key}
+                label="Settle {row.senderPic} to {row.receiverPic}"
+                onclick={() => handleSettleDirected(row.senderPic, row.receiverPic, row.key)}
+              />
+              <button
+                type="button"
+                class="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+                onclick={() => toggleExpanded(expandKey)}
+              >
+                <PicBadge name={row.senderPic} />
+                <span class="text-[10px] text-zinc-400">→</span>
+                <PicBadge name={row.receiverPic} />
+              </button>
+              <span class="shrink-0 font-mono text-xs tabular-nums">{formatCurrency(row.total)}</span>
             </div>
-            <ul class="space-y-0.5">
-              {#each group.receivers as row (row.receiver)}
-                <li class="flex items-center justify-between gap-2 text-[11px]">
-                  <div class="flex min-w-0 items-center gap-1">
-                    <span class="text-zinc-400">→</span>
-                    <PicBadge name={row.receiver} />
-                  </div>
-                  <span class="font-mono text-xs tabular-nums">{formatCurrency(row.total)}</span>
-                </li>
-              {/each}
-            </ul>
+            {#if expandedKey === expandKey}
+              <div class="px-2 pb-2">
+                <TransferPendingDetails lines={row.lines} {pocketDotColor} />
+              </div>
+            {/if}
           </div>
         {/each}
       </div>
     </div>
   {/if}
 
-  {#if transferNetTotals.length > 0}
+  {#if transferNetRows.length > 0}
     <div
       class="space-y-1.5 border-t border-dashed border-zinc-200 pt-3 dark:border-zinc-800"
       aria-label="Net final totals"
     >
       <p class="text-[9px] font-medium uppercase tracking-wider text-zinc-400">Net (final)</p>
-      <div class="space-y-1.5 border border-zinc-200 bg-zinc-50 px-3 py-2.5 dark:border-zinc-800 dark:bg-zinc-900">
-        {#each transferNetTotals as row (row.personA + row.personB)}
-          {@const netKey = reimbursementPeoplePairKey(row.personA, row.personB)}
-          <div class="flex items-center justify-between gap-2 text-xs font-medium">
-            <div class="flex min-w-0 items-center gap-1.5">
-              <PicBadge name={row.planPic} />
-              <span class="text-[10px] text-zinc-400" aria-hidden="true">→</span>
-              <PicBadge name={row.paidBy} />
-            </div>
-            <div class="flex shrink-0 items-center gap-2">
-              <span class="font-mono tabular-nums">{formatCurrency(row.total)}</span>
+      <div class="space-y-1.5">
+        {#each transferNetRows as row (row.key)}
+          {@const expandKey = `net:${row.key}`}
+          <div class="rounded-sm border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900">
+            <div class="flex items-center gap-2 px-2 py-2">
+              <TransferChecklistButton
+                disabled={isBulkPaying()}
+                loading={payingBulkKey === row.key}
+                label="Settle net {row.senderPic} to {row.receiverPic}"
+                onclick={() => handleSettleNet(row.personA, row.personB, row.key)}
+              />
               <button
                 type="button"
-                disabled={isBulkPaying()}
-                onclick={() => handlePaidNet(row.personA, row.personB)}
-                class="border border-zinc-300 px-2 py-1 text-[10px] font-medium disabled:opacity-50 dark:border-zinc-600"
+                class="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+                onclick={() => toggleExpanded(expandKey)}
               >
-                {payingAllKey === netKey ? '…' : 'Paid'}
+                <PicBadge name={row.senderPic} />
+                <span class="text-[10px] text-zinc-400">→</span>
+                <PicBadge name={row.receiverPic} />
               </button>
+              <span class="shrink-0 font-mono text-xs tabular-nums">{formatCurrency(row.total)}</span>
             </div>
+            {#if expandedKey === expandKey}
+              <div class="px-2 pb-2">
+                <TransferPendingDetails lines={row.lines} {pocketDotColor} />
+              </div>
+            {/if}
           </div>
         {/each}
       </div>
