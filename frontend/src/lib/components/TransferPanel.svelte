@@ -285,14 +285,14 @@
     customAmount = '';
     senderPic = DEFAULT_PIC;
     receiverPic = 'Anggita';
-    pocket = pocketOptions[0] || 'BCA';
+    pocket = 'BCA';
   }
 
   function pickOption(opt: SubOption) {
     itemQuery = opt.name;
     senderPic = opt.pic;
     receiverPic = otherPic(opt.pic);
-    pocket = opt.pocket || pocketOptions[0] || 'BCA';
+    pocket = opt.pocket || 'BCA';
     itemFocused = false;
   }
 
@@ -677,11 +677,11 @@
                       <span class="ml-auto shrink-0 font-mono text-xs tabular-nums">{formatCurrency(item.amount)}</span>
                     </div>
                     <div class="mt-1 flex items-center gap-1.5 text-[10px]">
-                      <span class="inline-flex items-center gap-1 rounded bg-zinc-100 px-1 py-0.5 font-semibold uppercase tracking-wide text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                      <span class="inline-flex items-center gap-1 rounded bg-zinc-100 px-1.5 py-0.5 font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
                         <span class="h-1.5 w-1.5 rounded-full" style="background-color: {pocketDotColor(item.pocket)}" aria-hidden="true"></span>
-                        {item.pocket || '—'}
+                        {item.pocket || 'BCA'}
                       </span>
-                      <span class="rounded bg-zinc-100 px-1 text-[9px] font-medium uppercase text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">Plan</span>
+                      <span class="rounded bg-zinc-100 px-1.5 py-0.5 font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">Plan</span>
                     </div>
                   </div>
                   {#if !item.done}
@@ -776,7 +776,7 @@
                 </div>
                 {#if expandedKey === expandKey}
                   <div class="px-2 pb-2">
-                    <TransferPendingDetails lines={row.lines} {pocketDotColor} />
+                    <TransferPendingDetails lines={row.lines} />
                   </div>
                 {/if}
               </div>
@@ -814,7 +814,7 @@
             </div>
             {#if expandedKey === expandKey}
               <div class="px-2 pb-2">
-                <TransferPendingDetails lines={row.lines} {pocketDotColor} />
+                <TransferPendingDetails lines={row.lines} />
               </div>
             {/if}
           </div>
@@ -853,7 +853,7 @@
             </div>
             {#if expandedKey === expandKey}
               <div class="px-2 pb-2">
-                <TransferPendingDetails lines={row.lines} {pocketDotColor} />
+                <TransferPendingDetails lines={row.lines} />
               </div>
             {/if}
           </div>

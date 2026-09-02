@@ -270,7 +270,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
     const amount = Math.round(Number(body.amount));
     const senderPic = body.senderPic?.trim() ?? '';
     const receiverPic = body.receiverPic?.trim() ?? '';
-    const pocket = body.pocket?.trim().toUpperCase() ?? '';
+    const pocket = body.pocket?.trim().toUpperCase() || 'BCA';
 
     if (!period || !subcategoryName) {
       return reply.code(400).send({ error: 'period and subcategoryName are required' });

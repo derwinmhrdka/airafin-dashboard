@@ -57,7 +57,7 @@ export function collectPendingLines(input: {
       senderPic: item.senderPic,
       receiverPic: item.receiverPic,
       amount: Number.parseFloat(item.amount) || 0,
-      pocket: item.pocket?.trim().toUpperCase() || '—',
+      pocket: item.pocket?.trim().toUpperCase() || 'BCA',
       checklistId: item.id,
       title: item.subcategoryName,
     });
