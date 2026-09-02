@@ -49,6 +49,13 @@ export function markReimbursementPaid(id: number): Promise<{
   return fetchJson(`/api/transactions/${id}/reimburse`, { method: 'PATCH' });
 }
 
+export function markReimbursementUnpaid(id: number): Promise<{
+  transaction: Transaction;
+  sheetsSync?: { status: 'synced' | 'skipped' | 'failed'; error?: string };
+}> {
+  return fetchJson(`/api/transactions/${id}/unreimburse`, { method: 'PATCH' });
+}
+
 export function getCategories(): Promise<{ categories: Category[] }> {
   return fetchJson('/api/categories');
 }

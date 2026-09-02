@@ -82,6 +82,8 @@ export const transactions = pgTable('transactions', {
   period: text('period').notNull(),
   pic: text('pic').notNull(),
   status: text('status').notNull(),
+  /** Original payer PIC before transfer settlement (enables undo). */
+  reimbursedFromPic: text('reimbursed_from_pic'),
 });
 
 /** PIC-to-PIC transfer checklist when a plan is created. */

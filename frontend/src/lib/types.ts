@@ -64,6 +64,8 @@ export interface Transaction {
 
 export interface ReimbursementItem extends Transaction {
   planPic: string;
+  paidBy: string;
+  settled: boolean;
 }
 
 export interface PlanIncome {

@@ -105,6 +105,7 @@ async function getTransactionWithCategory(id: number) {
       period: transactions.period,
       pic: transactions.pic,
       status: transactions.status,
+      reimbursedFromPic: transactions.reimbursedFromPic,
     })
     .from(transactions)
     .innerJoin(categories, eq(transactions.categoryId, categories.id))
@@ -387,7 +388,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
 
       const [updated] = await db
         .update(transactions)
-        .set({ pic: planPic })
+        .set({ pic: planPic, reimbursedFromPic: existing.pic })
         .where(eq(transactions.id, id))
         .returning();
 
@@ -402,6 +403,49 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
 
       if (sheetsSync.status === 'failed') {
         request.log.warn({ sheetsSync }, 'Reimburse updated in DB but Sheets sync failed');
+      }
+
+      return { transaction: updated, sheetsSync };
+    },
+  );
+
+  /** Undo reimbursement settlement — restore original payer PIC. */
+  app.patch<{ Params: { id: string } }>(
+    '/api/transactions/:id/unreimburse',
+    async (request, reply) => {
+      const id = Number.parseInt(request.params.id, 10);
+
+      if (!Number.isFinite(id)) {
+        return reply.code(400).send({ error: 'Invalid transaction id' });
+      }
+
+      const existing = await getTransactionWithCategory(id);
+      if (!existing) {
+        return reply.code(404).send({ error: 'Transaction not found' });
+      }
+
+      const reimbursedFrom = existing.reimbursedFromPic?.trim() ?? '';
+      if (!reimbursedFrom || !isValidPic(reimbursedFrom)) {
+        return reply.code(400).send({ error: 'Not a settled reimbursement' });
+      }
+
+      const [updated] = await db
+        .update(transactions)
+        .set({ pic: reimbursedFrom, reimbursedFromPic: null })
+        .where(eq(transactions.id, id))
+        .returning();
+
+      if (!updated) {
+        return reply.code(404).send({ error: 'Transaction not found' });
+      }
+
+      const sheetsSync = await updateTransactionInSheet(
+        toSheetRow(updated, existing.categoryName),
+        toSheetRow(existing, existing.categoryName),
+      );
+
+      if (sheetsSync.status === 'failed') {
+        request.log.warn({ sheetsSync }, 'Unreimburse updated in DB but Sheets sync failed');
       }
 
       return { transaction: updated, sheetsSync };

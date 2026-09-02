@@ -64,10 +64,11 @@ export function collectPendingLines(input: {
   }
 
   for (const item of input.reimbursements) {
+    if (item.settled) continue;
     lines.push({
       source: 'detail',
       senderPic: item.planPic,
-      receiverPic: item.pic,
+      receiverPic: item.paidBy,
       amount: Number.parseFloat(item.cost) || 0,
       pocket: null,
       reimbursementId: item.id,

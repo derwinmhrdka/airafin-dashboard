@@ -327,6 +327,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
           period: transactions.period,
           pic: transactions.pic,
           status: transactions.status,
+          reimbursedFromPic: transactions.reimbursedFromPic,
         })
         .from(transactions)
         .innerJoin(categories, eq(transactions.categoryId, categories.id))
@@ -337,7 +338,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         .map((tx) => {
           if (isNonSpendTransaction(tx)) return null;
           const txPic = tx.pic?.trim() ?? '';
-          if (!txPic || !isValidPic(txPic)) return null;
+          const reimbursedFrom = tx.reimbursedFromPic?.trim() ?? '';
 
           const planPic = resolvePlanPicFromMaps(
             tx.categoryId,
@@ -345,11 +346,26 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
             mainPicByCategory,
             subPicByKey,
           );
-          if (!planPic || planPic === txPic) return null;
+          if (!planPic) return null;
+
+          if (reimbursedFrom && isValidPic(reimbursedFrom)) {
+            return {
+              ...tx,
+              planPic,
+              paidBy: reimbursedFrom,
+              settled: true,
+              categoryName: categoryNameById.get(tx.categoryId) ?? tx.categoryName,
+            };
+          }
+
+          if (!txPic || !isValidPic(txPic)) return null;
+          if (planPic === txPic) return null;
 
           return {
             ...tx,
             planPic,
+            paidBy: txPic,
+            settled: false,
             categoryName: categoryNameById.get(tx.categoryId) ?? tx.categoryName,
           };
         })

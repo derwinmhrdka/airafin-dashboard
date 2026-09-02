@@ -30,7 +30,7 @@ export function computeTransferNetTotals(input: {
   }
 
   for (const item of input.reimbursements) {
-    const key = reimbursementPairKey(item.planPic, item.pic);
+    const key = reimbursementPairKey(item.planPic, item.paidBy);
     const cost = Number.parseFloat(item.cost) || 0;
     byPair.set(key, (byPair.get(key) ?? 0) + cost);
   }
@@ -95,7 +95,7 @@ export function sortReimbursementsByDate(items: readonly ReimbursementItem[]): R
 
 function rowSortKey(row: TransferRow): [done: number, date: number, id: number] {
   if (row.kind === 'reimbursement') {
-    return [0, parseSortDate(row.item.date), row.item.id];
+    return [row.item.settled ? 1 : 0, parseSortDate(row.item.date), row.item.id];
   }
   if (row.item.done) {
     return [1, row.item.id, row.item.id];
@@ -125,6 +125,7 @@ function pairPendingSortKey(group: TransferPairGroup): number {
   let min = Number.MAX_SAFE_INTEGER;
   for (const row of group.rows) {
     if (row.kind === 'checklist' && row.item.done) continue;
+    if (row.kind === 'reimbursement' && row.item.settled) continue;
     const [, date, id] = rowSortKey(row);
     const key = date === 0 ? id : date;
     min = Math.min(min, key);
@@ -163,9 +164,11 @@ export function groupTransferItems(input: {
   }
 
   for (const item of input.reimbursements) {
-    const group = ensurePair(item.planPic, item.pic);
+    const group = ensurePair(item.planPic, item.paidBy);
     group.reimbursements.push(item);
-    group.reimbursementTotal += Number.parseFloat(item.cost) || 0;
+    if (!item.settled) {
+      group.reimbursementTotal += Number.parseFloat(item.cost) || 0;
+    }
   }
 
   for (const group of pairMap.values()) {

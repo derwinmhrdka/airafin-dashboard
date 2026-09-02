@@ -4,6 +4,7 @@
     deleteChecklistItem,
     getReimbursements,
     markReimbursementPaid,
+    markReimbursementUnpaid,
     updateChecklistItem,
   } from '$lib/api';
   import AmountInput from '$lib/components/AmountInput.svelte';
@@ -146,9 +147,11 @@
   );
 
   const pendingCount = $derived(
-    items.filter((i) => !i.done).length + reimbursements.length,
+    items.filter((i) => !i.done).length + reimbursements.filter((r) => !r.settled).length,
   );
-  const doneCount = $derived(items.filter((i) => i.done).length);
+  const doneCount = $derived(
+    items.filter((i) => i.done).length + reimbursements.filter((r) => r.settled).length,
+  );
 
   const hasContent = $derived(
     grouped.balancing.length > 0 ||
@@ -173,9 +176,6 @@
     const checklistIds = new Set(
       toSettle.filter((l) => l.checklistId != null).map((l) => l.checklistId!),
     );
-    const reimbIds = new Set(
-      toSettle.filter((l) => l.reimbursementId != null).map((l) => l.reimbursementId!),
-    );
 
     for (const line of toSettle) {
       if (line.reimbursementId != null) {
@@ -188,7 +188,7 @@
       }
     }
 
-    reimbursements = reimbursements.filter((r) => !reimbIds.has(r.id));
+    await loadReimbursements(period);
     if (checklistIds.size > 0) {
       await onChange();
     }
@@ -359,14 +359,18 @@
     }
   }
 
-  async function handlePaid(item: ReimbursementItem) {
+  async function toggleReimbursementPaid(item: ReimbursementItem) {
     payingId = item.id;
     error = '';
     try {
-      await markReimbursementPaid(item.id);
-      reimbursements = reimbursements.filter((r) => r.id !== item.id);
+      if (item.settled) {
+        await markReimbursementUnpaid(item.id);
+      } else {
+        await markReimbursementPaid(item.id);
+      }
+      await loadReimbursements(period);
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to mark as paid';
+      error = e instanceof Error ? e.message : 'Failed to update reimbursement';
     } finally {
       payingId = null;
     }
@@ -701,17 +705,32 @@
               {:else}
                 {@const item = row.item}
                 <li
-                  class="flex items-center gap-2 rounded-sm border px-2 py-2 transition border-zinc-200 bg-white dark:border-zinc-800 dark:bg-black"
+                  class="flex items-center gap-2 rounded-sm border px-2 py-2 transition
+                    {item.settled
+                    ? 'border-emerald-200 bg-emerald-50/80 opacity-75 dark:border-emerald-900 dark:bg-emerald-950/30'
+                    : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-black'}"
                 >
-                  <TransferChecklistButton
-                    disabled={isBulkPaying()}
-                    loading={payingId === item.id}
-                    label="Mark paid"
-                    onclick={() => handlePaid(item)}
-                  />
-                  <div class="min-w-0 flex-1">
+                  <button
+                    type="button"
+                    disabled={isBulkPaying() || payingId === item.id}
+                    onclick={() => toggleReimbursementPaid(item)}
+                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition
+                      {item.settled
+                      ? 'border-emerald-500 bg-emerald-500 text-white'
+                      : 'border-zinc-300 bg-zinc-100 text-transparent hover:border-zinc-400 dark:border-zinc-600 dark:bg-zinc-800'}"
+                    aria-label={item.settled ? 'Mark pending' : 'Mark paid'}
+                  >
+                    {#if item.settled}
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true">
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
+                    {/if}
+                  </button>
+                  <div class="min-w-0 flex-1 {item.settled ? 'pointer-events-none' : ''}">
                     <div class="flex items-center gap-2">
-                      <span class="truncate text-sm font-medium">{item.detail}</span>
+                      <span class="truncate text-sm font-medium {item.settled ? 'text-emerald-800 line-through dark:text-emerald-200' : ''}">
+                        {item.detail}
+                      </span>
                       <span class="ml-auto shrink-0 font-mono text-xs tabular-nums">{formatCurrency(item.cost)}</span>
                     </div>
                     <div class="mt-1 flex flex-wrap items-center gap-1.5 text-[10px]">
