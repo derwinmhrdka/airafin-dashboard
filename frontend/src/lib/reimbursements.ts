@@ -1,11 +1,5 @@
 import type { PlanChecklistItem, ReimbursementItem } from '$lib/types';
 
-export interface ReimbursementPairTotal {
-  planPic: string;
-  paidBy: string;
-  total: number;
-}
-
 export interface ReimbursementNetTotal {
   planPic: string;
   paidBy: string;
@@ -22,28 +16,20 @@ export function reimbursementPeoplePairKey(personA: string, personB: string): st
   return personA < personB ? `${personA}\0${personB}` : `${personB}\0${personA}`;
 }
 
-export function computeReimbursementTotals(
-  reimbursements: readonly ReimbursementItem[],
-): ReimbursementPairTotal[] {
+export function computeTransferNetTotals(input: {
+  checklistItems: readonly PlanChecklistItem[];
+  reimbursements: readonly ReimbursementItem[];
+}): ReimbursementNetTotal[] {
   const byPair = new Map<string, number>();
-  for (const item of reimbursements) {
-    const key = reimbursementPairKey(item.planPic, item.pic);
-    const cost = Number.parseFloat(item.cost) || 0;
-    byPair.set(key, (byPair.get(key) ?? 0) + cost);
-  }
-  return [...byPair.entries()]
-    .map(([key, total]) => {
-      const [planPic, paidBy] = key.split('\0');
-      return { planPic, paidBy, total };
-    })
-    .sort((a, b) => b.total - a.total);
-}
 
-export function computeReimbursementNetTotals(
-  reimbursements: readonly ReimbursementItem[],
-): ReimbursementNetTotal[] {
-  const byPair = new Map<string, number>();
-  for (const item of reimbursements) {
+  for (const item of input.checklistItems) {
+    if (item.done) continue;
+    const key = reimbursementPairKey(item.senderPic, item.receiverPic);
+    const amt = Number.parseFloat(item.amount) || 0;
+    byPair.set(key, (byPair.get(key) ?? 0) + amt);
+  }
+
+  for (const item of input.reimbursements) {
     const key = reimbursementPairKey(item.planPic, item.pic);
     const cost = Number.parseFloat(item.cost) || 0;
     byPair.set(key, (byPair.get(key) ?? 0) + cost);

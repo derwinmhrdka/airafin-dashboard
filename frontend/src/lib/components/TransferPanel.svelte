@@ -9,10 +9,8 @@
   import AmountInput from '$lib/components/AmountInput.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
   import { formatCurrency, parseAmountInput, toAmountNumber } from '$lib/format';
-  import { picInitial } from '$lib/pics';
   import {
-    computeReimbursementNetTotals,
-    computeReimbursementTotals,
+    computeTransferNetTotals,
     groupTransferItems,
     reimbursementPairKey,
     reimbursementPeoplePairKey,
@@ -58,6 +56,8 @@
   let error = $state('');
   let payingId = $state<number | null>(null);
   let payingAllKey = $state<string | null>(null);
+  let payingPocketKey = $state<string | null>(null);
+  let payingPicKey = $state<string | null>(null);
 
   let formOpen = $state(false);
   let itemQuery = $state('');
@@ -70,8 +70,9 @@
   let togglingId = $state<number | null>(null);
   let formError = $state('');
 
-  const reimbursementTotals = $derived(computeReimbursementTotals(reimbursements));
-  const reimbursementNetTotals = $derived(computeReimbursementNetTotals(reimbursements));
+  const transferNetTotals = $derived(
+    computeTransferNetTotals({ checklistItems: items, reimbursements }),
+  );
   const grouped = $derived(groupTransferItems({ checklistItems: items, reimbursements }));
 
   const subOptions = $derived.by((): SubOption[] => {
@@ -134,13 +135,50 @@
     }
     return [...byPocket.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([pocketName, picMap]) => ({
-        pocket: pocketName,
-        color: pocketColors[pocketName] ?? '#71717a',
-        pics: [...picMap.entries()]
+      .map(([pocketName, picMap]) => {
+        const pics = [...picMap.entries()]
           .sort(([a], [b]) => a.localeCompare(b))
-          .map(([pic, total]) => ({ pic, total })),
-      }));
+          .map(([pic, total]) => ({ pic, total }));
+        return {
+          pocket: pocketName,
+          color: pocketColors[pocketName] ?? '#71717a',
+          total: pics.reduce((sum, row) => sum + row.total, 0),
+          pics,
+        };
+      });
+  });
+
+  const picTotals = $derived.by(() => {
+    const byPic = new Map<string, Map<string, number>>();
+    for (const item of items) {
+      if (item.done) continue;
+      const sender = item.senderPic?.trim() || '?';
+      const receiver = item.receiverPic?.trim() || '?';
+      const amt = toAmountNumber(item.amount);
+      if (!byPic.has(sender)) byPic.set(sender, new Map());
+      const recvMap = byPic.get(sender)!;
+      recvMap.set(receiver, (recvMap.get(receiver) ?? 0) + amt);
+    }
+    for (const item of reimbursements) {
+      const planPic = item.planPic?.trim() || '?';
+      const paidBy = item.pic?.trim() || '?';
+      const amt = Number.parseFloat(item.cost) || 0;
+      if (!byPic.has(planPic)) byPic.set(planPic, new Map());
+      const recvMap = byPic.get(planPic)!;
+      recvMap.set(paidBy, (recvMap.get(paidBy) ?? 0) + amt);
+    }
+    return [...byPic.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([pic, recvMap]) => {
+        const receivers = [...recvMap.entries()]
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([receiver, total]) => ({ receiver, total }));
+        return {
+          pic,
+          total: receivers.reduce((sum, row) => sum + row.total, 0),
+          receivers,
+        };
+      });
   });
 
   const pendingCount = $derived(
@@ -284,22 +322,81 @@
         (r.planPic === personA && r.pic === personB) ||
         (r.planPic === personB && r.pic === personA),
     );
-    const ids = new Set(toPay.map((item) => item.id));
+    const reimbIds = new Set(toPay.map((item) => item.id));
+    const checklistToDone = items.filter(
+      (i) =>
+        !i.done &&
+        ((i.senderPic === personA && i.receiverPic === personB) ||
+          (i.senderPic === personB && i.receiverPic === personA)),
+    );
     try {
       for (const item of toPay) {
         await markReimbursementPaid(item.id);
       }
-      reimbursements = reimbursements.filter((r) => !ids.has(r.id));
+      for (const item of checklistToDone) {
+        await updateChecklistItem(item.id, true);
+      }
+      reimbursements = reimbursements.filter((r) => !reimbIds.has(r.id));
+      await onChange();
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to mark all as paid';
       try {
         const reimbRes = await getReimbursements(period);
         reimbursements = reimbRes.reimbursements;
+        await onChange();
       } catch {
         /* keep partial state */
       }
     } finally {
       payingAllKey = null;
+    }
+  }
+
+  async function handlePaidByPocket(pocketName: string) {
+    const pocketKey = pocketName.trim().toUpperCase() || '—';
+    payingPocketKey = pocketKey;
+    error = '';
+    const toDone = items.filter(
+      (i) => !i.done && (i.pocket?.trim().toUpperCase() || '—') === pocketKey,
+    );
+    try {
+      for (const item of toDone) {
+        await updateChecklistItem(item.id, true);
+      }
+      await onChange();
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to mark pocket as paid';
+    } finally {
+      payingPocketKey = null;
+    }
+  }
+
+  async function handlePaidByPic(pic: string) {
+    payingPicKey = pic;
+    error = '';
+    const toDone = items.filter((i) => !i.done && i.senderPic === pic);
+    const toPay = reimbursements.filter((r) => r.planPic === pic);
+    const reimbIds = new Set(toPay.map((item) => item.id));
+    try {
+      for (const item of toPay) {
+        await markReimbursementPaid(item.id);
+      }
+      for (const item of toDone) {
+        await updateChecklistItem(item.id, true);
+      }
+      reimbursements = reimbursements.filter((r) => !reimbIds.has(r.id));
+      await onChange();
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to mark PIC as paid';
+      try {
+        const reimbRes = await getReimbursements(period);
+        reimbursements = reimbRes.reimbursements;
+        await onChange();
+      } catch {
+        /* keep partial state */
+      }
+    } finally {
+      payingPicKey = null;
     }
   }
 
@@ -326,6 +423,9 @@
       payingAllKey = null;
     }
   }
+  function isBulkPaying(): boolean {
+    return payingPocketKey != null || payingPicKey != null || payingAllKey != null || payingId != null;
+  }
 </script>
 
 <fieldset class="space-y-3 rounded-sm border border-zinc-200 p-3 dark:border-zinc-800">
@@ -351,73 +451,6 @@
 
   {#if error}
     <p class="text-xs text-red-600 dark:text-red-400">{error}</p>
-  {/if}
-
-  {#if reimbLoading}
-    <div class="h-12 animate-pulse border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900"></div>
-  {:else if reimbursementTotals.length > 0}
-    <div
-      class="space-y-1.5 border border-zinc-200 bg-zinc-50 px-3 py-2.5 dark:border-zinc-800 dark:bg-zinc-900"
-    >
-      <p class="text-[10px] font-medium uppercase tracking-wider text-zinc-500">Reimbursement totals</p>
-      {#each reimbursementTotals as row (row.planPic + row.paidBy)}
-        {@const pairKey = reimbursementPairKey(row.planPic, row.paidBy)}
-        <div class="flex items-center justify-between gap-2 text-xs">
-          <div class="flex min-w-0 items-center gap-1.5">
-            <PicBadge name={row.planPic} />
-            <span class="text-[10px] text-zinc-400" aria-hidden="true">→</span>
-            <PicBadge name={row.paidBy} />
-            <span class="truncate text-[10px] text-zinc-500" title="{row.paidBy} need paid">
-              {picInitial(row.paidBy)} need paid
-            </span>
-          </div>
-          <div class="flex shrink-0 items-center gap-2">
-            <span class="font-mono tabular-nums">{formatCurrency(row.total)}</span>
-            <button
-              type="button"
-              disabled={payingAllKey != null || payingId != null}
-              onclick={() => handlePaidAll(row.planPic, row.paidBy)}
-              class="border border-zinc-300 px-2 py-1 text-[10px] font-medium disabled:opacity-50 dark:border-zinc-600"
-            >
-              {payingAllKey === pairKey ? '…' : 'Paid All'}
-            </button>
-          </div>
-        </div>
-      {/each}
-
-      {#if reimbursementNetTotals.length > 0}
-        <div
-          class="space-y-1.5 border-t border-zinc-300 pt-2 dark:border-zinc-700"
-          aria-label="Net reimbursement totals"
-        >
-          <p class="text-[10px] font-medium uppercase tracking-wider text-zinc-500">Net (final)</p>
-          {#each reimbursementNetTotals as row (row.personA + row.personB)}
-            {@const netKey = reimbursementPeoplePairKey(row.personA, row.personB)}
-            <div class="flex items-center justify-between gap-2 text-xs font-medium">
-              <div class="flex min-w-0 items-center gap-1.5">
-                <PicBadge name={row.planPic} />
-                <span class="text-[10px] text-zinc-400" aria-hidden="true">→</span>
-                <PicBadge name={row.paidBy} />
-                <span class="truncate text-[10px] text-zinc-500" title="{row.paidBy} need paid (net)">
-                  {picInitial(row.paidBy)} need paid
-                </span>
-              </div>
-              <div class="flex shrink-0 items-center gap-2">
-                <span class="font-mono tabular-nums">{formatCurrency(row.total)}</span>
-                <button
-                  type="button"
-                  disabled={payingAllKey != null || payingId != null}
-                  onclick={() => handlePaidNet(row.personA, row.personB)}
-                  class="border border-zinc-300 px-2 py-1 text-[10px] font-medium disabled:opacity-50 dark:border-zinc-600"
-                >
-                  {payingAllKey === netKey ? '…' : 'Paid'}
-                </button>
-              </div>
-            </div>
-          {/each}
-        </div>
-      {/if}
-    </div>
   {/if}
 
   {#if !formOpen}
@@ -738,33 +771,34 @@
                 </li>
               {:else}
                 {@const item = row.item}
-                <li class="flex items-center gap-2 rounded-sm border border-sky-200 bg-sky-50/50 px-2 py-2 dark:border-sky-900/60 dark:bg-sky-950/20">
-                  <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-sky-300 bg-sky-100 text-[9px] font-bold uppercase text-sky-700 dark:border-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
-                    D
-                  </div>
-                  <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm">{item.detail}</p>
-                    <p class="font-mono text-[11px] tabular-nums text-zinc-500">
-                      {formatCurrency(item.cost)} · {item.categoryName}{#if item.subCategory?.trim()}
-                        · {item.subCategory.trim()}{/if}
-                    </p>
-                    <p class="mt-0.5 flex items-center gap-1 text-[10px] text-zinc-500">
-                      <span>{item.date}</span>
-                      <span aria-hidden="true">·</span>
-                      <span>Plan {picInitial(item.planPic)}</span>
-                      <span aria-hidden="true">→</span>
-                      <span>By {picInitial(item.pic)}</span>
-                      <span class="rounded bg-sky-100 px-1 text-[9px] font-medium uppercase text-sky-800 dark:bg-sky-900/40 dark:text-sky-200">Auto</span>
-                    </p>
-                  </div>
+                <li
+                  class="flex items-center gap-2 rounded-sm border px-2 py-2 transition border-zinc-200 bg-white dark:border-zinc-800 dark:bg-black"
+                >
                   <button
                     type="button"
                     disabled={payingId === item.id || payingAllKey != null}
                     onclick={() => handlePaid(item)}
-                    class="shrink-0 border border-zinc-300 px-2 py-1 text-[10px] font-medium disabled:opacity-50 dark:border-zinc-600"
+                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-zinc-300 bg-zinc-100 text-transparent transition hover:border-zinc-400 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-800"
+                    aria-label="Mark paid"
                   >
-                    {payingId === item.id ? '…' : 'Paid'}
+                    {#if payingId === item.id}
+                      <span class="text-[10px] font-medium text-zinc-500">…</span>
+                    {/if}
                   </button>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2">
+                      <span class="truncate text-sm font-medium">{item.detail}</span>
+                      <span class="ml-auto shrink-0 font-mono text-xs tabular-nums">{formatCurrency(item.cost)}</span>
+                    </div>
+                    <div class="mt-1 flex flex-wrap items-center gap-1.5 text-[10px]">
+                      <span class="rounded bg-zinc-100 px-1.5 py-0.5 font-medium tabular-nums text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                        {item.date}
+                      </span>
+                      <span class="rounded bg-zinc-100 px-1.5 py-0.5 font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                        {item.categoryName}
+                      </span>
+                    </div>
+                  </div>
                 </li>
               {/if}
             {/each}
@@ -782,13 +816,26 @@
       <div class="grid gap-2 sm:grid-cols-2">
         {#each pocketTotals as group (group.pocket)}
           <div class="rounded-sm border border-zinc-200 p-2 dark:border-zinc-800">
-            <div class="mb-1.5 flex items-center gap-1.5">
-              <span
-                class="h-2.5 w-2.5 rounded-full"
-                style="background-color: {group.color}"
-                aria-hidden="true"
-              ></span>
-              <span class="text-[11px] font-semibold uppercase tracking-wide">{group.pocket}</span>
+            <div class="mb-1.5 flex items-center justify-between gap-2">
+              <div class="flex min-w-0 items-center gap-1.5">
+                <span
+                  class="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style="background-color: {group.color}"
+                  aria-hidden="true"
+                ></span>
+                <span class="text-[11px] font-semibold uppercase tracking-wide">{group.pocket}</span>
+              </div>
+              <div class="flex shrink-0 items-center gap-2">
+                <span class="font-mono text-xs tabular-nums">{formatCurrency(group.total)}</span>
+                <button
+                  type="button"
+                  disabled={isBulkPaying()}
+                  onclick={() => handlePaidByPocket(group.pocket)}
+                  class="border border-zinc-300 px-2 py-0.5 text-[10px] font-medium disabled:opacity-50 dark:border-zinc-600"
+                >
+                  {payingPocketKey === group.pocket ? '…' : 'Paid'}
+                </button>
+              </div>
             </div>
             <ul class="space-y-0.5">
               {#each group.pics as row (row.pic)}
@@ -798,6 +845,75 @@
                 </li>
               {/each}
             </ul>
+          </div>
+        {/each}
+      </div>
+    </div>
+  {/if}
+
+  {#if picTotals.length > 0}
+    <div class="space-y-2 border-t border-dashed border-zinc-200 pt-3 dark:border-zinc-800">
+      <p class="text-[9px] font-medium uppercase tracking-wider text-zinc-400">Pending by PIC</p>
+      <div class="grid gap-2 sm:grid-cols-2">
+        {#each picTotals as group (group.pic)}
+          <div class="rounded-sm border border-zinc-200 p-2 dark:border-zinc-800">
+            <div class="mb-1.5 flex items-center justify-between gap-2">
+              <PicBadge name={group.pic} />
+              <div class="flex shrink-0 items-center gap-2">
+                <span class="font-mono text-xs tabular-nums">{formatCurrency(group.total)}</span>
+                <button
+                  type="button"
+                  disabled={isBulkPaying()}
+                  onclick={() => handlePaidByPic(group.pic)}
+                  class="border border-zinc-300 px-2 py-0.5 text-[10px] font-medium disabled:opacity-50 dark:border-zinc-600"
+                >
+                  {payingPicKey === group.pic ? '…' : 'Paid'}
+                </button>
+              </div>
+            </div>
+            <ul class="space-y-0.5">
+              {#each group.receivers as row (row.receiver)}
+                <li class="flex items-center justify-between gap-2 text-[11px]">
+                  <div class="flex min-w-0 items-center gap-1">
+                    <span class="text-zinc-400">→</span>
+                    <PicBadge name={row.receiver} />
+                  </div>
+                  <span class="font-mono text-xs tabular-nums">{formatCurrency(row.total)}</span>
+                </li>
+              {/each}
+            </ul>
+          </div>
+        {/each}
+      </div>
+    </div>
+  {/if}
+
+  {#if transferNetTotals.length > 0}
+    <div
+      class="space-y-1.5 border-t border-dashed border-zinc-200 pt-3 dark:border-zinc-800"
+      aria-label="Net final totals"
+    >
+      <p class="text-[9px] font-medium uppercase tracking-wider text-zinc-400">Net (final)</p>
+      <div class="space-y-1.5 border border-zinc-200 bg-zinc-50 px-3 py-2.5 dark:border-zinc-800 dark:bg-zinc-900">
+        {#each transferNetTotals as row (row.personA + row.personB)}
+          {@const netKey = reimbursementPeoplePairKey(row.personA, row.personB)}
+          <div class="flex items-center justify-between gap-2 text-xs font-medium">
+            <div class="flex min-w-0 items-center gap-1.5">
+              <PicBadge name={row.planPic} />
+              <span class="text-[10px] text-zinc-400" aria-hidden="true">→</span>
+              <PicBadge name={row.paidBy} />
+            </div>
+            <div class="flex shrink-0 items-center gap-2">
+              <span class="font-mono tabular-nums">{formatCurrency(row.total)}</span>
+              <button
+                type="button"
+                disabled={isBulkPaying()}
+                onclick={() => handlePaidNet(row.personA, row.personB)}
+                class="border border-zinc-300 px-2 py-1 text-[10px] font-medium disabled:opacity-50 dark:border-zinc-600"
+              >
+                {payingAllKey === netKey ? '…' : 'Paid'}
+              </button>
+            </div>
           </div>
         {/each}
       </div>
