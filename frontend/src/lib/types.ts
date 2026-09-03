@@ -19,6 +19,7 @@ export interface AuthEmailSetting {
   email: string;
   pic: string;
   isSuperUser?: boolean;
+  isAdmin?: boolean;
 }
 
 export interface Project {

@@ -2,7 +2,8 @@ import 'dotenv/config';
 import cors from '@fastify/cors';
 import Fastify from 'fastify';
 import { refreshPicCache } from './lib/pic.js';
-import { getProjectById, parseProjectIdHeader } from './lib/project.js';
+import { emailIsAdmin } from './lib/auth-emails.js';
+import { getProjectById, isProjectMember, parseProjectIdHeader } from './lib/project.js';
 import { budgetRoutes } from './routes/budgets.js';
 import { categoryRoutes } from './routes/categories.js';
 import { dashboardRoutes } from './routes/dashboard.js';
@@ -35,6 +36,13 @@ function needsProjectId(url: string): boolean {
   return true;
 }
 
+function userEmailFromHeader(raw: string | string[] | undefined): string {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return String(value ?? '')
+    .trim()
+    .toLowerCase();
+}
+
 app.addHook('onRequest', async (request, reply) => {
   if (!needsProjectId(request.url)) return;
 
@@ -46,6 +54,18 @@ app.addHook('onRequest', async (request, reply) => {
   if (!project) {
     return reply.code(404).send({ error: 'Project not found' });
   }
+
+  const email = userEmailFromHeader(request.headers['x-user-email']);
+  if (email) {
+    const isAdmin = await emailIsAdmin(email);
+    if (!isAdmin) {
+      const member = await isProjectMember(projectId, email);
+      if (!member) {
+        return reply.code(403).send({ error: 'Project not assigned to this user' });
+      }
+    }
+  }
+
   request.projectId = projectId;
 });
 

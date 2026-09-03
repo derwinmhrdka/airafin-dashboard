@@ -142,7 +142,22 @@ export const authEmails = pgTable('auth_emails', {
   id: serial('id').primaryKey(),
   email: text('email').notNull().unique(),
   pic: text('pic').notNull(),
+  /** App admin (in addition to AUTH_EMAIL env root). */
+  isAdmin: boolean('is_admin').notNull().default(false),
 });
+
+/** Which Google users can open a project. */
+export const projectMembers = pgTable(
+  'project_members',
+  {
+    id: serial('id').primaryKey(),
+    projectId: integer('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    email: text('email').notNull(),
+  },
+  (table) => [uniqueIndex('project_members_project_email_idx').on(table.projectId, table.email)],
+);
 
 /** Named PICs that can be assigned to users and plan/detail rows. */
 export const pics = pgTable('pics', {
@@ -174,6 +189,7 @@ export const notifications = pgTable(
 );
 
 export type Project = typeof projects.$inferSelect;
+export type ProjectMember = typeof projectMembers.$inferSelect;
 export type Category = typeof categories.$inferSelect;
 export type Pocket = typeof pockets.$inferSelect;
 export type Income = typeof incomes.$inferSelect;

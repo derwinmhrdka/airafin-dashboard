@@ -1,7 +1,8 @@
-import { getSession, isSuperUserEmail } from '$lib/server/auth';
+import { getSession, isAdminEmail, isSuperUserEmail } from '$lib/server/auth';
 
-export function load({ cookies }) {
+export async function load({ cookies }) {
   const session = getSession(cookies);
+  const isAdmin = session ? await isAdminEmail(session.email) : false;
   return {
     session: session
       ? {
@@ -13,5 +14,6 @@ export function load({ cookies }) {
         }
       : null,
     isSuperUser: isSuperUserEmail(session?.email),
+    isAdmin,
   };
 }

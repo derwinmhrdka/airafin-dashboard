@@ -136,6 +136,16 @@ export function updateAuthEmailPic(
   });
 }
 
+export function setAuthEmailAdmin(
+  id: number,
+  isAdmin: boolean,
+): Promise<{ email: AuthEmailSetting }> {
+  return fetchJson(`/api/settings/auth-emails/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ isAdmin }),
+  });
+}
+
 export function deleteAuthEmail(id: number): Promise<{ ok: boolean }> {
   return fetchJson(`/api/settings/auth-emails/${id}`, { method: 'DELETE' });
 }
@@ -171,8 +181,9 @@ export function getNotifications(
   return fetchJson(`/api/notifications?${q}`, { cache: 'no-store' });
 }
 
-export function getProjects(): Promise<{ projects: Project[] }> {
-  return fetchJson('/api/projects');
+export function getProjects(opts?: { all?: boolean }): Promise<{ projects: Project[] }> {
+  const q = opts?.all ? '?all=1' : '';
+  return fetchJson(`/api/projects${q}`);
 }
 
 export function createProject(input: {
@@ -214,6 +225,42 @@ export async function selectSessionProject(projectId: number | null): Promise<{ 
     throw new Error(body.error ?? `Request failed (${res.status})`);
   }
   return res.json();
+}
+
+export function getProjectMembers(
+  projectId: number,
+): Promise<{ members: { id: number; projectId: number; email: string }[] }> {
+  return fetchJson(`/api/projects/${projectId}/members`);
+}
+
+export function addProjectMember(
+  projectId: number,
+  email: string,
+): Promise<{ member: { id: number; projectId: number; email: string }; created: boolean }> {
+  return fetchJson(`/api/projects/${projectId}/members`, {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function removeProjectMember(projectId: number, email: string): Promise<{ ok: boolean }> {
+  return fetchJson(`/api/projects/${projectId}/members/${encodeURIComponent(email)}`, {
+    method: 'DELETE',
+  });
+}
+
+export function copyProjectTemplate(
+  toProjectId: number,
+  input: { fromProjectId: number; period: string },
+): Promise<{
+  ok: boolean;
+  period: string;
+  copied: { incomes: number; budgets: number; subcategories: number; checklist: number };
+}> {
+  return fetchJson(`/api/projects/${toProjectId}/copy-template`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }
 
 export function markNotificationRead(id: number): Promise<{ notification: AppNotification }> {

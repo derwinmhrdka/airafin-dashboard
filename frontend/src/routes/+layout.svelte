@@ -7,7 +7,7 @@
   import ProfileMenu from '$lib/components/ProfileMenu.svelte';
   import ProjectPicker from '$lib/components/ProjectPicker.svelte';
   import TabNav from '$lib/components/TabNav.svelte';
-  import { getPics, getProjects } from '$lib/api';
+  import { getPics, getProjects, selectSessionProject } from '$lib/api';
   import { currentPeriod, parsePeriodToDate, periodFromUrl } from '$lib/period';
   import { setPicNames } from '$lib/pics';
 
@@ -35,13 +35,23 @@
       return;
     }
     void getProjects()
-      .then((res) => {
+      .then(async (res) => {
         const p = res.projects.find((x) => x.id === id);
-        projectName = p?.name ?? `Project #${id}`;
-        projectPhoto = p?.photo ?? null;
+        if (!p) {
+          // Session points at a project no longer assigned to this user.
+          try {
+            await selectSessionProject(null);
+          } catch {
+            /* ignore */
+          }
+          window.location.href = '/';
+          return;
+        }
+        projectName = p.name;
+        projectPhoto = p.photo ?? null;
       })
       .catch(() => {
-        projectName = `Project #${id}`;
+        projectName = null;
         projectPhoto = null;
       });
   });
@@ -99,7 +109,7 @@
               {#if data.session.projectId}
                 <NotificationBell pic={data.session.pic} {period} />
               {/if}
-              <ProfileMenu pic={data.session.pic} email={data.session.email} />
+              <ProfileMenu pic={data.session.pic} email={data.session.email} isAdmin={data.isAdmin} />
             </div>
           {/if}
         </div>
@@ -111,8 +121,10 @@
       </div>
     </header>
 
-    {#if data.session?.projectId}
-      <TabNav />
+    {#if data.session?.projectId || page.url.pathname.startsWith('/admin')}
+      {#if data.session?.projectId}
+        <TabNav />
+      {/if}
       <main class="flex-1 px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] md:px-8 md:py-6 md:pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
         {@render children()}
       </main>
@@ -121,16 +133,16 @@
     {/if}
   </div>
 
-  {#if needsProject && data.session}
+  {#if needsProject && data.session && !page.url.pathname.startsWith('/admin')}
     <ProjectPicker
       selectedProjectId={data.session.projectId}
-      isSuperUser={data.isSuperUser}
+      isAdmin={data.isAdmin}
       required={true}
     />
   {:else if switchOpen && data.session}
     <ProjectPicker
       selectedProjectId={data.session.projectId}
-      isSuperUser={data.isSuperUser}
+      isAdmin={data.isAdmin}
       required={false}
       onClose={() => (switchOpen = false)}
     />

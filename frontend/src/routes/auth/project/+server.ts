@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { getSession, setSessionCookie } from '$lib/server/auth';
+import { getSession, isAdminEmail, setSessionCookie } from '$lib/server/auth';
 import { env } from '$env/dynamic/private';
 
 function resolveBackendUrl(): string {
@@ -39,15 +39,28 @@ export const POST: RequestHandler = async ({ request, cookies, url }) => {
     return json({ error: 'Valid projectId is required' }, { status: 400 });
   }
 
+  const id = Math.trunc(projectId);
+
   try {
-    const res = await fetch(`${resolveBackendUrl()}/api/projects/${projectId}`);
+    const isAdmin = await isAdminEmail(session.email);
+    const listUrl = isAdmin
+      ? `${resolveBackendUrl()}/api/projects?all=1`
+      : `${resolveBackendUrl()}/api/projects`;
+    const res = await fetch(listUrl, {
+      headers: { 'X-User-Email': session.email },
+    });
     if (!res.ok) {
-      return json({ error: 'Project not found' }, { status: 404 });
+      return json({ error: 'Failed to verify project access' }, { status: 502 });
+    }
+    const data = (await res.json()) as { projects?: { id: number }[] };
+    const allowed = (data.projects ?? []).some((p) => p.id === id);
+    if (!allowed) {
+      return json({ error: 'Project not assigned to this user' }, { status: 403 });
     }
   } catch {
     return json({ error: 'Backend unreachable' }, { status: 502 });
   }
 
-  setSessionCookie(cookies, { ...session, projectId: Math.trunc(projectId) }, secure);
-  return json({ ok: true, projectId: Math.trunc(projectId) });
+  setSessionCookie(cookies, { ...session, projectId: id }, secure);
+  return json({ ok: true, projectId: id });
 };

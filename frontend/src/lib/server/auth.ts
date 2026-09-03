@@ -93,6 +93,24 @@ export function isSuperUserEmail(email: string | undefined | null): boolean {
   return Boolean(superEmail && email?.trim().toLowerCase() === superEmail);
 }
 
+/** Root AUTH_EMAIL or auth_emails.is_admin via backend. */
+export async function isAdminEmail(email: string | undefined | null): Promise<boolean> {
+  if (!email?.trim()) return false;
+  if (isSuperUserEmail(email)) return true;
+  try {
+    const res = await fetch(`${resolveBackendUrl()}/api/auth/is-admin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim().toLowerCase() }),
+    });
+    if (!res.ok) return false;
+    const data = (await res.json()) as { isAdmin?: boolean };
+    return Boolean(data.isAdmin);
+  } catch {
+    return false;
+  }
+}
+
 /** Look up allowed Google email → PIC from backend settings. */
 export async function resolvePicFromEmail(email: string): Promise<SessionPic | null> {
   const normalized = email.trim().toLowerCase();

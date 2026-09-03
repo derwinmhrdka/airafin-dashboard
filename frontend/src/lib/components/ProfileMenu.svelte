@@ -1,18 +1,24 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import PicBadge from '$lib/components/PicBadge.svelte';
+  import { periodFromUrl, withPeriodParam } from '$lib/period';
 
   interface Props {
     pic: string;
     email: string;
+    isAdmin?: boolean;
   }
 
-  let { pic, email }: Props = $props();
+  let { pic, email, isAdmin = false }: Props = $props();
 
   let open = $state(false);
   let signingOut = $state(false);
   let rootEl = $state<HTMLDivElement | null>(null);
   let buttonEl = $state<HTMLButtonElement | null>(null);
   let panelTop = $state(0);
+
+  const period = $derived(periodFromUrl(page.url.searchParams));
 
   function placePanel() {
     if (!buttonEl) return;
@@ -43,6 +49,11 @@
   function toggleOpen() {
     open = !open;
     if (open) requestAnimationFrame(placePanel);
+  }
+
+  async function goAdmin() {
+    open = false;
+    await goto(withPeriodParam('/admin', period));
   }
 
   async function signOut() {
@@ -84,6 +95,17 @@
         </span>
         <span class="max-w-full truncate text-[10px] text-zinc-400" title={email}>{email}</span>
       </div>
+
+      {#if isAdmin}
+        <button
+          type="button"
+          role="menuitem"
+          onclick={goAdmin}
+          class="flex w-full items-center justify-center border-b border-zinc-200 px-3 py-2.5 text-xs font-medium text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-900"
+        >
+          Admin
+        </button>
+      {/if}
 
       <button
         type="button"

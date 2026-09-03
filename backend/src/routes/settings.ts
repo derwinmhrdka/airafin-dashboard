@@ -1,8 +1,14 @@
 import { asc, eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/index.js';
-import { authEmails, budgetSubcategories, budgets, pockets } from '../db/schema.js';
-import { listAuthEmails, resolveAuthEmail, getSuperUserEmail } from '../lib/auth-emails.js';
+import { authEmails, budgetSubcategories, budgets, pockets, projectMembers } from '../db/schema.js';
+import {
+  emailIsAdmin,
+  getSuperUserEmail,
+  listAuthEmails,
+  resolveAuthEmail,
+  setAuthEmailAdmin,
+} from '../lib/auth-emails.js';
 import { createPic, deletePic, isValidPic, listPics } from '../lib/pic.js';
 
 interface PocketBody {
@@ -145,34 +151,67 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
 
     const [created] = await db
       .insert(authEmails)
-      .values({ email, pic })
+      .values({ email, pic, isAdmin: false })
       .onConflictDoNothing()
       .returning();
 
     if (!created) {
       return reply.code(409).send({ error: 'Email already registered' });
     }
-    return { email: created, created: true };
+    return {
+      email: {
+        ...created,
+        isSuperUser: false,
+        isAdmin: false,
+      },
+      created: true,
+    };
   });
 
-  app.patch<{ Params: { id: string }; Body: Pick<AuthEmailBody, 'pic'> }>(
+  app.patch<{ Params: { id: string }; Body: { pic?: string; isAdmin?: boolean } }>(
     '/api/settings/auth-emails/:id',
     async (request, reply) => {
       const id = Number.parseInt(request.params.id, 10);
       if (!Number.isFinite(id) || id <= 0) return reply.code(400).send({ error: 'Invalid id' });
 
-      const pic = request.body?.pic?.trim() ?? '';
-      if (!isValidPic(pic)) {
-        return reply.code(400).send({ error: 'Invalid PIC' });
+      const pic = request.body?.pic?.trim();
+      const isAdminBody = request.body?.isAdmin;
+      if (pic === undefined && typeof isAdminBody !== 'boolean') {
+        return reply.code(400).send({ error: 'pic or isAdmin is required' });
       }
 
-      const [updated] = await db
-        .update(authEmails)
-        .set({ pic })
-        .where(eq(authEmails.id, id))
-        .returning();
-      if (!updated) return reply.code(404).send({ error: 'Email not found' });
-      return { email: updated };
+      try {
+        if (pic !== undefined) {
+          if (!isValidPic(pic)) {
+            return reply.code(400).send({ error: 'Invalid PIC' });
+          }
+          const [updated] = await db
+            .update(authEmails)
+            .set({ pic })
+            .where(eq(authEmails.id, id))
+            .returning();
+          if (!updated) return reply.code(404).send({ error: 'Email not found' });
+        }
+
+        if (typeof isAdminBody === 'boolean') {
+          const email = await setAuthEmailAdmin(id, isAdminBody);
+          if (!email) return reply.code(404).send({ error: 'Email not found' });
+          return { email };
+        }
+
+        const [row] = await db.select().from(authEmails).where(eq(authEmails.id, id)).limit(1);
+        if (!row) return reply.code(404).send({ error: 'Email not found' });
+        const superEmail = getSuperUserEmail();
+        return {
+          email: {
+            ...row,
+            isSuperUser: superEmail != null && row.email === superEmail,
+            isAdmin: Boolean(row.isAdmin) || (superEmail != null && row.email === superEmail),
+          },
+        };
+      } catch (e) {
+        return reply.code(400).send({ error: e instanceof Error ? e.message : 'Failed' });
+      }
     },
   );
 
@@ -188,6 +227,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(403).send({ error: 'Cannot remove the super-user email (AUTH_EMAIL)' });
     }
 
+    await db.delete(projectMembers).where(eq(projectMembers.email, target.email));
     await db.delete(authEmails).where(eq(authEmails.id, id));
     return { ok: true };
   });
@@ -202,5 +242,11 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(404).send({ error: 'Email not allowed' });
     }
     return resolved;
+  });
+
+  app.post<{ Body: { email?: string } }>('/api/auth/is-admin', async (request, reply) => {
+    const email = normalizeEmail(request.body?.email);
+    if (!email) return reply.code(400).send({ error: 'email is required' });
+    return { email, isAdmin: await emailIsAdmin(email) };
   });
 }
