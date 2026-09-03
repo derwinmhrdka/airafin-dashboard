@@ -107,6 +107,12 @@ export const authEmails = pgTable('auth_emails', {
   pic: text('pic').notNull(),
 });
 
+/** Named PICs that can be assigned to users and plan/detail rows. */
+export const pics = pgTable('pics', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull().unique(),
+});
+
 /** In-app notifications per PIC (pay due / paid received). */
 export const notifications = pgTable(
   'notifications',
@@ -132,6 +138,7 @@ export type Budget = typeof budgets.$inferSelect;
 export type BudgetSubcategory = typeof budgetSubcategories.$inferSelect;
 export type PlanChecklistItem = typeof planChecklist.$inferSelect;
 export type AuthEmail = typeof authEmails.$inferSelect;
+export type PicRow = typeof pics.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 

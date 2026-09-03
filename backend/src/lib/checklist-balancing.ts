@@ -1,5 +1,5 @@
 import type { Budget, BudgetSubcategory, Income } from '../db/schema.js';
-import { isValidPic, type Pic, VALID_PIC } from './pic.js';
+import { defaultPic, isValidPic, listCachedPics, type Pic } from './pic.js';
 
 export const BALANCING_ITEM_NAME = 'Balancing';
 
@@ -10,9 +10,8 @@ function parseAmount(value: string | null | undefined): number {
 
 function incomePicFromSource(source: string): Pic | null {
   const s = source.toLowerCase();
-  if (s.includes('derwin')) return 'Derwin';
-  if (s.includes('anggita')) return 'Anggita';
-  return null;
+  const names = [...listCachedPics()].sort((a, b) => b.length - a.length);
+  return names.find((p) => s.includes(p.toLowerCase())) ?? null;
 }
 
 function subAmountTotal(subs: readonly BudgetSubcategory[]): number {
@@ -31,12 +30,16 @@ export function computeBalancingTransfer(input: {
   budgets: readonly Budget[];
   subcategories: readonly BudgetSubcategory[];
 }): BalancingTransfer | null {
-  const incomeByPic: Record<Pic, number> = { Derwin: 0, Anggita: 0 };
-  const planByPic: Record<Pic, number> = { Derwin: 0, Anggita: 0 };
+  const incomeByPic: Record<string, number> = {};
+  const planByPic: Record<string, number> = {};
+  for (const pic of listCachedPics()) {
+    incomeByPic[pic] = 0;
+    planByPic[pic] = 0;
+  }
 
   for (const row of input.incomes) {
     const owner = incomePicFromSource(row.source);
-    if (owner) incomeByPic[owner] += parseAmount(row.amount);
+    if (owner) incomeByPic[owner] = (incomeByPic[owner] ?? 0) + parseAmount(row.amount);
   }
 
   const subsByCategory = new Map<number, BudgetSubcategory[]>();
@@ -47,20 +50,21 @@ export function computeBalancingTransfer(input: {
   }
 
   for (const budget of input.budgets) {
-    const pic = isValidPic(budget.pic?.trim() ?? '') ? (budget.pic.trim() as Pic) : 'Derwin';
+    const pic = isValidPic(budget.pic?.trim() ?? '') ? budget.pic.trim() : defaultPic();
     const subs = subsByCategory.get(budget.categoryId) ?? [];
     const subTotal = subAmountTotal(subs);
     const mainAmount = Math.max(0, parseAmount(budget.allocatedAmount) - subTotal);
-    planByPic[pic] += mainAmount;
+    planByPic[pic] = (planByPic[pic] ?? 0) + mainAmount;
     for (const sub of subs) {
-      const subPic = isValidPic(sub.pic?.trim() ?? '') ? (sub.pic.trim() as Pic) : pic;
-      planByPic[subPic] += parseAmount(sub.allocatedAmount);
+      const subPic = isValidPic(sub.pic?.trim() ?? '') ? sub.pic.trim() : pic;
+      planByPic[subPic] = (planByPic[subPic] ?? 0) + parseAmount(sub.allocatedAmount);
     }
   }
 
-  const balancing = VALID_PIC.map((pic) => ({
+  const pics = [...new Set([...Object.keys(incomeByPic), ...Object.keys(planByPic)])];
+  const balancing = pics.map((pic) => ({
     pic,
-    value: incomeByPic[pic] - planByPic[pic],
+    value: (incomeByPic[pic] ?? 0) - (planByPic[pic] ?? 0),
   }));
 
   const surplus = balancing.filter((r) => r.value > 0).sort((a, b) => b.value - a.value)[0];

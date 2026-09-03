@@ -1,4 +1,4 @@
-import { getSession } from '$lib/server/auth';
+import { getSession, isSuperUserEmail } from '$lib/server/auth';
 
 export function load({ cookies }) {
   const session = getSession(cookies);
@@ -6,5 +6,6 @@ export function load({ cookies }) {
     session: session
       ? { email: session.email, pic: session.pic, name: session.name, auth: session.auth }
       : null,
+    isSuperUser: isSuperUserEmail(session?.email),
   };
 }

@@ -25,7 +25,7 @@
     periodFromUrl,
     periodParts,
   } from '$lib/period';
-  import { DEFAULT_PIC, PICS, picInitial, type Pic } from '$lib/pics';
+  import { defaultPic, isKnownPic, picInitial, picNames, type Pic } from '$lib/pics';
   import type { Category, PlanData } from '$lib/types';
 
   const DEFAULT_INCOMES = ['Gaji Derwin', 'Gaji Anggita'] as const;
@@ -34,6 +34,7 @@
   const DEFAULT_POCKET: Pocket = 'BCA';
 
   const period = $derived(periodFromUrl(page.url.searchParams));
+  const picList = $derived($picNames);
 
   const removeBtnClass =
     'flex h-6 w-6 shrink-0 items-center justify-center bg-transparent text-base leading-none font-light text-red-600 dark:bg-transparent dark:text-red-500 md:h-8 md:w-8 md:text-xl';
@@ -110,13 +111,13 @@
     const subs: Record<number, SubcategoryRow[]> = {};
     for (const cat of categories) {
       inputs[cat.id] = '';
-      pics[cat.id] = DEFAULT_PIC;
+      pics[cat.id] = defaultPic(picList);
       pockets[cat.id] = DEFAULT_POCKET;
       subs[cat.id] = [];
     }
     for (const b of plan.budgets) {
       inputs[b.categoryId] = formatAmountInput(b.allocatedAmount);
-      if (b.pic && (PICS as readonly string[]).includes(b.pic)) {
+      if (b.pic && isKnownPic(b.pic, picList)) {
         pics[b.categoryId] = b.pic as Pic;
       }
       if (b.pocket?.trim()) {
@@ -129,10 +130,7 @@
         key: `copied-${sub.id}-${Date.now()}`,
         name: sub.name,
         amount: formatAmountInput(sub.allocatedAmount ?? ''),
-        pic:
-          sub.pic && (PICS as readonly string[]).includes(sub.pic)
-            ? (sub.pic as Pic)
-            : DEFAULT_PIC,
+        pic: sub.pic && isKnownPic(sub.pic, picList) ? sub.pic : defaultPic(picList),
         pocket:
           sub.pocket?.trim() ? sub.pocket : DEFAULT_POCKET,
       });
@@ -174,7 +172,7 @@
       const plan = await getPlan(sourcePeriod);
       applyPlanToForm(plan);
       copyOpen = false;
-      success = `Copied from ${sourcePeriod} — Save to apply`;
+      success = `Copied from ${sourcePeriod}. Review, then Save Plan.`;
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to copy plan';
     } finally {
@@ -217,7 +215,7 @@
       const { category } = await createCategory(name);
       categories = [...categories, category];
       budgetInputs = { ...budgetInputs, [category.id]: '' };
-      picInputs = { ...picInputs, [category.id]: DEFAULT_PIC };
+      picInputs = { ...picInputs, [category.id]: defaultPic(picList) };
       pocketInputs = { ...pocketInputs, [category.id]: DEFAULT_POCKET };
       subcategoryInputs = { ...subcategoryInputs, [category.id]: [] };
       newCategoryName = '';
@@ -246,7 +244,7 @@
       .map((cat) => ({
         categoryId: cat.id,
         allocatedAmount: parseAmountInput(budgetInputs[cat.id] || ''),
-        pic: picInputs[cat.id] ?? DEFAULT_PIC,
+        pic: picInputs[cat.id] ?? defaultPic(picList),
         pocket: pocketInputs[cat.id] ?? DEFAULT_POCKET,
       }))
       .filter((b) => b.allocatedAmount > 0);
@@ -284,7 +282,7 @@
   );
 
   const picSummary = $derived(
-    picPlanSummary({ incomeRows, categories, budgetInputs, picInputs, subcategoryInputs }),
+    picPlanSummary({ pics: picList, incomeRows, categories, budgetInputs, picInputs, subcategoryInputs }),
   );
 
   const transferNote = $derived.by(() => {
@@ -306,7 +304,7 @@
           key: `new-${Date.now()}`,
           name: '',
           amount: '',
-          pic: DEFAULT_PIC,
+          pic: defaultPic(picList),
           pocket: DEFAULT_POCKET,
         },
       ],
@@ -325,20 +323,23 @@
   {#if loading}
     <div class="h-48 animate-pulse border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900"></div>
   {:else}
-    <div class="flex flex-wrap items-center justify-end gap-2">
-      <button
-        type="button"
-        onclick={openCopyPanel}
-        class="border border-zinc-300 px-2.5 py-1 text-[11px] font-medium dark:border-zinc-600"
-      >
-        Copy
-      </button>
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <p class="text-[11px] uppercase tracking-wider text-zinc-500">Plan · {period}</p>
+      <div class="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onclick={openCopyPanel}
+          class="border border-zinc-300 px-2.5 py-1 text-[11px] font-medium dark:border-zinc-600"
+        >
+          Copy Plan
+        </button>
+      </div>
     </div>
 
     {#if copyOpen}
       <div class="space-y-3 rounded-sm border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
         <p class="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-          Copy → <span class="font-mono">{period}</span>
+          Copy plan into <span class="font-mono">{period}</span> from
         </p>
         <div class="grid grid-cols-2 gap-2">
           <label class="block min-w-0">
@@ -375,7 +376,7 @@
           </label>
         </div>
         <p class="text-[10px] text-zinc-500">
-          Review, then Save.
+          Copies income, budgets, PIC, and subs. Still need Save.
         </p>
         <div class="flex gap-2">
           <button
@@ -401,7 +402,7 @@
     <form onsubmit={handleSubmit} class="space-y-3 md:space-y-4">
       <fieldset class="space-y-3 rounded-sm border border-zinc-200 p-3 dark:border-zinc-800">
         <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">
-          Income
+          Income — {period}
         </legend>
         <div class="space-y-2">
             {#each incomeRows as row (row.key)}
@@ -438,11 +439,11 @@
               class="w-full border border-dashed border-zinc-300 py-2 text-xs text-zinc-500 dark:border-zinc-700"
               aria-label="Add income"
             >
-              + Income
+              + Add income
             </button>
 
             <p class="text-right text-xs text-zinc-500">
-              Total
+              Total Income:
               <span class="font-mono text-black dark:text-white">{formatCurrency(totalIncome)}</span>
             </p>
         </div>
@@ -450,7 +451,7 @@
 
       <fieldset class="space-y-3 rounded-sm border border-zinc-200 p-3 dark:border-zinc-800">
         <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">
-          Budget
+          Budget per Category
         </legend>
 
         <div class="space-y-2 text-[11px] md:text-sm">
@@ -480,7 +481,7 @@
                       class="h-7 w-full border border-zinc-200 bg-white px-0 text-center text-[8px] font-semibold md:h-8 md:text-[11px] dark:border-zinc-800 dark:bg-black"
                   aria-label="PIC for {cat.name}"
                 >
-                  {#each PICS as p}
+                  {#each picList as p}
                     <option value={p}>{picInitial(p)}</option>
                   {/each}
                 </select>
@@ -517,7 +518,7 @@
                           class="h-7 w-full border border-zinc-200 bg-white px-0 text-center text-[8px] font-semibold md:h-8 md:text-[11px] dark:border-zinc-800 dark:bg-black"
                     aria-label="PIC for sub category"
                   >
-                    {#each PICS as p}
+                    {#each picList as p}
                       <option value={p}>{picInitial(p)}</option>
                     {/each}
                   </select>
@@ -548,7 +549,7 @@
                 onclick={() => addSubcategory(cat.id)}
                 class="ml-2 border border-dashed border-zinc-300 px-2 py-1 text-[9px] md:text-[11px] text-zinc-500 dark:border-zinc-700"
               >
-                + Sub
+                + Sub category
               </button>
 
               {#if (subcategoryInputs[cat.id] ?? []).length > 0}
@@ -558,7 +559,7 @@
                 <div class="grid grid-cols-[minmax(0,1fr)_5.2rem_1.8rem_3.4rem_1rem] items-center gap-x-1 border-t border-dashed border-zinc-200 pt-1 text-zinc-500 dark:border-zinc-800">
                   <p class="text-xs italic md:text-sm">Main</p>
                   <span class="font-mono text-right text-xs tabular-nums md:text-sm">{formatCurrency(mainRemainder)}</span>
-                  <span class="text-center text-[9px] md:text-[11px]">{picInitial(picInputs[cat.id] ?? DEFAULT_PIC)}</span>
+                  <span class="text-center text-[9px] md:text-[11px]">{picInitial(picInputs[cat.id] ?? defaultPic(picList))}</span>
                   <span class="truncate text-center text-[9px] md:text-[11px]">{pocketInputs[cat.id] ?? DEFAULT_POCKET}</span>
                   <span></span>
                 </div>
@@ -585,12 +586,12 @@
             disabled={addingCategory || !newCategoryName.trim()}
             class="shrink-0 border border-zinc-300 px-3 py-2 text-xs disabled:opacity-50 dark:border-zinc-700"
           >
-            {addingCategory ? '…' : '+ Add'}
+            {addingCategory ? 'Adding…' : '+ Add'}
           </button>
         </div>
 
         <p class="text-right text-xs text-zinc-500">
-          Total
+          Total Plan:
           <span class="font-mono text-black dark:text-white">{formatCurrency(totalBudget)}</span>
         </p>
       </fieldset>
@@ -600,13 +601,16 @@
           Per PIC
         </legend>
         <div class="space-y-2">
+            <p class="text-[10px] text-zinc-500">
+              Income − Plan. Negative means that PIC needs a transfer.
+            </p>
             <div
               class="grid grid-cols-[minmax(0,4.5rem)_1fr_1fr] items-center gap-x-2 gap-y-2 border-b border-zinc-200 pb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-500 md:grid-cols-[minmax(0,4.5rem)_1fr_1fr_1fr] dark:border-zinc-800"
             >
               <span>PIC</span>
               <span class="hidden text-right md:block">Income</span>
               <span class="text-right">Plan</span>
-              <span class="text-right">Balance</span>
+              <span class="text-right">Balancing</span>
             </div>
 
             {#each picSummary as row (row.pic)}
@@ -649,7 +653,7 @@
         disabled={saving}
         class="w-full border border-black bg-black py-2.5 text-sm font-medium text-white transition-opacity disabled:opacity-50 dark:border-white dark:bg-white dark:text-black"
       >
-        {saving ? '…' : 'Save'}
+        {saving ? 'Saving…' : 'Save Plan'}
       </button>
     </form>
   {/if}

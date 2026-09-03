@@ -4,6 +4,7 @@ import type {
   AuthEmailSetting,
   Category,
   DashboardSummary,
+  PicSetting,
   PlanChecklistItem,
   PlanData,
   PocketSetting,
@@ -92,6 +93,21 @@ export function updatePocketColor(id: number, color: string): Promise<{ pocket: 
 
 export function deletePocket(id: number): Promise<{ ok: boolean }> {
   return fetchJson(`/api/settings/pockets/${id}`, { method: 'DELETE' });
+}
+
+export function getPics(): Promise<{ pics: PicSetting[] }> {
+  return fetchJson('/api/settings/pics');
+}
+
+export function createPic(name: string): Promise<{ pic: PicSetting; created: boolean }> {
+  return fetchJson('/api/settings/pics', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+}
+
+export function deletePic(id: number): Promise<{ ok: boolean }> {
+  return fetchJson(`/api/settings/pics/${id}`, { method: 'DELETE' });
 }
 
 export function getAuthEmails(): Promise<{ emails: AuthEmailSetting[] }> {

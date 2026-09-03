@@ -26,7 +26,7 @@ import {
   BALANCING_ITEM_NAME,
   computeBalancingTransfer,
 } from '../lib/checklist-balancing.js';
-import { isValidPic } from '../lib/pic.js';
+import { defaultPic, isValidPic } from '../lib/pic.js';
 import { shiftPeriod } from '../lib/period.js';
 
 interface IncomeInput {
@@ -60,6 +60,13 @@ interface TransferEndpoint {
   categoryId: number;
   /** Empty / omitted = Main (default) residual of the category. */
   subcategoryName?: string | null;
+}
+
+interface TransferBody {
+  period: string;
+  amount: number;
+  from: TransferEndpoint;
+  to: TransferEndpoint;
 }
 
 interface CloseMonthBody {
@@ -748,7 +755,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
             if (pic && isValidPic(pic)) return pic;
           }
           const pic = budgetByCategory.get(categoryId)?.pic?.trim() ?? '';
-          return pic && isValidPic(pic) ? pic : 'Derwin';
+          return pic && isValidPic(pic) ? pic : defaultPic();
         }
 
         const [fromCatRow] = await tx
@@ -947,7 +954,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
               subcategoryName: '',
               amount: Math.abs(sisa),
               kind: sisa > 0 ? 'surplus' : 'deficit',
-              pic: budget.pic?.trim() && isValidPic(budget.pic.trim()) ? budget.pic.trim() : 'Derwin',
+              pic: budget.pic?.trim() && isValidPic(budget.pic.trim()) ? budget.pic.trim() : defaultPic(),
               pocket: budget.pocket?.trim() ?? '',
             });
             continue;
@@ -968,7 +975,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
               subcategoryName: sub.name.trim(),
               amount: Math.abs(sisa),
               kind: sisa > 0 ? 'surplus' : 'deficit',
-              pic: sub.pic?.trim() && isValidPic(sub.pic.trim()) ? sub.pic.trim() : 'Derwin',
+              pic: sub.pic?.trim() && isValidPic(sub.pic.trim()) ? sub.pic.trim() : defaultPic(),
               pocket: sub.pocket?.trim() || budget.pocket?.trim() || '',
             });
           }
@@ -983,7 +990,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
               subcategoryName: '',
               amount: Math.abs(mainSisa),
               kind: mainSisa > 0 ? 'surplus' : 'deficit',
-              pic: budget.pic?.trim() && isValidPic(budget.pic.trim()) ? budget.pic.trim() : 'Derwin',
+              pic: budget.pic?.trim() && isValidPic(budget.pic.trim()) ? budget.pic.trim() : defaultPic(),
               pocket: budget.pocket?.trim() ?? '',
             });
           }

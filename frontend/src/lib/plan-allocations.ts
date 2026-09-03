@@ -1,5 +1,5 @@
 import { parseAmountInput } from '$lib/format';
-import { DEFAULT_PIC, incomePicFromSource, PICS, type Pic } from '$lib/pics';
+import { defaultPic, incomePicFromSource, type Pic } from '$lib/pics';
 
 export const MAIN_SUB_LABEL = 'Main (default)';
 
@@ -33,36 +33,39 @@ export interface PicPlanRow {
 }
 
 export function picPlanSummary(input: {
+  pics: readonly string[];
   incomeRows: readonly { source: string; amount: string }[];
   categories: readonly { id: number }[];
   budgetInputs: Record<number, string>;
   picInputs: Record<number, Pic>;
   subcategoryInputs: Record<number, readonly { amount: string; pic: Pic }[]>;
 }): PicPlanRow[] {
-  const incomeByPic: Record<Pic, number> = { Derwin: 0, Anggita: 0 };
-  const planByPic: Record<Pic, number> = { Derwin: 0, Anggita: 0 };
+  const names = input.pics.length > 0 ? [...input.pics] : [defaultPic()];
+  const incomeByPic: Record<string, number> = Object.fromEntries(names.map((p) => [p, 0]));
+  const planByPic: Record<string, number> = Object.fromEntries(names.map((p) => [p, 0]));
 
   for (const row of input.incomeRows) {
-    const owner = incomePicFromSource(row.source);
+    const owner = incomePicFromSource(row.source, names);
     if (owner) {
-      incomeByPic[owner] += parseAmountInput(row.amount || '');
+      incomeByPic[owner] = (incomeByPic[owner] ?? 0) + parseAmountInput(row.amount || '');
     }
   }
 
   for (const cat of input.categories) {
-    const pic = input.picInputs[cat.id] ?? DEFAULT_PIC;
+    const pic = input.picInputs[cat.id] ?? defaultPic(names);
     const subs = input.subcategoryInputs[cat.id] ?? [];
-    planByPic[pic] += mainCategoryRemainder(input.budgetInputs[cat.id] || '', subs);
+    planByPic[pic] = (planByPic[pic] ?? 0) + mainCategoryRemainder(input.budgetInputs[cat.id] || '', subs);
     for (const sub of subs) {
-      planByPic[sub.pic] += parseAmountInput(sub.amount || '');
+      planByPic[sub.pic] = (planByPic[sub.pic] ?? 0) + parseAmountInput(sub.amount || '');
     }
   }
 
-  return PICS.map((pic) => ({
+  const all = [...new Set([...names, ...Object.keys(incomeByPic), ...Object.keys(planByPic)])];
+  return all.map((pic) => ({
     pic,
-    income: incomeByPic[pic],
-    plan: planByPic[pic],
-    balancing: incomeByPic[pic] - planByPic[pic],
+    income: incomeByPic[pic] ?? 0,
+    plan: planByPic[pic] ?? 0,
+    balancing: (incomeByPic[pic] ?? 0) - (planByPic[pic] ?? 0),
   }));
 }
 

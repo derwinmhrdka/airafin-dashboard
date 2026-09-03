@@ -24,7 +24,7 @@
     linesForPocketNet,
     type TransferPendingLine,
   } from '$lib/transfer-pending';
-  import { DEFAULT_PIC, PICS, type Pic } from '$lib/pics';
+  import { defaultPic, otherPic as pickOtherPic, picNames, type Pic } from '$lib/pics';
   import type { Category, PlanChecklistItem, ReimbursementItem } from '$lib/types';
 
   interface SubOption {
@@ -71,8 +71,9 @@
   let itemQuery = $state('');
   let itemFocused = $state(false);
   let customAmount = $state('');
-  let senderPic = $state<Pic>(DEFAULT_PIC);
-  let receiverPic = $state<Pic>('Anggita');
+  let senderPic = $state<Pic>(defaultPic());
+  let receiverPic = $state<Pic>(pickOtherPic(defaultPic()));
+  const picList = $derived($picNames);
   let pocket = $state('');
   let saving = $state(false);
   let togglingId = $state<number | null>(null);
@@ -162,7 +163,7 @@
   );
 
   function otherPic(p: Pic): Pic {
-    return PICS.find((x) => x !== p) ?? DEFAULT_PIC;
+    return pickOtherPic(p, picList);
   }
 
   function pocketDotColor(name: string): string {
@@ -289,8 +290,8 @@
     formError = '';
     itemQuery = '';
     customAmount = '';
-    senderPic = DEFAULT_PIC;
-    receiverPic = 'Anggita';
+    senderPic = defaultPic(picList);
+    receiverPic = otherPic(senderPic);
     pocket = 'BCA';
   }
 
@@ -399,18 +400,25 @@
 </script>
 
 <fieldset class="space-y-3 rounded-sm border border-zinc-200 p-3 dark:border-zinc-800">
-  <legend class="flex w-full items-center justify-end gap-1.5 px-1 text-[10px] tabular-nums text-zinc-400">
-    {#if pendingCount > 0}
-      <span class="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-100 px-1 font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
-        {pendingCount}
-      </span>
-    {/if}
-    {#if doneCount > 0}
-      <span class="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-100 px-1 font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
-        {doneCount}
-      </span>
-    {/if}
+  <legend class="flex w-full items-center justify-between gap-2 px-1">
+    <span class="text-xs font-medium uppercase tracking-wider text-zinc-500">Transfer</span>
+    <span class="flex items-center gap-1.5 text-[10px] tabular-nums text-zinc-400">
+      {#if pendingCount > 0}
+        <span class="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-100 px-1 font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+          {pendingCount}
+        </span>
+      {/if}
+      {#if doneCount > 0}
+        <span class="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-100 px-1 font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
+          {doneCount}
+        </span>
+      {/if}
+    </span>
   </legend>
+
+  <p class="text-[10px] text-zinc-500">
+    Plan + Detail reimbursements (Paid by ≠ plan PIC). Check when transferred / paid.
+  </p>
 
   {#if error}
     <p class="text-xs text-red-600 dark:text-red-400">{error}</p>
@@ -420,13 +428,14 @@
     <button
       type="button"
       onclick={openForm}
-      class="flex w-full items-center justify-center gap-2 border border-dashed border-zinc-300 py-2.5 text-zinc-600 transition-colors hover:border-zinc-400 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-900"
+      class="flex w-full items-center justify-center gap-2 border border-dashed border-zinc-300 py-2.5 text-xs text-zinc-600 transition-colors hover:border-zinc-400 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-900"
       aria-label="Add transfer"
     >
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
         <path d="M12 5v14" />
         <path d="M5 12h14" />
       </svg>
+      <span>Add transfer</span>
     </button>
   {:else}
     <div class="space-y-3 rounded-sm border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-950">
@@ -442,7 +451,7 @@
           bind:value={itemQuery}
           onfocus={() => (itemFocused = true)}
           onblur={() => setTimeout(() => (itemFocused = false), 150)}
-          placeholder="Search…"
+          placeholder="Search item…"
           class="w-full border border-zinc-200 bg-white py-2 pl-8 pr-2 text-sm dark:border-zinc-800 dark:bg-black"
           autocomplete="off"
         />
@@ -470,7 +479,7 @@
                     <path d="M12 5v14" />
                     <path d="M5 12h14" />
                   </svg>
-                  + {itemQuery.trim()}
+                  Custom: <strong class="text-zinc-700 dark:text-zinc-300">{itemQuery.trim()}</strong>
                 </span>
               </li>
             {/if}
@@ -493,7 +502,7 @@
         <div class="flex flex-col items-center gap-1">
           <span class="text-[9px] uppercase tracking-wider text-zinc-400">From</span>
           <div class="flex gap-1">
-            {#each PICS as p}
+            {#each picList as p}
               <button
                 type="button"
                 onclick={() => {
@@ -519,7 +528,7 @@
         <div class="flex flex-col items-center gap-1">
           <span class="text-[9px] uppercase tracking-wider text-zinc-400">To</span>
           <div class="flex gap-1">
-            {#each PICS as p}
+            {#each picList as p}
               <button
                 type="button"
                 onclick={() => {
@@ -768,12 +777,12 @@
       {/each}
     </div>
   {:else if !formOpen && !reimbLoading}
-    <p class="py-2 text-center text-[11px] text-zinc-400">None</p>
+    <p class="py-2 text-center text-[11px] text-zinc-400">No pending transfers</p>
   {/if}
 
   {#if pocketNetGroups.length > 0}
     <div class="space-y-2 border-t border-dashed border-zinc-200 pt-3 dark:border-zinc-800">
-      <p class="text-[9px] font-medium uppercase tracking-wider text-zinc-400">By pocket</p>
+      <p class="text-[9px] font-medium uppercase tracking-wider text-zinc-400">Pending by pocket</p>
       <div class="space-y-3">
         {#each pocketNetGroups as group (group.pocket)}
           <div class="space-y-1.5">
@@ -821,7 +830,7 @@
 
   {#if directedPairRows.length > 0}
     <div class="space-y-2 border-t border-dashed border-zinc-200 pt-3 dark:border-zinc-800">
-      <p class="text-[9px] font-medium uppercase tracking-wider text-zinc-400">By PIC</p>
+      <p class="text-[9px] font-medium uppercase tracking-wider text-zinc-400">Pending by PIC</p>
       <div class="space-y-1.5">
         {#each directedPairRows as row (row.key)}
           {@const expandKey = `pic:${row.key}`}
@@ -860,7 +869,7 @@
       class="space-y-1.5 border-t border-dashed border-zinc-200 pt-3 dark:border-zinc-800"
       aria-label="Net final totals"
     >
-      <p class="text-[9px] font-medium uppercase tracking-wider text-zinc-400">Net</p>
+      <p class="text-[9px] font-medium uppercase tracking-wider text-zinc-400">Net (final)</p>
       <div class="space-y-1.5">
         {#each transferNetRows as row (row.key)}
           {@const expandKey = `net:${row.key}`}

@@ -14,7 +14,7 @@
   import { formatAmountInput, formatCurrency, parseAmountInput } from '$lib/format';
   import { MAIN_SUB_LABEL } from '$lib/plan-allocations';
   import { periodFromUrl, shiftPeriod } from '$lib/period';
-  import { DEFAULT_PIC, PICS, type Pic } from '$lib/pics';
+  import { defaultPic, isKnownPic, type Pic } from '$lib/pics';
   import type { Category, PlanChecklistItem } from '$lib/types';
 
   const DEFAULT_POCKETS = ['BCA', 'MANDIRI', 'SUPA', 'DANA', 'OVO', 'CASH', 'BIBIT'] as const;
@@ -97,9 +97,9 @@
         name: sub.name,
         amount: formatAmountInput(sub.allocatedAmount ?? ''),
         pic:
-          sub.pic && (PICS as readonly string[]).includes(sub.pic)
+          sub.pic && isKnownPic(sub.pic)
             ? (sub.pic as Pic)
-            : DEFAULT_PIC,
+            : defaultPic(),
         pocket: sub.pocket?.trim() ? sub.pocket : DEFAULT_POCKET,
       });
     }
@@ -324,21 +324,24 @@
 </script>
 
 <section class="mx-auto w-full space-y-6 md:space-y-8">
-  <div class="flex flex-wrap items-center justify-end gap-2">
-    <button
-      type="button"
-      onclick={openClosePanel}
-      class="border border-zinc-300 px-2.5 py-1 text-[11px] font-medium dark:border-zinc-600"
-    >
-      Close
-    </button>
-    <button
-      type="button"
-      onclick={openMovePanel}
-      class="border border-zinc-300 px-2.5 py-1 text-[11px] font-medium dark:border-zinc-600"
-    >
-      Move
-    </button>
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <p class="text-[11px] uppercase tracking-wider text-zinc-500">Transfer · {period}</p>
+    <div class="flex flex-wrap gap-2">
+      <button
+        type="button"
+        onclick={openClosePanel}
+        class="border border-zinc-300 px-2.5 py-1 text-[11px] font-medium dark:border-zinc-600"
+      >
+        Close Month
+      </button>
+      <button
+        type="button"
+        onclick={openMovePanel}
+        class="border border-zinc-300 px-2.5 py-1 text-[11px] font-medium dark:border-zinc-600"
+      >
+        Move Allocation
+      </button>
+    </div>
   </div>
 
   {#if error}
@@ -358,7 +361,7 @@
       {#if closeLoading}
         <p class="text-[11px] text-zinc-500">Loading remaining…</p>
       {:else if closePreview.length === 0}
-        <p class="text-[11px] text-zinc-500">Nothing to close</p>
+        <p class="text-[11px] text-zinc-500">Nothing to close — all buckets settled.</p>
       {:else}
         <div class="overflow-x-auto border border-zinc-200 dark:border-zinc-800">
           <table class="w-full text-left text-[11px]">
@@ -378,7 +381,7 @@
                   <td class="px-2 py-1.5 text-right font-mono tabular-nums">{formatCurrency(row.amount)}</td>
                   <td class="px-2 py-1.5">
                     {#if row.kind === 'surplus'}
-                      <span class="text-emerald-700 dark:text-emerald-400">Surplus</span>
+                      <span class="text-emerald-700 dark:text-emerald-400">Carry to plan + income</span>
                     {:else}
                       <span class="text-amber-700 dark:text-amber-400">Deficit</span>
                     {/if}
@@ -393,17 +396,22 @@
             <span>
               Surplus
               <span class="font-mono text-emerald-700 dark:text-emerald-400">{formatCurrency(closeSurplusTotal)}</span>
+              → income &amp; plan in {closeNextPeriod}
             </span>
           {/if}
           {#if closeDeficitTotal > 0}
             <span>
               Deficit
               <span class="font-mono text-amber-700 dark:text-amber-400">{formatCurrency(closeDeficitTotal)}</span>
+              → Detail in {closeNextPeriod}
             </span>
           {/if}
         </div>
       {/if}
 
+      <p class="text-[10px] text-zinc-500">
+        Surplus → Detail Carryover. Deficit → next-month expense.
+      </p>
       <div class="flex gap-2">
         <button
           type="button"
@@ -411,7 +419,7 @@
           onclick={handleCloseMonth}
           class="border border-black bg-black px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 dark:border-white dark:bg-white dark:text-black"
         >
-          {closing ? '…' : 'Close'}
+          {closing ? 'Closing…' : 'Close Month'}
         </button>
         <button
           type="button"
@@ -521,6 +529,9 @@
         <AmountInput bind:value={moveAmount} aria-label="Amount to move" />
       </label>
 
+      <p class="text-[10px] text-zinc-500">
+        Moves leftover plan (allocation − spent). Writes Detail immediately.
+      </p>
       <div class="flex gap-2">
         <button
           type="button"
@@ -528,7 +539,7 @@
           onclick={handleMoveAllocation}
           class="border border-black bg-black px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 dark:border-white dark:bg-white dark:text-black"
         >
-          {moving ? '…' : 'Move'}
+          {moving ? 'Moving…' : 'Move'}
         </button>
         <button
           type="button"

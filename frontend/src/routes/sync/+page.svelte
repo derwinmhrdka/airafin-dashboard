@@ -61,8 +61,8 @@
   <p class="text-[11px] uppercase tracking-wider text-zinc-500">Sync · {period}</p>
 
   <p class="text-[11px] text-zinc-500">
-    Uses the month and year from the header. Only the <strong class="text-zinc-700 dark:text-zinc-300">DETAIL</strong>
-    tab is read or written — monthly tabs (JUNE, JULY, etc.) are never changed.
+    Uses the header period. Only the <strong class="text-zinc-700 dark:text-zinc-300">DETAIL</strong>
+    tab is synced — monthly tabs are never changed.
   </p>
 
   <div class="space-y-2">

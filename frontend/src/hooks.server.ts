@@ -1,6 +1,6 @@
 import { env } from '$env/dynamic/private';
 import { redirect, type Handle } from '@sveltejs/kit';
-import { getSession } from '$lib/server/auth';
+import { getSession, isSuperUserEmail } from '$lib/server/auth';
 
 /** Internal backend URL — must include http:// host (never a path like /api). */
 function resolveBackendUrl(): string {
@@ -43,6 +43,24 @@ export const handle: Handle = async ({ event, resolve }) => {
       });
     }
     redirect(303, '/login');
+  }
+
+  if (path.startsWith('/api/settings/auth-emails') && !isSuperUserEmail(session?.email)) {
+    return new Response(JSON.stringify({ error: 'Super user only' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  if (
+    path.startsWith('/api/settings/pics') &&
+    event.request.method !== 'GET' &&
+    !isSuperUserEmail(session?.email)
+  ) {
+    return new Response(JSON.stringify({ error: 'Super user only' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   if (!path.startsWith('/api/')) {

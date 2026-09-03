@@ -68,7 +68,7 @@
           subsOpen = !subsOpen;
         }}
       >
-        <span>Subs</span>
+        <span>Sub Category</span>
         <span class="font-mono text-[10px] normal-case tracking-normal text-zinc-400" aria-hidden="true">
           {subsOpen ? '−' : '+'}
         </span>

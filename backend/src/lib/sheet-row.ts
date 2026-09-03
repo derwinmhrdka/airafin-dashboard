@@ -1,4 +1,4 @@
-import { isValidPic, type Pic } from './pic.js';
+import { defaultPic, isValidPic, listCachedPics, type Pic } from './pic.js';
 import { parsePeriod } from './period.js';
 
 const MONTH_NAMES = [
@@ -117,10 +117,17 @@ export function picFromSheetCells(cells: (string | number | undefined)[]): strin
 export function parseExplicitPic(raw: string): Pic | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
-  const s = trimmed.toLowerCase();
-  if (s === 'a' || s.includes('anggita')) return 'Anggita';
-  if (s === 'd' || s.includes('derwin')) return 'Derwin';
   if (isValidPic(trimmed)) return trimmed;
+  const s = trimmed.toLowerCase();
+  const names = listCachedPics();
+  const exact = names.find((n) => n.toLowerCase() === s);
+  if (exact) return exact;
+  if (s.length === 1) {
+    const byInitial = names.filter((n) => n.charAt(0).toLowerCase() === s);
+    if (byInitial.length === 1) return byInitial[0];
+  }
+  const contains = names.filter((n) => s.includes(n.toLowerCase()));
+  if (contains.length === 1) return contains[0];
   return null;
 }
 
@@ -136,7 +143,7 @@ export function resolvePic(
   const fromPlan = planPicByKey.get(`${categoryId}|${period}`);
   if (fromPlan) return fromPlan;
 
-  return 'Derwin';
+  return defaultPic();
 }
 
 export interface ParsedSheetRow {

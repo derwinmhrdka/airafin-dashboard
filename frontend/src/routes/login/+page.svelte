@@ -1,15 +1,21 @@
 <script lang="ts">
   import { page } from '$app/state';
   import PicBadge from '$lib/components/PicBadge.svelte';
-  import { PICS, type Pic } from '$lib/pics';
+  import { defaultPic, type Pic } from '$lib/pics';
 
-  let { data }: { data: { googleEnabled: boolean } } = $props();
+  let { data }: { data: { googleEnabled: boolean; pics: string[] } } = $props();
+
+  const pics = $derived(data.pics.length > 0 ? data.pics : ['Derwin', 'Anggita']);
 
   let password = $state('');
-  let pic = $state<Pic>('Derwin');
+  let pic = $state<Pic>(defaultPic());
   let error = $state('');
   let loading = $state(false);
   let showPassword = $state(false);
+
+  $effect(() => {
+    if (!pics.includes(pic)) pic = pics[0] ?? defaultPic();
+  });
 
   const errorMessages: Record<string, string> = {
     google_not_configured: 'Google sign-in is not configured.',
@@ -57,6 +63,8 @@
 
 <svelte:head>
   <title>Sign in · Airafin</title>
+  <meta name="theme-color" content="#000000" />
+  <meta name="color-scheme" content="dark" />
 </svelte:head>
 
 <div class="login-shell">
@@ -75,13 +83,14 @@
 
     <div class="login-actions login-rise" style="--delay: 220ms">
       {#if data.googleEnabled}
-        <a href="/auth/google" class="login-google" aria-label="Continue with Google">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
+        <a href="/auth/google" class="login-google">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
             <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.2 6.1 29.4 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.5-.4-3.5z"/>
             <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16.1 19 12 24 12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.2 6.1 29.4 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
             <path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.6-5.2l-6.3-5.3C29.2 35.1 26.7 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/>
             <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-1.1 3.1-3.5 5.5-6.4 6.9l.1.1 6.3 5.3C37.3 38.3 44 33 44 24c0-1.3-.1-2.5-.4-3.5z"/>
           </svg>
+          Continue with Google
         </a>
 
         <button
@@ -89,15 +98,9 @@
           class="login-key"
           class:login-key-open={showPassword}
           onclick={() => (showPassword = !showPassword)}
-          aria-label={showPassword ? 'Hide password sign-in' : 'Use password'}
           aria-expanded={showPassword}
-          title="Password"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-            <circle cx="8" cy="15" r="4" />
-            <path d="M12 15h8v-3" />
-            <path d="M17 15v-2" />
-          </svg>
+          {showPassword ? 'Hide password' : 'Use password'}
         </button>
       {/if}
     </div>
@@ -109,7 +112,7 @@
         style="--delay: {data.googleEnabled ? '80ms' : '220ms'}"
       >
         <div class="login-pics" role="group" aria-label="PIC">
-          {#each PICS as p}
+          {#each pics as p}
             <button
               type="button"
               onclick={() => (pic = p)}
@@ -165,32 +168,24 @@
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    color-scheme: dark;
+    color: #fafafa;
     background:
-      radial-gradient(ellipse 80% 55% at 50% -10%, rgb(244 244 245 / 0.9), transparent 55%),
-      #fff;
+      radial-gradient(ellipse 70% 50% at 50% -8%, rgb(39 39 42 / 0.55), transparent 55%),
+      #000;
     padding:
       max(2rem, env(safe-area-inset-top, 0px))
       1.25rem
       max(2rem, env(safe-area-inset-bottom, 0px));
   }
 
-  :global(.dark) .login-shell {
-    background:
-      radial-gradient(ellipse 70% 50% at 50% -8%, rgb(39 39 42 / 0.55), transparent 55%),
-      #000;
-  }
-
   .login-grain {
     pointer-events: none;
     position: absolute;
     inset: 0;
-    opacity: 0.035;
+    opacity: 0.06;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     background-size: 180px 180px;
-  }
-
-  :global(.dark) .login-grain {
-    opacity: 0.06;
   }
 
   .login-stage {
@@ -213,6 +208,7 @@
 
   .login-brand {
     margin: 0;
+    color: #fafafa;
     font-size: 1.5rem;
     font-weight: 600;
     letter-spacing: -0.04em;
@@ -223,100 +219,65 @@
     display: block;
     height: 1px;
     width: 100%;
-    background: #e4e4e7;
-    transform-origin: center;
-  }
-
-  :global(.dark) .login-rule {
     background: #27272a;
+    transform-origin: center;
   }
 
   .login-error {
     margin: 1.25rem 0 0;
     text-align: center;
     font-size: 0.6875rem;
-    color: #dc2626;
-  }
-
-  :global(.dark) .login-error {
     color: #f87171;
   }
 
   .login-actions {
     margin-top: 2rem;
     display: flex;
-    align-items: center;
-    gap: 0.625rem;
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
   }
 
   .login-google {
     display: inline-flex;
     height: 2.75rem;
-    width: 2.75rem;
+    width: 100%;
     align-items: center;
     justify-content: center;
-    border: 1px solid #d4d4d8;
-    background: #fff;
+    gap: 0.625rem;
+    border: 1px solid #3f3f46;
+    background: #09090b;
+    color: #fafafa;
+    font-size: 0.8125rem;
+    font-weight: 500;
     transition:
       border-color 200ms ease,
-      background-color 200ms ease,
-      transform 200ms ease;
+      background-color 200ms ease;
   }
 
   .login-google:hover {
-    border-color: #a1a1aa;
-    background: #fafafa;
-    transform: translateY(-1px);
-  }
-
-  .login-google:active {
-    transform: translateY(0);
-  }
-
-  :global(.dark) .login-google {
-    border-color: #3f3f46;
-    background: #09090b;
-  }
-
-  :global(.dark) .login-google:hover {
     border-color: #71717a;
     background: #18181b;
   }
 
   .login-key {
     display: inline-flex;
-    height: 2.75rem;
-    width: 2.75rem;
     align-items: center;
     justify-content: center;
-    border: 1px solid transparent;
-    color: #a1a1aa;
-    transition:
-      color 200ms ease,
-      border-color 200ms ease,
-      background-color 200ms ease;
+    border: none;
+    background: transparent;
+    color: #71717a;
+    font-size: 0.6875rem;
+    transition: color 200ms ease;
   }
 
   .login-key:hover {
-    color: #52525b;
-    border-color: #e4e4e7;
+    color: #d4d4d8;
   }
 
   .login-key-open {
-    color: #18181b;
-    border-color: #18181b;
-    background: #fafafa;
-  }
-
-  :global(.dark) .login-key:hover {
-    color: #d4d4d8;
-    border-color: #3f3f46;
-  }
-
-  :global(.dark) .login-key-open {
     color: #fafafa;
-    border-color: #fafafa;
-    background: #18181b;
   }
 
   .login-form {
@@ -352,10 +313,6 @@
 
   .login-pic-active {
     opacity: 1;
-    box-shadow: 0 0 0 2px #18181b;
-  }
-
-  :global(.dark) .login-pic-active {
     box-shadow: 0 0 0 2px #fafafa;
   }
 
@@ -372,8 +329,9 @@
   .login-pass-input {
     min-width: 0;
     flex: 1;
-    border: 1px solid #e4e4e7;
-    background: #fff;
+    border: 1px solid #27272a;
+    background: #09090b;
+    color: #fafafa;
     padding: 0.625rem 0.75rem;
     font-size: 0.875rem;
     letter-spacing: 0.12em;
@@ -381,16 +339,11 @@
     transition: border-color 200ms ease;
   }
 
+  .login-pass-input::placeholder {
+    color: #52525b;
+  }
+
   .login-pass-input:focus {
-    border-color: #18181b;
-  }
-
-  :global(.dark) .login-pass-input {
-    border-color: #27272a;
-    background: #000;
-  }
-
-  :global(.dark) .login-pass-input:focus {
     border-color: #fafafa;
   }
 
@@ -401,20 +354,14 @@
     flex-shrink: 0;
     align-items: center;
     justify-content: center;
-    border: 1px solid #18181b;
-    background: #18181b;
-    color: #fff;
+    border: 1px solid #fafafa;
+    background: #fafafa;
+    color: #000;
     transition: opacity 200ms ease;
   }
 
   .login-submit:disabled {
     opacity: 0.5;
-  }
-
-  :global(.dark) .login-submit {
-    border-color: #fafafa;
-    background: #fafafa;
-    color: #000;
   }
 
   .login-spin {
@@ -469,10 +416,6 @@
     .login-rule-draw,
     .login-spin {
       animation: none;
-    }
-
-    .login-google:hover {
-      transform: none;
     }
   }
 </style>

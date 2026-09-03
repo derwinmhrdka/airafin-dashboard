@@ -149,24 +149,14 @@
       aria-label="Notifications"
     >
       <div class="flex items-center justify-between border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
-        <span class="inline-flex items-center text-zinc-500" aria-hidden="true">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-          </svg>
-        </span>
+        <span class="text-[11px] font-medium uppercase tracking-wider text-zinc-500">Notifications</span>
         {#if unreadCount > 0}
           <button
             type="button"
             onclick={handleReadAll}
-            class="inline-flex h-6 w-6 items-center justify-center text-zinc-400 transition hover:text-zinc-700 dark:hover:text-zinc-200"
-            aria-label="Mark all read"
-            title="Mark all read"
+            class="text-[10px] text-zinc-500 underline-offset-2 hover:underline"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path d="M18 6 7 17l-5-5" />
-              <path d="m22 10-7.5 7.5L13 16" />
-            </svg>
+            Mark all read
           </button>
         {/if}
       </div>
@@ -175,7 +165,7 @@
         {#if loading && items.length === 0}
           <p class="px-3 py-4 text-center text-[11px] text-zinc-400">Loading…</p>
         {:else if items.length === 0}
-          <p class="px-3 py-4 text-center text-[11px] text-zinc-400">None</p>
+          <p class="px-3 py-4 text-center text-[11px] text-zinc-400">No notifications</p>
         {:else}
           <ul>
             {#each items as item (item.id)}

@@ -6,11 +6,20 @@
   import PeriodSelector from '$lib/components/PeriodSelector.svelte';
   import ProfileMenu from '$lib/components/ProfileMenu.svelte';
   import TabNav from '$lib/components/TabNav.svelte';
+  import { getPics } from '$lib/api';
   import { currentPeriod, parsePeriodToDate, periodFromUrl } from '$lib/period';
+  import { setPicNames } from '$lib/pics';
 
   let { children, data } = $props();
 
   const period = $derived(periodFromUrl(page.url.searchParams));
+
+  $effect(() => {
+    if (page.url.pathname === '/login') return;
+    void getPics()
+      .then((res) => setPicNames(res.pics.map((p) => p.name)))
+      .catch(() => {});
+  });
 
   // Keep ?period= in the URL so all tabs share the same month/year.
   $effect(() => {

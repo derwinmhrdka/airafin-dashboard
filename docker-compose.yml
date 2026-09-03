@@ -57,6 +57,7 @@ services:
       ORIGIN: ${ORIGIN:-https://airafin.teknodika.com}
       DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD}
       SESSION_SECRET: ${SESSION_SECRET:-change-me-in-production}
+      AUTH_EMAIL: ${AUTH_EMAIL:-}
       GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
       GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
     ports:

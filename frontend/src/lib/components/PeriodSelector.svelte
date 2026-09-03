@@ -34,37 +34,51 @@
 </script>
 
 <div class="grid grid-cols-2 gap-2">
-  <div class="relative min-w-0">
-    <select
-      value={parts.month}
-      onchange={onMonthChange}
-      class={selectClass}
-      aria-label="Month"
-    >
-      {#each MONTH_NAMES as name, index}
-        <option value={index}>{name}</option>
-      {/each}
-    </select>
-    <span
-      class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-zinc-400"
-      aria-hidden="true"
-    >▼</span>
-  </div>
+  <label class="block min-w-0">
+    <span class="mb-1 block text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+      Month
+    </span>
+    <div class="relative">
+      <select
+        value={parts.month}
+        onchange={onMonthChange}
+        class={selectClass}
+        aria-label="Select month"
+      >
+        {#each MONTH_NAMES as name, index}
+          <option value={index}>{name}</option>
+        {/each}
+      </select>
+      <span
+        class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-zinc-400"
+        aria-hidden="true"
+      >▼</span>
+    </div>
+  </label>
 
-  <div class="relative min-w-0">
-    <select
-      value={parts.year}
-      onchange={onYearChange}
-      class={selectClass}
-      aria-label="Year"
-    >
-      {#each years as year}
-        <option value={year}>{year}</option>
-      {/each}
-    </select>
-    <span
-      class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-zinc-400"
-      aria-hidden="true"
-    >▼</span>
-  </div>
+  <label class="block min-w-0">
+    <span class="mb-1 block text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+      Year
+    </span>
+    <div class="relative">
+      <select
+        value={parts.year}
+        onchange={onYearChange}
+        class={selectClass}
+        aria-label="Select year"
+      >
+        {#each years as year}
+          <option value={year}>{year}</option>
+        {/each}
+      </select>
+      <span
+        class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-zinc-400"
+        aria-hidden="true"
+      >▼</span>
+    </div>
+  </label>
 </div>
+
+<p class="mt-2 text-[10px] text-zinc-500">
+  Viewing <span class="font-medium text-zinc-700 dark:text-zinc-300">{period}</span>
+</p>

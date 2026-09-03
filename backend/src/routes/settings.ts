@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { db } from '../db/index.js';
 import { authEmails, budgetSubcategories, budgets, pockets } from '../db/schema.js';
 import { listAuthEmails, resolveAuthEmail, getSuperUserEmail } from '../lib/auth-emails.js';
-import { isValidPic } from '../lib/pic.js';
+import { createPic, deletePic, isValidPic, listPics } from '../lib/pic.js';
 
 interface PocketBody {
   name?: string;
@@ -99,6 +99,32 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     }
 
     await db.delete(pockets).where(eq(pockets.id, id));
+    return { ok: true };
+  });
+
+  app.get('/api/settings/pics', async () => {
+    const rows = await listPics();
+    return { pics: rows };
+  });
+
+  app.post<{ Body: { name?: string } }>('/api/settings/pics', async (request, reply) => {
+    const name = request.body?.name ?? '';
+    try {
+      const result = await createPic(name);
+      if (!result.created) {
+        return reply.code(409).send({ error: 'PIC already exists', pic: result.pic });
+      }
+      return result;
+    } catch (e) {
+      return reply.code(400).send({ error: e instanceof Error ? e.message : 'Invalid PIC' });
+    }
+  });
+
+  app.delete<{ Params: { id: string } }>('/api/settings/pics/:id', async (request, reply) => {
+    const id = Number.parseInt(request.params.id, 10);
+    if (!Number.isFinite(id) || id <= 0) return reply.code(400).send({ error: 'Invalid id' });
+    const result = await deletePic(id);
+    if ('error' in result) return reply.code(result.status).send({ error: result.error });
     return { ok: true };
   });
 

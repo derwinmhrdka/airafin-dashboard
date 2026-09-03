@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import cors from '@fastify/cors';
 import Fastify from 'fastify';
+import { refreshPicCache } from './lib/pic.js';
 import { budgetRoutes } from './routes/budgets.js';
 import { categoryRoutes } from './routes/categories.js';
 import { dashboardRoutes } from './routes/dashboard.js';
@@ -25,6 +26,8 @@ await app.register(budgetRoutes);
 await app.register(syncRoutes);
 await app.register(settingsRoutes);
 await app.register(notificationRoutes);
+
+await refreshPicCache();
 
 app.setErrorHandler((error, request, reply) => {
   request.log.error({ err: error, url: request.url }, 'Unhandled route error');

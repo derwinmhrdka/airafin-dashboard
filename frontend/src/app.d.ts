@@ -3,7 +3,7 @@ declare global {
     interface Locals {
       session: {
         email: string;
-        pic: 'Derwin' | 'Anggita';
+        pic: string;
         name?: string;
         auth: 'google' | 'password';
       } | null;

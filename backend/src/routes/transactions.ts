@@ -11,10 +11,7 @@ import {
 import { requireApiToken } from '../middleware/api-token.js';
 import { isValidPic } from '../lib/pic.js';
 
-const VALID_PIC = ['Derwin', 'Anggita'] as const;
 const VALID_STATUS = ['Done', 'On Going', 'Not Yet'] as const;
-
-type Pic = (typeof VALID_PIC)[number];
 type Status = (typeof VALID_STATUS)[number];
 
 interface CreateTransactionBody {
@@ -24,7 +21,7 @@ interface CreateTransactionBody {
   detail: string;
   cost: number;
   period: string;
-  pic: Pic;
+  pic: string;
   status?: Status;
 }
 
@@ -34,7 +31,7 @@ interface UpdateTransactionBody {
   subCategory?: string;
   detail: string;
   cost: number;
-  pic: Pic;
+  pic: string;
 }
 
 interface UpdateStatusBody {
@@ -193,7 +190,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(400).send({ error: 'Missing required fields' });
       }
 
-      if (!VALID_PIC.includes(body.pic)) {
+      if (!isValidPic(body.pic)) {
         return reply.code(400).send({ error: 'Invalid pic value' });
       }
 
@@ -256,7 +253,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(400).send({ error: 'Missing required fields' });
       }
 
-      if (!VALID_PIC.includes(body.pic)) {
+      if (!isValidPic(body.pic)) {
         return reply.code(400).send({ error: 'Invalid pic value' });
       }
 

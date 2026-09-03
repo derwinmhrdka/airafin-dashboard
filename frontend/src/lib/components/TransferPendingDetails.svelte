@@ -1,7 +1,7 @@
 <script lang="ts">
   import PicBadge from '$lib/components/PicBadge.svelte';
   import { formatCurrency } from '$lib/format';
-  import { PICS, type Pic } from '$lib/pics';
+  import { picNames, picRank } from '$lib/pics';
   import type { TransferPendingLine } from '$lib/transfer-pending';
 
   interface Props {
@@ -12,17 +12,14 @@
 
   let { lines, showPicPair = false }: Props = $props();
 
-  function picRank(name: string): number {
-    const idx = PICS.indexOf(name as Pic);
-    return idx === -1 ? PICS.length : idx;
-  }
+  const picList = $derived($picNames);
 
   const displayLines = $derived.by(() => {
     if (!showPicPair) return lines;
     return [...lines].sort(
       (a, b) =>
-        picRank(a.senderPic) - picRank(b.senderPic) ||
-        picRank(a.receiverPic) - picRank(b.receiverPic) ||
+        picRank(a.senderPic, picList) - picRank(b.senderPic, picList) ||
+        picRank(a.receiverPic, picList) - picRank(b.receiverPic, picList) ||
         a.title.localeCompare(b.title),
     );
   });

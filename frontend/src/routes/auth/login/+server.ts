@@ -1,22 +1,18 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import {
-  authenticatePassword,
-  type SessionPic,
-  setSessionCookie,
-} from '$lib/server/auth';
+import { authenticatePassword, listPicsFromBackend, setSessionCookie } from '$lib/server/auth';
 
 export const POST: RequestHandler = async ({ request, cookies, url }) => {
   const body = await request.json().catch(() => ({}));
   const password = typeof body.password === 'string' ? body.password : '';
-  const picRaw = typeof body.pic === 'string' ? body.pic : '';
-  const pic: SessionPic | null =
-    picRaw === 'Derwin' || picRaw === 'Anggita' ? picRaw : null;
+  const picRaw = typeof body.pic === 'string' ? body.pic.trim() : '';
 
   if (!authenticatePassword(password)) {
     return json({ error: 'Incorrect password' }, { status: 401 });
   }
 
+  const allowed = await listPicsFromBackend();
+  const pic = allowed.includes(picRaw) ? picRaw : null;
   if (!pic) {
     return json({ error: 'Select your PIC' }, { status: 400 });
   }

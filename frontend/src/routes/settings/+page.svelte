@@ -2,10 +2,13 @@
   import { page } from '$app/state';
   import {
     createAuthEmail,
+    createPic,
     createPocket,
     deleteAuthEmail,
+    deletePic,
     deletePocket,
     getAuthEmails,
+    getPics,
     getPockets,
     syncDbToSheet,
     syncSheetToDb,
@@ -14,33 +17,51 @@
   } from '$lib/api';
   import ColorPicker from '$lib/components/ColorPicker.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
-  import { PICS, type Pic } from '$lib/pics';
+  import { defaultPic, setPicNames } from '$lib/pics';
   import { POCKET_COLORS } from '$lib/pocket-colors';
   import { periodFromUrl } from '$lib/period';
-  import type { AuthEmailSetting, PocketSetting } from '$lib/types';
+  import type { AuthEmailSetting, PicSetting, PocketSetting } from '$lib/types';
 
   const period = $derived(periodFromUrl(page.url.searchParams));
+  const isSuperUser = $derived(page.data.isSuperUser === true);
 
   let pockets = $state<PocketSetting[]>([]);
+  let pics = $state<PicSetting[]>([]);
   let authEmails = $state<AuthEmailSetting[]>([]);
   let pocketName = $state('');
   let pocketColor = $state(POCKET_COLORS[0]);
+  let picNameInput = $state('');
   let authEmailInput = $state('');
-  let authEmailPic = $state<Pic>('Derwin');
+  let authEmailPic = $state(defaultPic());
   let loading = $state(true);
   let pocketBusy = $state(false);
+  let picBusy = $state(false);
   let authBusy = $state(false);
   let colorBusyId = $state<number | null>(null);
   let syncing = $state<'db-to-sheet' | 'sheet-to-db' | null>(null);
   let success = $state('');
   let error = $state('');
 
+  const picNamesList = $derived(pics.map((p) => p.name));
+
   async function loadSettings() {
     loading = true;
     try {
-      const [pocketRes, emailRes] = await Promise.all([getPockets(), getAuthEmails()]);
+      const pocketRes = await getPockets();
       pockets = pocketRes.pockets;
-      authEmails = emailRes.emails;
+      const picRes = await getPics();
+      const names = picRes.pics.map((p) => p.name);
+      pics = picRes.pics;
+      setPicNames(names);
+      if (!names.includes(authEmailPic)) {
+        authEmailPic = defaultPic(names);
+      }
+      if (isSuperUser) {
+        const emailRes = await getAuthEmails();
+        authEmails = emailRes.emails;
+      } else {
+        authEmails = [];
+      }
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load settings';
     } finally {
@@ -49,6 +70,7 @@
   }
 
   $effect(() => {
+    void isSuperUser;
     void loadSettings();
   });
 
@@ -87,6 +109,41 @@
     }
   }
 
+  async function handleAddPic() {
+    const name = picNameInput.trim();
+    if (!name) return;
+    picBusy = true;
+    success = '';
+    error = '';
+    try {
+      await createPic(name);
+      picNameInput = '';
+      await loadSettings();
+      success = `PIC ${name} added`;
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to add PIC';
+    } finally {
+      picBusy = false;
+    }
+  }
+
+  async function handleDeletePic(item: PicSetting) {
+    if (!confirm(`Delete PIC "${item.name}"?`)) return;
+    picBusy = true;
+    success = '';
+    error = '';
+    try {
+      await deletePic(item.id);
+      pics = pics.filter((p) => p.id !== item.id);
+      setPicNames(pics.map((p) => p.name));
+      success = `PIC ${item.name} deleted`;
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to delete PIC';
+    } finally {
+      picBusy = false;
+    }
+  }
+
   async function handleAddAuthEmail() {
     const email = authEmailInput.trim().toLowerCase();
     if (!email) return;
@@ -97,7 +154,7 @@
       await createAuthEmail(email, authEmailPic);
       authEmailInput = '';
       await loadSettings();
-      success = `${email} can now sign in as ${authEmailPic}`;
+      success = `${email} → ${authEmailPic}`;
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to save email';
     } finally {
@@ -105,7 +162,7 @@
     }
   }
 
-  async function handleUpdateAuthPic(item: AuthEmailSetting, pic: Pic) {
+  async function handleUpdateAuthPic(item: AuthEmailSetting, pic: string) {
     if (item.pic === pic) return;
     authBusy = true;
     success = '';
@@ -197,6 +254,8 @@
 </script>
 
 <section class="space-y-4">
+  <p class="text-[11px] uppercase tracking-wider text-zinc-500">Settings · {period}</p>
+
   <fieldset class="space-y-2 border border-zinc-200 p-3 dark:border-zinc-800">
     <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">Sync</legend>
     <button
@@ -205,8 +264,9 @@
       onclick={handleSyncDbToSheet}
       class="w-full border border-zinc-200 px-3 py-3 text-left disabled:opacity-50 dark:border-zinc-800"
     >
-      <span class="block text-sm font-medium">DB → Sheet</span>
-      {#if syncing === 'db-to-sheet'}<span class="mt-1 block text-[10px] text-zinc-500">…</span>{/if}
+      <span class="block text-sm font-medium">Sync to Spreadsheet</span>
+      <span class="text-[11px] text-zinc-500">Database → DETAIL</span>
+      {#if syncing === 'db-to-sheet'}<span class="mt-1 block text-[10px] text-zinc-500">Syncing…</span>{/if}
     </button>
     <button
       type="button"
@@ -214,97 +274,135 @@
       onclick={handleSyncSheetToDb}
       class="w-full border border-zinc-200 px-3 py-3 text-left disabled:opacity-50 dark:border-zinc-800"
     >
-      <span class="block text-sm font-medium">Sheet → DB</span>
-      {#if syncing === 'sheet-to-db'}<span class="mt-1 block text-[10px] text-zinc-500">…</span>{/if}
+      <span class="block text-sm font-medium">Sync from Spreadsheet</span>
+      <span class="text-[11px] text-zinc-500">DETAIL → Database</span>
+      {#if syncing === 'sheet-to-db'}<span class="mt-1 block text-[10px] text-zinc-500">Syncing…</span>{/if}
     </button>
   </fieldset>
 
-  <fieldset class="space-y-2 border border-zinc-200 p-3 dark:border-zinc-800">
-    <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">Login</legend>
-    <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-      <input
-        type="email"
-        bind:value={authEmailInput}
-        placeholder="name@gmail.com"
-        class="min-w-0 flex-1 border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
-      />
-      <div class="flex items-center gap-2">
-        <div class="flex gap-1">
-          {#each PICS as p}
-            <button
-              type="button"
-              onclick={() => (authEmailPic = p)}
-              class="rounded-full transition ring-2 ring-offset-1 ring-offset-white dark:ring-offset-black
-                {authEmailPic === p ? 'ring-zinc-900 dark:ring-white' : 'ring-transparent opacity-50'}"
-              aria-label="PIC {p}"
-              aria-pressed={authEmailPic === p}
-            >
-              <PicBadge name={p} />
-            </button>
-          {/each}
-        </div>
+  {#if isSuperUser}
+    <fieldset class="space-y-2 border border-zinc-200 p-3 dark:border-zinc-800">
+      <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">PIC</legend>
+      <p class="text-[11px] text-zinc-500">Add people, then assign them to users below.</p>
+      <div class="flex gap-2">
+        <input
+          type="text"
+          bind:value={picNameInput}
+          placeholder="PIC name (e.g. X)"
+          class="min-w-0 flex-1 border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
+        />
         <button
           type="button"
-          onclick={handleAddAuthEmail}
-          disabled={authBusy || !authEmailInput.trim()}
-          class="ml-auto shrink-0 border border-zinc-300 px-3 py-2 text-xs disabled:opacity-50 sm:ml-0 dark:border-zinc-700"
+          onclick={handleAddPic}
+          disabled={picBusy || !picNameInput.trim()}
+          class="shrink-0 border border-zinc-300 px-3 py-2 text-xs disabled:opacity-50 dark:border-zinc-700"
         >
           + Add
         </button>
       </div>
-    </div>
-
-    {#if loading}
-      <p class="text-xs text-zinc-500">Loading…</p>
-    {:else if authEmails.length === 0}
-      <p class="text-xs text-zinc-500">No emails</p>
-    {:else}
-      <div class="space-y-1">
-        {#each authEmails as item (item.id)}
-          <div class="flex items-center justify-between gap-2 border border-zinc-200 px-2 py-1.5 dark:border-zinc-800">
-            <div class="min-w-0">
-              <span class="block truncate text-sm">{item.email}</span>
-              {#if item.isSuperUser}
-                <span class="text-[10px] uppercase tracking-wider text-zinc-400">Owner</span>
-              {/if}
+      {#if loading}
+        <p class="text-xs text-zinc-500">Loading…</p>
+      {:else if pics.length === 0}
+        <p class="text-xs text-zinc-500">No PICs yet.</p>
+      {:else}
+        <div class="space-y-1">
+          {#each pics as item (item.id)}
+            <div class="flex items-center justify-between gap-2 border border-zinc-200 px-2 py-1.5 dark:border-zinc-800">
+              <div class="flex min-w-0 items-center gap-2">
+                <PicBadge name={item.name} />
+                <span class="truncate text-sm">{item.name}</span>
+              </div>
+              <button
+                type="button"
+                onclick={() => handleDeletePic(item)}
+                disabled={picBusy || pics.length <= 1}
+                class="border border-red-200 px-2 py-1 text-[10px] text-red-600 disabled:opacity-50 dark:border-red-900 dark:text-red-400"
+              >
+                Delete
+              </button>
             </div>
-            <div class="flex shrink-0 items-center gap-2">
-              <div class="flex gap-1">
-                {#each PICS as p}
+          {/each}
+        </div>
+      {/if}
+    </fieldset>
+
+    <fieldset class="space-y-2 border border-zinc-200 p-3 dark:border-zinc-800">
+      <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">Users</legend>
+      <p class="text-[11px] text-zinc-500">Google emails that can sign in. Assign a PIC.</p>
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <input
+          type="email"
+          bind:value={authEmailInput}
+          placeholder="name@gmail.com"
+          class="min-w-0 flex-1 border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
+        />
+        <div class="flex items-center gap-2">
+          <select
+            bind:value={authEmailPic}
+            class="border border-zinc-200 bg-white px-2 py-2 text-xs dark:border-zinc-800 dark:bg-black"
+            aria-label="PIC"
+          >
+            {#each picNamesList as p}
+              <option value={p}>{p}</option>
+            {/each}
+          </select>
+          <button
+            type="button"
+            onclick={handleAddAuthEmail}
+            disabled={authBusy || !authEmailInput.trim() || picNamesList.length === 0}
+            class="shrink-0 border border-zinc-300 px-3 py-2 text-xs disabled:opacity-50 dark:border-zinc-700"
+          >
+            + Add
+          </button>
+        </div>
+      </div>
+
+      {#if loading}
+        <p class="text-xs text-zinc-500">Loading…</p>
+      {:else if authEmails.length === 0}
+        <p class="text-xs text-zinc-500">No emails yet. Super user is AUTH_EMAIL.</p>
+      {:else}
+        <div class="space-y-1">
+          {#each authEmails as item (item.id)}
+            <div class="flex items-center justify-between gap-2 border border-zinc-200 px-2 py-1.5 dark:border-zinc-800">
+              <div class="min-w-0">
+                <span class="block truncate text-sm">{item.email}</span>
+                {#if item.isSuperUser}
+                  <span class="text-[10px] uppercase tracking-wider text-zinc-400">Super user</span>
+                {/if}
+              </div>
+              <div class="flex shrink-0 items-center gap-2">
+                <select
+                  value={item.pic}
+                  disabled={authBusy}
+                  onchange={(e) => handleUpdateAuthPic(item, (e.currentTarget as HTMLSelectElement).value)}
+                  class="border border-zinc-200 bg-white px-1.5 py-1 text-xs dark:border-zinc-800 dark:bg-black"
+                  aria-label="PIC for {item.email}"
+                >
+                  {#each picNamesList as p}
+                    <option value={p}>{p}</option>
+                  {/each}
+                  {#if !picNamesList.includes(item.pic)}
+                    <option value={item.pic}>{item.pic}</option>
+                  {/if}
+                </select>
+                {#if !item.isSuperUser}
                   <button
                     type="button"
+                    onclick={() => handleDeleteAuthEmail(item)}
                     disabled={authBusy}
-                    onclick={() => handleUpdateAuthPic(item, p)}
-                    class="rounded-full transition ring-2 ring-offset-1 ring-offset-white dark:ring-offset-black
-                      {item.pic === p ? 'ring-zinc-900 dark:ring-white' : 'ring-transparent opacity-40 hover:opacity-80'}"
-                    aria-label="Set {item.email} to {p}"
-                    aria-pressed={item.pic === p}
+                    class="border border-red-200 px-2 py-1 text-[10px] text-red-600 disabled:opacity-50 dark:border-red-900 dark:text-red-400"
                   >
-                    <PicBadge name={p} />
+                    Delete
                   </button>
-                {/each}
+                {/if}
               </div>
-              {#if !item.isSuperUser}
-                <button
-                  type="button"
-                  onclick={() => handleDeleteAuthEmail(item)}
-                  disabled={authBusy}
-                  class="inline-flex h-7 w-7 items-center justify-center text-red-600 disabled:opacity-50 dark:text-red-400"
-                  aria-label="Remove {item.email}"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                    <path d="M3 6h18" />
-                    <path d="M8 6V4h8v2" />
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                  </svg>
-                </button>
-              {/if}
             </div>
-          </div>
-        {/each}
-      </div>
-    {/if}
-  </fieldset>
+          {/each}
+        </div>
+      {/if}
+    </fieldset>
+  {/if}
 
   <fieldset class="space-y-2 border border-zinc-200 p-3 dark:border-zinc-800">
     <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">Pocket</legend>
@@ -316,6 +414,7 @@
         class="min-w-0 flex-1 border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
       />
       <div class="flex items-center gap-2">
+        <span class="text-[10px] text-zinc-500">Color</span>
         <ColorPicker bind:value={pocketColor} aria-label="Select pocket color" />
         <button
           type="button"
@@ -323,7 +422,7 @@
           disabled={pocketBusy || !pocketName.trim()}
           class="ml-auto shrink-0 border border-zinc-300 px-3 py-2 text-xs disabled:opacity-50 sm:ml-0 dark:border-zinc-700"
         >
-          +
+          + Add
         </button>
       </div>
     </div>
@@ -352,14 +451,9 @@
                 type="button"
                 onclick={() => handleDeletePocket(item)}
                 disabled={pocketBusy || colorBusyId === item.id}
-                class="inline-flex h-7 w-7 items-center justify-center text-red-600 disabled:opacity-50 dark:text-red-400"
-                aria-label="Delete {item.name}"
+                class="border border-red-200 px-2 py-1 text-[10px] text-red-600 disabled:opacity-50 dark:border-red-900 dark:text-red-400"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <path d="M3 6h18" />
-                  <path d="M8 6V4h8v2" />
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                </svg>
+                Delete
               </button>
             </div>
           </div>

@@ -6,7 +6,7 @@ const COOKIE_NAME = 'airafin_session';
 const OAUTH_STATE_COOKIE = 'airafin_oauth_state';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 365; // 1 year — “one time login”
 
-export type SessionPic = 'Derwin' | 'Anggita';
+export type SessionPic = string;
 
 export interface SessionUser {
   email: string;
@@ -48,11 +48,11 @@ function decodeSession(token: string): SessionUser | null {
 
   try {
     const raw = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as SessionUser;
-    if (!raw?.email || (raw.pic !== 'Derwin' && raw.pic !== 'Anggita')) return null;
+    if (!raw?.email || typeof raw.pic !== 'string' || !raw.pic.trim()) return null;
     if (raw.auth !== 'google' && raw.auth !== 'password') return null;
     return {
       email: String(raw.email).toLowerCase(),
-      pic: raw.pic,
+      pic: String(raw.pic).trim(),
       name: raw.name ? String(raw.name) : undefined,
       auth: raw.auth,
     };
@@ -69,6 +69,23 @@ function resolveBackendUrl(): string {
   return 'http://localhost:3081';
 }
 
+export async function listPicsFromBackend(): Promise<string[]> {
+  try {
+    const res = await fetch(`${resolveBackendUrl()}/api/settings/pics`);
+    if (!res.ok) return ['Derwin', 'Anggita'];
+    const data = (await res.json()) as { pics?: { name?: string }[] };
+    const names = (data.pics ?? []).map((p) => p.name?.trim() ?? '').filter(Boolean);
+    return names.length > 0 ? names : ['Derwin', 'Anggita'];
+  } catch {
+    return ['Derwin', 'Anggita'];
+  }
+}
+
+export function isSuperUserEmail(email: string | undefined | null): boolean {
+  const superEmail = env.AUTH_EMAIL?.split(',')[0]?.trim().toLowerCase() ?? '';
+  return Boolean(superEmail && email?.trim().toLowerCase() === superEmail);
+}
+
 /** Look up allowed Google email → PIC from backend settings. */
 export async function resolvePicFromEmail(email: string): Promise<SessionPic | null> {
   const normalized = email.trim().toLowerCase();
@@ -82,7 +99,7 @@ export async function resolvePicFromEmail(email: string): Promise<SessionPic | n
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { pic?: string };
-    if (data.pic === 'Derwin' || data.pic === 'Anggita') return data.pic;
+    if (typeof data.pic === 'string' && data.pic.trim()) return data.pic.trim();
     return null;
   } catch (e) {
     console.error('resolvePicFromEmail failed:', e);

@@ -1,9 +1,9 @@
 import { asc, eq } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { authEmails } from '../db/schema.js';
-import { isValidPic, type Pic } from './pic.js';
+import { isValidPic, defaultPic, type Pic } from './pic.js';
 
-const DEFAULT_SUPER_PIC: Pic = 'Derwin';
+const DEFAULT_SUPER_PIC = () => defaultPic();
 
 /** Single super-user email from AUTH_EMAIL env. */
 export function parseAuthEmailEnv(raw = process.env.AUTH_EMAIL ?? ''): string | null {
@@ -21,7 +21,7 @@ export async function ensureSuperUserAuthEmail(): Promise<void> {
   if (!email) return;
   await db
     .insert(authEmails)
-    .values({ email, pic: DEFAULT_SUPER_PIC })
+    .values({ email, pic: DEFAULT_SUPER_PIC() })
     .onConflictDoNothing();
 }
 

@@ -9,6 +9,11 @@ export interface PocketSetting {
   color: string;
 }
 
+export interface PicSetting {
+  id: number;
+  name: string;
+}
+
 export interface AuthEmailSetting {
   id: number;
   email: string;
