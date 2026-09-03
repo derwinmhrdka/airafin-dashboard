@@ -4,12 +4,11 @@
   import '../app.css';
   import NotificationBell from '$lib/components/NotificationBell.svelte';
   import PeriodSelector from '$lib/components/PeriodSelector.svelte';
-  import PicBadge from '$lib/components/PicBadge.svelte';
+  import ProfileMenu from '$lib/components/ProfileMenu.svelte';
   import TabNav from '$lib/components/TabNav.svelte';
   import { currentPeriod, parsePeriodToDate, periodFromUrl } from '$lib/period';
 
   let { children, data } = $props();
-  let signingOut = $state(false);
 
   const period = $derived(periodFromUrl(page.url.searchParams));
 
@@ -28,15 +27,6 @@
 
     goto(next, { replaceState: true, noScroll: true, keepFocus: true });
   });
-
-  async function signOut() {
-    signingOut = true;
-    try {
-      await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' });
-    } finally {
-      window.location.href = '/login';
-    }
-  }
 </script>
 
 <svelte:head>
@@ -49,33 +39,17 @@
 {:else}
   <div class="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-white dark:bg-black md:max-w-none">
     <header
-      class="sticky top-0 z-10 border-b border-zinc-200 bg-white px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] dark:border-zinc-800 dark:bg-black md:px-8 md:pb-4 md:pt-[calc(1rem+env(safe-area-inset-top,0px))]"
+      class="sticky top-0 z-20 overflow-visible border-b border-zinc-200 bg-white px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] dark:border-zinc-800 dark:bg-black md:px-8 md:pb-4 md:pt-[calc(1rem+env(safe-area-inset-top,0px))]"
     >
       <div class="md:flex md:items-start md:justify-between md:gap-8">
         <div class="mb-3 flex shrink-0 items-center justify-between gap-3 md:mb-0">
           <div class="flex items-center gap-2">
             <h1 class="text-sm font-semibold tracking-tight md:text-base">Airafin</h1>
-            <span
-              class="shrink-0 rounded border border-zinc-200 px-2 py-0.5 font-mono text-[10px] text-zinc-500 dark:border-zinc-800"
-            >
-              v1
-            </span>
           </div>
           {#if data.session}
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2.5">
               <NotificationBell pic={data.session.pic} {period} />
-              <span class="inline-flex items-center gap-1.5" title={data.session.email}>
-                <PicBadge name={data.session.pic} />
-                <span class="text-[11px] font-medium text-zinc-600 dark:text-zinc-300">{data.session.pic}</span>
-              </span>
-              <button
-                type="button"
-                disabled={signingOut}
-                onclick={signOut}
-                class="text-[10px] text-zinc-400 underline-offset-2 hover:text-zinc-600 hover:underline disabled:opacity-50"
-              >
-                {signingOut ? '…' : 'Sign out'}
-              </button>
+              <ProfileMenu pic={data.session.pic} email={data.session.email} />
             </div>
           {/if}
         </div>

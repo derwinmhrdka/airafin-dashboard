@@ -174,7 +174,7 @@
       const plan = await getPlan(sourcePeriod);
       applyPlanToForm(plan);
       copyOpen = false;
-      success = `Copied plan from ${sourcePeriod}. Review and click Save Plan to apply.`;
+      success = `Copied from ${sourcePeriod} — Save to apply`;
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to copy plan';
     } finally {
@@ -325,23 +325,20 @@
   {#if loading}
     <div class="h-48 animate-pulse border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900"></div>
   {:else}
-    <div class="flex flex-wrap items-center justify-between gap-2">
-      <p class="text-[11px] uppercase tracking-wider text-zinc-500">Plan · {period}</p>
-      <div class="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onclick={openCopyPanel}
-          class="border border-zinc-300 px-2.5 py-1 text-[11px] font-medium dark:border-zinc-600"
-        >
-          Copy Plan
-        </button>
-      </div>
+    <div class="flex flex-wrap items-center justify-end gap-2">
+      <button
+        type="button"
+        onclick={openCopyPanel}
+        class="border border-zinc-300 px-2.5 py-1 text-[11px] font-medium dark:border-zinc-600"
+      >
+        Copy
+      </button>
     </div>
 
     {#if copyOpen}
       <div class="space-y-3 rounded-sm border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
         <p class="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-          Copy plan into <span class="font-mono">{period}</span> from
+          Copy → <span class="font-mono">{period}</span>
         </p>
         <div class="grid grid-cols-2 gap-2">
           <label class="block min-w-0">
@@ -378,7 +375,7 @@
           </label>
         </div>
         <p class="text-[10px] text-zinc-500">
-          Copies income, category budgets, PIC, and sub-categories. You still need to save.
+          Review, then Save.
         </p>
         <div class="flex gap-2">
           <button
@@ -404,7 +401,7 @@
     <form onsubmit={handleSubmit} class="space-y-3 md:space-y-4">
       <fieldset class="space-y-3 rounded-sm border border-zinc-200 p-3 dark:border-zinc-800">
         <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">
-          Income — {period}
+          Income
         </legend>
         <div class="space-y-2">
             {#each incomeRows as row (row.key)}
@@ -439,12 +436,13 @@
               type="button"
               onclick={addIncomeRow}
               class="w-full border border-dashed border-zinc-300 py-2 text-xs text-zinc-500 dark:border-zinc-700"
+              aria-label="Add income"
             >
-              + Add income
+              + Income
             </button>
 
             <p class="text-right text-xs text-zinc-500">
-              Total Income:
+              Total
               <span class="font-mono text-black dark:text-white">{formatCurrency(totalIncome)}</span>
             </p>
         </div>
@@ -452,7 +450,7 @@
 
       <fieldset class="space-y-3 rounded-sm border border-zinc-200 p-3 dark:border-zinc-800">
         <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">
-          Budget per Category
+          Budget
         </legend>
 
         <div class="space-y-2 text-[11px] md:text-sm">
@@ -550,7 +548,7 @@
                 onclick={() => addSubcategory(cat.id)}
                 class="ml-2 border border-dashed border-zinc-300 px-2 py-1 text-[9px] md:text-[11px] text-zinc-500 dark:border-zinc-700"
               >
-                + Sub category
+                + Sub
               </button>
 
               {#if (subcategoryInputs[cat.id] ?? []).length > 0}
@@ -592,7 +590,7 @@
         </div>
 
         <p class="text-right text-xs text-zinc-500">
-          Total Plan:
+          Total
           <span class="font-mono text-black dark:text-white">{formatCurrency(totalBudget)}</span>
         </p>
       </fieldset>
@@ -602,17 +600,13 @@
           Per PIC
         </legend>
         <div class="space-y-2">
-            <p class="text-[10px] text-zinc-500">
-              Balancing = Income − Plan. A negative balance means that PIC needs more from the other.
-            </p>
-
             <div
               class="grid grid-cols-[minmax(0,4.5rem)_1fr_1fr] items-center gap-x-2 gap-y-2 border-b border-zinc-200 pb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-500 md:grid-cols-[minmax(0,4.5rem)_1fr_1fr_1fr] dark:border-zinc-800"
             >
               <span>PIC</span>
               <span class="hidden text-right md:block">Income</span>
               <span class="text-right">Plan</span>
-              <span class="text-right">Balancing</span>
+              <span class="text-right">Balance</span>
             </div>
 
             {#each picSummary as row (row.pic)}
@@ -655,7 +649,7 @@
         disabled={saving}
         class="w-full border border-black bg-black py-2.5 text-sm font-medium text-white transition-opacity disabled:opacity-50 dark:border-white dark:bg-white dark:text-black"
       >
-        {saving ? 'Saving…' : 'Save Plan'}
+        {saving ? '…' : 'Save'}
       </button>
     </form>
   {/if}

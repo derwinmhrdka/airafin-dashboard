@@ -349,9 +349,9 @@
     <div class="flex items-center justify-between gap-2">
       <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">
         {#if editingId != null}
-          Edit #{editingId} · {period}
+          Edit #{editingId}
         {:else}
-          Quick Insert · {period}
+          Insert
         {/if}
       </h2>
       {#if editingId != null}
@@ -396,7 +396,7 @@
         type="text"
         bind:value={detail}
         required
-        placeholder="What was this for?"
+        placeholder="Detail"
         class="w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
       />
     </label>
@@ -421,12 +421,12 @@
 
     {#if subCategoryOptions.length > 0}
       <label class="block space-y-1">
-        <span class="text-[11px] text-zinc-500">Sub Category</span>
+        <span class="text-[11px] text-zinc-500">Sub</span>
         <select
           bind:value={subCategory}
           class="w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
         >
-          <option value="">Main (default)</option>
+          <option value="">Main</option>
           {#each subCategoryOptions as name}
             <option value={name}>{name}</option>
           {/each}
@@ -459,22 +459,28 @@
       disabled={saving || loading}
       class="w-full border border-black bg-black py-2.5 text-sm font-medium text-white transition-opacity disabled:opacity-50 dark:border-white dark:bg-white dark:text-black"
     >
-      {saving ? 'Saving…' : editingId != null ? 'Save Changes' : 'Add Transaction'}
+      {saving ? '…' : editingId != null ? 'Save' : 'Add'}
     </button>
   </form>
 
   <div class="min-w-0 space-y-2">
     <div class="flex items-center justify-between gap-2">
-      <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">
-        Recent — {period}
-      </h2>
+      <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Recent</h2>
       {#if hasActiveFilters}
         <button
           type="button"
           onclick={clearFilters}
-          class="text-[10px] text-zinc-500 underline-offset-2 hover:underline"
+          class="inline-flex h-7 w-7 items-center justify-center text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+          aria-label="Clear filters"
+          title="Clear filters"
         >
-          Clear filters
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M3 4h18" />
+            <path d="M7 8v10a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V8" />
+            <path d="M10 12v4" />
+            <path d="M14 12v4" />
+            <path d="m9 4 1-2h4l1 2" />
+          </svg>
         </button>
       {/if}
     </div>
@@ -484,7 +490,7 @@
         <input
           type="search"
           bind:value={filterSearch}
-          placeholder="Search detail…"
+          placeholder="Search…"
           enterkeyhint="search"
           class="w-full border border-zinc-200 bg-white px-2 py-1.5 text-xs dark:border-zinc-800 dark:bg-black"
         />
@@ -492,8 +498,9 @@
           <select
             bind:value={filterCategory}
             class="border border-zinc-200 bg-white px-1.5 py-1.5 text-[11px] dark:border-zinc-800 dark:bg-black"
+            aria-label="Category"
           >
-            <option value="">All categories</option>
+            <option value="">All</option>
             {#each categories as cat}
               <option value={cat.id}>{cat.name}</option>
             {/each}
@@ -501,17 +508,18 @@
           <select
             bind:value={filterPic}
             class="border border-zinc-200 bg-white px-1.5 py-1.5 text-[11px] dark:border-zinc-800 dark:bg-black"
+            aria-label="Paid by"
           >
-            <option value="">All paid by</option>
+            <option value="">All</option>
             {#each PICS as p}
               <option value={p}>{p}</option>
             {/each}
           </select>
         </div>
-        <p class="text-[10px] text-zinc-500">
-          {transactions.length} loaded of {total}{hasActiveFilters ? ' matching' : ''}
+        <p class="text-[10px] tabular-nums text-zinc-500">
+          {transactions.length}/{total}
           {#if hasActiveFilters && monthTotal > total}
-            · {monthTotal} total this month
+            · {monthTotal}
           {/if}
         </p>
       </div>
@@ -521,11 +529,11 @@
       <div class="h-32 animate-pulse border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900"></div>
     {:else if monthTotal === 0}
       <p class="border border-dashed border-zinc-200 px-3 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800">
-        No transactions this month.
+        No transactions
       </p>
     {:else if total === 0 && !filterLoading}
       <p class="border border-dashed border-zinc-200 px-3 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800">
-        No transactions match your filters.
+        No matches
       </p>
     {:else}
       <div
@@ -625,7 +633,7 @@
             use:infiniteScroll
             class="flex items-center justify-center border-t border-zinc-200 py-3 text-[10px] text-zinc-500 dark:border-zinc-800"
           >
-            {loadingMore ? 'Loading more…' : 'Scroll for more'}
+            {loadingMore ? '…' : ''}
           </div>
         {/if}
       </div>

@@ -109,7 +109,6 @@
   </p>
 {:else if summary}
   <section class="mx-auto w-full space-y-4 md:space-y-6">
-    <p class="text-[11px] uppercase tracking-wider text-zinc-500 md:text-xs">Overview · {period}</p>
     <div class="grid min-w-0 grid-cols-3 gap-1 md:gap-3">
       <StatCard label="Income" value={summary.totalIncome} accent="income" />
       <StatCard label="Spent" value={summary.totalSpent} accent="spent" />
@@ -126,35 +125,26 @@
     <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
       <article class="border border-zinc-200 p-3 dark:border-zinc-800">
         <div class="mb-3 space-y-2">
-          <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Plan vs Expenses</h2>
-          <label class="block space-y-1">
-            <span class="text-[10px] text-zinc-500">Category</span>
-            <select
-              bind:value={planVsScope}
-              class="w-full border border-zinc-200 bg-white px-2 py-1.5 text-xs dark:border-zinc-800 dark:bg-black"
-            >
-              <option value="general">General (all categories)</option>
-              {#each chartCategories as cat (cat.categoryId)}
-                <option value={String(cat.categoryId)}>{cat.categoryName}</option>
-              {/each}
-            </select>
-          </label>
-          <p class="text-[10px] text-zinc-500">
-            {planVsNumbers.title}: Plan {formatCurrency(planVsNumbers.plan)} · Spent
-            {formatCurrency(planVsNumbers.spent)}
-          </p>
+          <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Plan vs Spent</h2>
+          <select
+            bind:value={planVsScope}
+            class="w-full border border-zinc-200 bg-white px-2 py-1.5 text-xs dark:border-zinc-800 dark:bg-black"
+            aria-label="Category"
+          >
+            <option value="general">All</option>
+            {#each chartCategories as cat (cat.categoryId)}
+              <option value={String(cat.categoryId)}>{cat.categoryName}</option>
+            {/each}
+          </select>
         </div>
-        <PieChart slices={planVsSlices} emptyLabel="No plan data" />
+        <PieChart slices={planVsSlices} emptyLabel="No plan" />
       </article>
 
       <article class="border border-zinc-200 p-3 dark:border-zinc-800">
         <div class="mb-3">
-          <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Plan Allocation</h2>
-          <p class="mt-1 text-[10px] text-zinc-500">
-            Share of total plan per category ({formatCurrency(summary.totalBudgetAllocated)}).
-          </p>
+          <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Allocation</h2>
         </div>
-        <PieChart slices={allocationSlices} emptyLabel="Set plan in Plan tab" />
+        <PieChart slices={allocationSlices} emptyLabel="No plan" />
       </article>
     </div>
 
@@ -165,7 +155,7 @@
         <CategoryProgress {item} index={i} />
       {:else}
         <p class="border border-dashed border-zinc-200 px-3 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800 md:col-span-full">
-          No budget data yet. Set your plan in the Plan tab.
+          No plan yet
         </p>
       {/each}
       </div>
@@ -179,8 +169,8 @@
             <details class="border border-zinc-200 p-3 dark:border-zinc-800">
               <summary class="flex cursor-pointer list-none items-center justify-between gap-2">
                 <PicBadge name={group.pic} />
-                <span class="text-[10px] uppercase tracking-wider text-zinc-500">
-                  {group.pockets.length} pockets
+                <span class="font-mono text-[10px] tabular-nums text-zinc-500">
+                  {group.pockets.length}
                 </span>
               </summary>
               <div class="mt-2 space-y-2">

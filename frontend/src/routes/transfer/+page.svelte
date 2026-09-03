@@ -324,24 +324,21 @@
 </script>
 
 <section class="mx-auto w-full space-y-6 md:space-y-8">
-  <div class="flex flex-wrap items-center justify-between gap-2">
-    <p class="text-[11px] uppercase tracking-wider text-zinc-500">Transfer · {period}</p>
-    <div class="flex flex-wrap gap-2">
-      <button
-        type="button"
-        onclick={openClosePanel}
-        class="border border-zinc-300 px-2.5 py-1 text-[11px] font-medium dark:border-zinc-600"
-      >
-        Close Month
-      </button>
-      <button
-        type="button"
-        onclick={openMovePanel}
-        class="border border-zinc-300 px-2.5 py-1 text-[11px] font-medium dark:border-zinc-600"
-      >
-        Move Allocation
-      </button>
-    </div>
+  <div class="flex flex-wrap items-center justify-end gap-2">
+    <button
+      type="button"
+      onclick={openClosePanel}
+      class="border border-zinc-300 px-2.5 py-1 text-[11px] font-medium dark:border-zinc-600"
+    >
+      Close
+    </button>
+    <button
+      type="button"
+      onclick={openMovePanel}
+      class="border border-zinc-300 px-2.5 py-1 text-[11px] font-medium dark:border-zinc-600"
+    >
+      Move
+    </button>
   </div>
 
   {#if error}
@@ -361,7 +358,7 @@
       {#if closeLoading}
         <p class="text-[11px] text-zinc-500">Loading remaining…</p>
       {:else if closePreview.length === 0}
-        <p class="text-[11px] text-zinc-500">All buckets are settled — nothing to carry.</p>
+        <p class="text-[11px] text-zinc-500">Nothing to close</p>
       {:else}
         <div class="overflow-x-auto border border-zinc-200 dark:border-zinc-800">
           <table class="w-full text-left text-[11px]">
@@ -381,9 +378,9 @@
                   <td class="px-2 py-1.5 text-right font-mono tabular-nums">{formatCurrency(row.amount)}</td>
                   <td class="px-2 py-1.5">
                     {#if row.kind === 'surplus'}
-                      <span class="text-emerald-700 dark:text-emerald-400">Carry to plan + income</span>
+                      <span class="text-emerald-700 dark:text-emerald-400">Surplus</span>
                     {:else}
-                      <span class="text-amber-700 dark:text-amber-400">Deficit expense</span>
+                      <span class="text-amber-700 dark:text-amber-400">Deficit</span>
                     {/if}
                   </td>
                 </tr>
@@ -394,24 +391,19 @@
         <div class="flex flex-wrap gap-3 text-[10px] text-zinc-500">
           {#if closeSurplusTotal > 0}
             <span>
-              Surplus:
+              Surplus
               <span class="font-mono text-emerald-700 dark:text-emerald-400">{formatCurrency(closeSurplusTotal)}</span>
-              → income &amp; budget in {closeNextPeriod}
             </span>
           {/if}
           {#if closeDeficitTotal > 0}
             <span>
-              Deficit:
+              Deficit
               <span class="font-mono text-amber-700 dark:text-amber-400">{formatCurrency(closeDeficitTotal)}</span>
-              → Detail only (plan unchanged)
             </span>
           {/if}
         </div>
       {/if}
 
-      <p class="text-[10px] text-zinc-500">
-        Surplus is recorded on Detail as Carryover. Deficit is recorded as a normal expense in the next month.
-      </p>
       <div class="flex gap-2">
         <button
           type="button"
@@ -419,7 +411,7 @@
           onclick={handleCloseMonth}
           class="border border-black bg-black px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 dark:border-white dark:bg-white dark:text-black"
         >
-          {closing ? 'Closing…' : 'Close Month'}
+          {closing ? '…' : 'Close'}
         </button>
         <button
           type="button"
@@ -529,9 +521,6 @@
         <AmountInput bind:value={moveAmount} aria-label="Amount to move" />
       </label>
 
-      <p class="text-[10px] text-zinc-500">
-        Moves remaining planned budget (allocation − spent). Creates Detail records and applies immediately.
-      </p>
       <div class="flex gap-2">
         <button
           type="button"
@@ -539,7 +528,7 @@
           onclick={handleMoveAllocation}
           class="border border-black bg-black px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 dark:border-white dark:bg-white dark:text-black"
         >
-          {moving ? 'Moving…' : 'Move'}
+          {moving ? '…' : 'Move'}
         </button>
         <button
           type="button"

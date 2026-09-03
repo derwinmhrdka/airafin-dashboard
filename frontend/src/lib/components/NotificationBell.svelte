@@ -21,6 +21,9 @@
   let items = $state<AppNotification[]>([]);
   let unreadCount = $state(0);
   let rootEl = $state<HTMLDivElement | null>(null);
+  let buttonEl = $state<HTMLButtonElement | null>(null);
+  let panelTop = $state(0);
+  let panelMaxHeight = $state(320);
 
   async function refresh() {
     if (!pic) return;
@@ -42,6 +45,15 @@
     void refresh();
   });
 
+  function placePanel() {
+    if (!buttonEl) return;
+    const rect = buttonEl.getBoundingClientRect();
+    const gap = 8;
+    const bottomSafe = 12;
+    panelTop = rect.bottom + gap;
+    panelMaxHeight = Math.max(160, window.innerHeight - panelTop - bottomSafe);
+  }
+
   function onDocClick(e: MouseEvent) {
     if (!open || !rootEl) return;
     if (!rootEl.contains(e.target as Node)) open = false;
@@ -49,14 +61,25 @@
 
   $effect(() => {
     if (!open) return;
+    placePanel();
+    const onResize = () => placePanel();
     const handler = (e: MouseEvent) => onDocClick(e);
+    window.addEventListener('resize', onResize);
+    window.addEventListener('scroll', onResize, true);
     document.addEventListener('click', handler);
-    return () => document.removeEventListener('click', handler);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('scroll', onResize, true);
+      document.removeEventListener('click', handler);
+    };
   });
 
   async function toggleOpen() {
     open = !open;
-    if (open) await refresh();
+    if (open) {
+      requestAnimationFrame(placePanel);
+      await refresh();
+    }
   }
 
   async function handleRead(item: AppNotification) {
@@ -99,6 +122,7 @@
 <div class="relative" bind:this={rootEl}>
   <button
     type="button"
+    bind:this={buttonEl}
     onclick={toggleOpen}
     class="relative flex h-8 w-8 items-center justify-center rounded border border-zinc-200 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300"
     aria-label="Notifications"
@@ -119,55 +143,68 @@
 
   {#if open}
     <div
-      class="absolute right-0 z-30 mt-2 w-72 border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-950"
+      class="fixed z-50 w-[min(18rem,calc(100vw-1.5rem))] border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-950"
+      style="top: {panelTop}px; right: max(0.75rem, env(safe-area-inset-right, 0px)); max-height: {panelMaxHeight}px;"
       role="dialog"
       aria-label="Notifications"
     >
       <div class="flex items-center justify-between border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
-        <span class="text-[11px] font-medium uppercase tracking-wider text-zinc-500">Notifications</span>
+        <span class="inline-flex items-center text-zinc-500" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+          </svg>
+        </span>
         {#if unreadCount > 0}
           <button
             type="button"
             onclick={handleReadAll}
-            class="text-[10px] text-zinc-400 underline-offset-2 hover:text-zinc-600 hover:underline"
+            class="inline-flex h-6 w-6 items-center justify-center text-zinc-400 transition hover:text-zinc-700 dark:hover:text-zinc-200"
+            aria-label="Mark all read"
+            title="Mark all read"
           >
-            Mark all read
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M18 6 7 17l-5-5" />
+              <path d="m22 10-7.5 7.5L13 16" />
+            </svg>
           </button>
         {/if}
       </div>
 
-      {#if loading && items.length === 0}
-        <p class="px-3 py-4 text-center text-[11px] text-zinc-400">Loading…</p>
-      {:else if items.length === 0}
-        <p class="px-3 py-4 text-center text-[11px] text-zinc-400">No notifications</p>
-      {:else}
-        <ul class="max-h-72 overflow-y-auto">
-          {#each items as item (item.id)}
-            <li>
-              <button
-                type="button"
-                onclick={() => handleRead(item)}
-                class="flex w-full items-start gap-2 px-3 py-2.5 text-left transition hover:bg-zinc-50 dark:hover:bg-zinc-900
-                  {!item.readAt ? 'bg-amber-50/60 dark:bg-amber-950/20' : ''}"
-              >
-                <PicBadge name={item.type === 'pay_due' ? item.fromPic : item.fromPic} />
-                <div class="min-w-0 flex-1">
-                  <p class="truncate text-xs font-medium {!item.readAt ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-600 dark:text-zinc-300'}">
-                    {titleFor(item)}
-                  </p>
-                  <p class="mt-0.5 font-mono text-[11px] tabular-nums text-zinc-500">
-                    {formatCurrency(item.amount)}
-                    <span class="text-zinc-400"> · {item.period}</span>
-                  </p>
-                </div>
-                {#if !item.readAt}
-                  <span class="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" aria-hidden="true"></span>
-                {/if}
-              </button>
-            </li>
-          {/each}
-        </ul>
-      {/if}
+      <div class="overflow-y-auto" style="max-height: calc({panelMaxHeight}px - 2.5rem);">
+        {#if loading && items.length === 0}
+          <p class="px-3 py-4 text-center text-[11px] text-zinc-400">Loading…</p>
+        {:else if items.length === 0}
+          <p class="px-3 py-4 text-center text-[11px] text-zinc-400">None</p>
+        {:else}
+          <ul>
+            {#each items as item (item.id)}
+              <li>
+                <button
+                  type="button"
+                  onclick={() => handleRead(item)}
+                  class="flex w-full items-start gap-2 px-3 py-2.5 text-left transition hover:bg-zinc-50 dark:hover:bg-zinc-900
+                    {!item.readAt ? 'bg-amber-50/60 dark:bg-amber-950/20' : ''}"
+                >
+                  <PicBadge name={item.fromPic} />
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-xs font-medium {!item.readAt ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-600 dark:text-zinc-300'}">
+                      {titleFor(item)}
+                    </p>
+                    <p class="mt-0.5 font-mono text-[11px] tabular-nums text-zinc-500">
+                      {formatCurrency(item.amount)}
+                      <span class="text-zinc-400"> · {item.period}</span>
+                    </p>
+                  </div>
+                  {#if !item.readAt}
+                    <span class="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" aria-hidden="true"></span>
+                  {/if}
+                </button>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </div>
     </div>
   {/if}
 </div>

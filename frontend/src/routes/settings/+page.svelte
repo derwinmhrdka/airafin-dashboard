@@ -197,8 +197,6 @@
 </script>
 
 <section class="space-y-4">
-  <p class="text-[11px] uppercase tracking-wider text-zinc-500">Settings · {period}</p>
-
   <fieldset class="space-y-2 border border-zinc-200 p-3 dark:border-zinc-800">
     <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">Sync</legend>
     <button
@@ -207,9 +205,8 @@
       onclick={handleSyncDbToSheet}
       class="w-full border border-zinc-200 px-3 py-3 text-left disabled:opacity-50 dark:border-zinc-800"
     >
-      <span class="block text-sm font-medium">Sync to Spreadsheet</span>
-      <span class="text-[11px] text-zinc-500">Database → DETAIL tab</span>
-      {#if syncing === 'db-to-sheet'}<span class="mt-1 block text-[10px] text-zinc-500">Syncing…</span>{/if}
+      <span class="block text-sm font-medium">DB → Sheet</span>
+      {#if syncing === 'db-to-sheet'}<span class="mt-1 block text-[10px] text-zinc-500">…</span>{/if}
     </button>
     <button
       type="button"
@@ -217,17 +214,13 @@
       onclick={handleSyncSheetToDb}
       class="w-full border border-zinc-200 px-3 py-3 text-left disabled:opacity-50 dark:border-zinc-800"
     >
-      <span class="block text-sm font-medium">Sync from Spreadsheet</span>
-      <span class="text-[11px] text-zinc-500">DETAIL tab → Database</span>
-      {#if syncing === 'sheet-to-db'}<span class="mt-1 block text-[10px] text-zinc-500">Syncing…</span>{/if}
+      <span class="block text-sm font-medium">Sheet → DB</span>
+      {#if syncing === 'sheet-to-db'}<span class="mt-1 block text-[10px] text-zinc-500">…</span>{/if}
     </button>
   </fieldset>
 
   <fieldset class="space-y-2 border border-zinc-200 p-3 dark:border-zinc-800">
-    <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">Login emails</legend>
-    <p class="text-[11px] text-zinc-500">
-      Super user comes from AUTH_EMAIL. Register other Google emails here and assign a PIC.
-    </p>
+    <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">Login</legend>
     <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
       <input
         type="email"
@@ -264,7 +257,7 @@
     {#if loading}
       <p class="text-xs text-zinc-500">Loading…</p>
     {:else if authEmails.length === 0}
-      <p class="text-xs text-zinc-500">No emails yet. Set AUTH_EMAIL in .env for the super user.</p>
+      <p class="text-xs text-zinc-500">No emails</p>
     {:else}
       <div class="space-y-1">
         {#each authEmails as item (item.id)}
@@ -272,7 +265,7 @@
             <div class="min-w-0">
               <span class="block truncate text-sm">{item.email}</span>
               {#if item.isSuperUser}
-                <span class="text-[10px] uppercase tracking-wider text-zinc-400">Super user</span>
+                <span class="text-[10px] uppercase tracking-wider text-zinc-400">Owner</span>
               {/if}
             </div>
             <div class="flex shrink-0 items-center gap-2">
@@ -296,9 +289,14 @@
                   type="button"
                   onclick={() => handleDeleteAuthEmail(item)}
                   disabled={authBusy}
-                  class="border border-red-200 px-2 py-1 text-[10px] text-red-600 disabled:opacity-50 dark:border-red-900 dark:text-red-400"
+                  class="inline-flex h-7 w-7 items-center justify-center text-red-600 disabled:opacity-50 dark:text-red-400"
+                  aria-label="Remove {item.email}"
                 >
-                  Delete
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4h8v2" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                  </svg>
                 </button>
               {/if}
             </div>
@@ -318,7 +316,6 @@
         class="min-w-0 flex-1 border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
       />
       <div class="flex items-center gap-2">
-        <span class="text-[10px] text-zinc-500">Color</span>
         <ColorPicker bind:value={pocketColor} aria-label="Select pocket color" />
         <button
           type="button"
@@ -326,7 +323,7 @@
           disabled={pocketBusy || !pocketName.trim()}
           class="ml-auto shrink-0 border border-zinc-300 px-3 py-2 text-xs disabled:opacity-50 sm:ml-0 dark:border-zinc-700"
         >
-          + Add
+          +
         </button>
       </div>
     </div>
@@ -355,9 +352,14 @@
                 type="button"
                 onclick={() => handleDeletePocket(item)}
                 disabled={pocketBusy || colorBusyId === item.id}
-                class="border border-red-200 px-2 py-1 text-[10px] text-red-600 disabled:opacity-50 dark:border-red-900 dark:text-red-400"
+                class="inline-flex h-7 w-7 items-center justify-center text-red-600 disabled:opacity-50 dark:text-red-400"
+                aria-label="Delete {item.name}"
               >
-                Delete
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M3 6h18" />
+                  <path d="M8 6V4h8v2" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                </svg>
               </button>
             </div>
           </div>

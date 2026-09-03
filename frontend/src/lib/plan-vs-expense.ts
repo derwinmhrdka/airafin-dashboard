@@ -14,7 +14,7 @@ export function planVsExpenseSlices(plan: number, spent: number): PieSlice[] {
   if (plan > 0 && spent > plan) {
     return [
       { label: 'Plan', value: plan, color: CHART_PLAN },
-      { label: 'Over budget', value: spent - plan, color: CHART_OVER },
+      { label: 'Over', value: spent - plan, color: CHART_OVER },
     ];
   }
 
