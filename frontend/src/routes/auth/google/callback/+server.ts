@@ -80,6 +80,7 @@ export const GET: RequestHandler = async ({ cookies, url, request }) => {
       pic,
       name: profile.name,
       auth: 'google',
+      projectId: null,
     },
     secure,
   );

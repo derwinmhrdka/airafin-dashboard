@@ -17,6 +17,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Querystring: { period?: string } }>(
     '/api/dashboard/summary',
     async (request, reply) => {
+      const projectId = request.projectId!;
       const period = request.query.period?.trim();
 
       if (!period) {
@@ -26,12 +27,12 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       const [incomeRow] = await db
         .select({ total: sql<string>`coalesce(sum(${incomes.amount}), 0)` })
         .from(incomes)
-        .where(eq(incomes.period, period));
+        .where(and(eq(incomes.period, period), eq(incomes.projectId, projectId)));
 
       const [budgetRow] = await db
         .select({ total: sql<string>`coalesce(sum(${budgets.allocatedAmount}), 0)` })
         .from(budgets)
-        .where(eq(budgets.period, period));
+        .where(and(eq(budgets.period, period), eq(budgets.projectId, projectId)));
 
       const [spentRow] = await db
         .select({ total: sql<string>`coalesce(sum(${transactions.cost}), 0)` })
@@ -39,20 +40,24 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         .where(
           and(
             eq(transactions.period, period),
+            eq(transactions.projectId, projectId),
             notInArray(transactions.status, [...NON_SPEND_STATUSES]),
           ),
         );
 
       const allCategories = await db.select().from(categories).orderBy(categories.id);
-      const periodBudgets = await db.select().from(budgets).where(eq(budgets.period, period));
+      const periodBudgets = await db
+        .select()
+        .from(budgets)
+        .where(and(eq(budgets.period, period), eq(budgets.projectId, projectId)));
       const periodSubcategories = await db
         .select()
         .from(budgetSubcategories)
-        .where(eq(budgetSubcategories.period, period));
+        .where(and(eq(budgetSubcategories.period, period), eq(budgetSubcategories.projectId, projectId)));
       const periodTransactions = await db
         .select()
         .from(transactions)
-        .where(eq(transactions.period, period));
+        .where(and(eq(transactions.period, period), eq(transactions.projectId, projectId)));
       const pocketRows = await db.select({ name: pockets.name, color: pockets.color }).from(pockets);
       const pocketColorByName = new Map(
         pocketRows.map((row) => [row.name.trim().toUpperCase(), row.color || DEFAULT_POCKET_COLOR]),
@@ -280,6 +285,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Querystring: { period?: string } }>(
     '/api/dashboard/reimbursements',
     async (request, reply) => {
+      const projectId = request.projectId!;
       const period = request.query.period?.trim();
 
       if (!period) {
@@ -294,7 +300,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         })
         .from(budgets)
         .innerJoin(categories, eq(budgets.categoryId, categories.id))
-        .where(eq(budgets.period, period));
+        .where(and(eq(budgets.period, period), eq(budgets.projectId, projectId)));
 
       const subcategoryRows = await db
         .select({
@@ -303,7 +309,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
           pic: budgetSubcategories.pic,
         })
         .from(budgetSubcategories)
-        .where(eq(budgetSubcategories.period, period));
+        .where(and(eq(budgetSubcategories.period, period), eq(budgetSubcategories.projectId, projectId)));
 
       const mainPicByCategory = new Map(
         budgetRows.map((b) => [b.categoryId, b.planPic]),
@@ -331,7 +337,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         })
         .from(transactions)
         .innerJoin(categories, eq(transactions.categoryId, categories.id))
-        .where(eq(transactions.period, period))
+        .where(and(eq(transactions.period, period), eq(transactions.projectId, projectId)))
         .orderBy(desc(transactions.id));
 
       const reimbursements = txRows

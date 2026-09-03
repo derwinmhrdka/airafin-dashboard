@@ -1,6 +1,7 @@
+import type { Handle } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
-import { redirect, type Handle } from '@sveltejs/kit';
-import { getSession, isSuperUserEmail } from '$lib/server/auth';
+import { redirect } from '@sveltejs/kit';
+import { authenticatePassword, getSession, isSuperUserEmail } from '$lib/server/auth';
 
 /** Internal backend URL — must include http:// host (never a path like /api). */
 function resolveBackendUrl(): string {
@@ -23,6 +24,10 @@ function isPublicPath(path: string): boolean {
     path === '/favicon.ico' ||
     path === '/robots.txt'
   );
+}
+
+function isProjectDeletePath(path: string): boolean {
+  return /^\/api\/projects\/\d+$/.test(path);
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
@@ -88,6 +93,10 @@ export const handle: Handle = async ({ event, resolve }) => {
     if (token) headers.set('X-API-Token', token);
   }
 
+  if (session?.projectId) {
+    headers.set('X-Project-Id', String(session.projectId));
+  }
+
   let body: string | undefined;
   if (!['GET', 'HEAD'].includes(event.request.method)) {
     const text = await event.request.text();
@@ -97,6 +106,33 @@ export const handle: Handle = async ({ event, resolve }) => {
       headers.delete('content-type');
       headers.delete('content-length');
     }
+  }
+
+  // Super-user + dashboard password required to delete a project.
+  if (event.request.method === 'DELETE' && isProjectDeletePath(path)) {
+    if (!isSuperUserEmail(session?.email)) {
+      return new Response(JSON.stringify({ error: 'Super user only' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    let password = '';
+    try {
+      const parsed = body ? (JSON.parse(body) as { password?: string }) : {};
+      password = typeof parsed.password === 'string' ? parsed.password : '';
+    } catch {
+      password = '';
+    }
+    if (!authenticatePassword(password)) {
+      return new Response(JSON.stringify({ error: 'Incorrect password' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    // Backend delete expects empty/no password body
+    body = undefined;
+    headers.delete('content-type');
+    headers.delete('content-length');
   }
 
   let response: Response;

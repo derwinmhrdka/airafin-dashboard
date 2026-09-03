@@ -33,8 +33,13 @@ function directedKey(sender: string, receiver: string): string {
   return `${sender}\0${receiver}`;
 }
 
-function payDueRefKey(period: string, senderPic: string, receiverPic: string): string {
-  return `pay_due:${period}:${senderPic}->${receiverPic}`;
+function payDueRefKey(
+  projectId: number,
+  period: string,
+  senderPic: string,
+  receiverPic: string,
+): string {
+  return `pay_due:${projectId}:${period}:${senderPic}->${receiverPic}`;
 }
 
 /** Stable key so settle sync upserts one paid_received per cleared due (no stamp spam). */
@@ -43,7 +48,10 @@ function paidReceivedRefKey(payDueRef: string): string {
 }
 
 /** Collect pending directed amounts (plan + unsettled reimbursements), then net. */
-export async function computePeriodTransferNets(period: string): Promise<TransferNet[]> {
+export async function computePeriodTransferNets(
+  period: string,
+  projectId: number,
+): Promise<TransferNet[]> {
   const directed = new Map<string, number>();
 
   const checklist = await db
@@ -54,7 +62,7 @@ export async function computePeriodTransferNets(period: string): Promise<Transfe
       done: planChecklist.done,
     })
     .from(planChecklist)
-    .where(eq(planChecklist.period, period));
+    .where(and(eq(planChecklist.period, period), eq(planChecklist.projectId, projectId)));
 
   for (const item of checklist) {
     if (item.done) continue;
@@ -71,7 +79,7 @@ export async function computePeriodTransferNets(period: string): Promise<Transfe
       planPic: budgets.pic,
     })
     .from(budgets)
-    .where(eq(budgets.period, period));
+    .where(and(eq(budgets.period, period), eq(budgets.projectId, projectId)));
 
   const subcategoryRows = await db
     .select({
@@ -80,7 +88,9 @@ export async function computePeriodTransferNets(period: string): Promise<Transfe
       pic: budgetSubcategories.pic,
     })
     .from(budgetSubcategories)
-    .where(eq(budgetSubcategories.period, period));
+    .where(
+      and(eq(budgetSubcategories.period, period), eq(budgetSubcategories.projectId, projectId)),
+    );
 
   const mainPicByCategory = new Map(budgetRows.map((b) => [b.categoryId, b.planPic]));
   const subPicByKey = new Map(
@@ -98,7 +108,7 @@ export async function computePeriodTransferNets(period: string): Promise<Transfe
     })
     .from(transactions)
     .innerJoin(categories, eq(transactions.categoryId, categories.id))
-    .where(eq(transactions.period, period));
+    .where(and(eq(transactions.period, period), eq(transactions.projectId, projectId)));
 
   for (const tx of txRows) {
     if (isNonSpendTransaction(tx)) continue;
@@ -150,14 +160,17 @@ export async function computePeriodTransferNets(period: string): Promise<Transfe
  * Upsert pay_due for current nets (to = payer).
  * When a pay_due clears, resolve it and upsert paid_received for the receiver.
  */
-export async function syncTransferNotifications(period: string): Promise<{
+export async function syncTransferNotifications(
+  period: string,
+  projectId: number,
+): Promise<{
   payDue: number;
   paidReceivedCreated: number;
   resolved: number;
 }> {
-  const nets = await computePeriodTransferNets(period);
+  const nets = await computePeriodTransferNets(period, projectId);
   const activeRefKeys = new Set(
-    nets.map((n) => payDueRefKey(period, n.senderPic, n.receiverPic)),
+    nets.map((n) => payDueRefKey(projectId, period, n.senderPic, n.receiverPic)),
   );
   const stamp = nowIso();
   let payDue = 0;
@@ -165,13 +178,13 @@ export async function syncTransferNotifications(period: string): Promise<{
   let resolved = 0;
 
   for (const net of nets) {
-    const refKey = payDueRefKey(period, net.senderPic, net.receiverPic);
+    const refKey = payDueRefKey(projectId, period, net.senderPic, net.receiverPic);
     const amount = String(Math.round(net.total));
 
     const [existing] = await db
       .select()
       .from(notifications)
-      .where(eq(notifications.refKey, refKey))
+      .where(and(eq(notifications.projectId, projectId), eq(notifications.refKey, refKey)))
       .limit(1);
 
     if (existing) {
@@ -188,9 +201,10 @@ export async function syncTransferNotifications(period: string): Promise<{
           fromPic: net.receiverPic,
           type: 'pay_due',
         })
-        .where(eq(notifications.id, existing.id));
+        .where(and(eq(notifications.id, existing.id), eq(notifications.projectId, projectId)));
     } else {
       await db.insert(notifications).values({
+        projectId,
         toPic: net.senderPic,
         fromPic: net.receiverPic,
         type: 'pay_due',
@@ -210,6 +224,7 @@ export async function syncTransferNotifications(period: string): Promise<{
     .from(notifications)
     .where(
       and(
+        eq(notifications.projectId, projectId),
         eq(notifications.type, 'pay_due'),
         eq(notifications.period, period),
         isNull(notifications.resolvedAt),
@@ -222,7 +237,7 @@ export async function syncTransferNotifications(period: string): Promise<{
     await db
       .update(notifications)
       .set({ resolvedAt: stamp })
-      .where(eq(notifications.id, row.id));
+      .where(and(eq(notifications.id, row.id), eq(notifications.projectId, projectId)));
     resolved += 1;
 
     // Notify the previous receiver that payment was made (stable ref → upsert)
@@ -230,7 +245,7 @@ export async function syncTransferNotifications(period: string): Promise<{
     const [already] = await db
       .select()
       .from(notifications)
-      .where(eq(notifications.refKey, paidRef))
+      .where(and(eq(notifications.projectId, projectId), eq(notifications.refKey, paidRef)))
       .limit(1);
 
     if (already) {
@@ -246,10 +261,11 @@ export async function syncTransferNotifications(period: string): Promise<{
           resolvedAt: null,
           createdAt: stamp,
         })
-        .where(eq(notifications.id, already.id));
+        .where(and(eq(notifications.id, already.id), eq(notifications.projectId, projectId)));
       paidReceivedCreated += 1;
     } else {
       await db.insert(notifications).values({
+        projectId,
         toPic: row.fromPic,
         fromPic: row.toPic,
         type: 'paid_received',
@@ -269,7 +285,8 @@ export async function syncTransferNotifications(period: string): Promise<{
 
 /** Sync the given period plus any periods that still have open pay_dues. */
 export async function syncOpenTransferNotifications(
-  primaryPeriod?: string,
+  primaryPeriod: string | undefined,
+  projectId: number,
 ): Promise<string[]> {
   const periods = new Set<string>();
   if (primaryPeriod?.trim()) periods.add(primaryPeriod.trim());
@@ -277,14 +294,20 @@ export async function syncOpenTransferNotifications(
   const openDues = await db
     .select({ period: notifications.period })
     .from(notifications)
-    .where(and(eq(notifications.type, 'pay_due'), isNull(notifications.resolvedAt)));
+    .where(
+      and(
+        eq(notifications.projectId, projectId),
+        eq(notifications.type, 'pay_due'),
+        isNull(notifications.resolvedAt),
+      ),
+    );
 
   for (const row of openDues) {
     if (row.period) periods.add(row.period);
   }
 
   for (const period of periods) {
-    await syncTransferNotifications(period);
+    await syncTransferNotifications(period, projectId);
   }
 
   return [...periods];

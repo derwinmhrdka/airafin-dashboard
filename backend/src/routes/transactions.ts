@@ -58,13 +58,16 @@ function toSheetRow(
   };
 }
 
-function transactionListFilters(query: {
-  period?: string;
-  categoryId?: string;
-  pic?: string;
-  search?: string;
-}): SQL | undefined {
-  const conditions: SQL[] = [];
+function transactionListFilters(
+  query: {
+    period?: string;
+    categoryId?: string;
+    pic?: string;
+    search?: string;
+  },
+  projectId: number,
+): SQL {
+  const conditions: SQL[] = [eq(transactions.projectId, projectId)];
 
   if (query.period) {
     conditions.push(eq(transactions.period, query.period));
@@ -86,10 +89,10 @@ function transactionListFilters(query: {
     conditions.push(ilike(transactions.detail, `%${escaped}%`));
   }
 
-  return conditions.length ? and(...conditions) : undefined;
+  return and(...conditions)!;
 }
 
-async function getTransactionWithCategory(id: number) {
+async function getTransactionWithCategory(id: number, projectId: number) {
   const [row] = await db
     .select({
       id: transactions.id,
@@ -106,7 +109,7 @@ async function getTransactionWithCategory(id: number) {
     })
     .from(transactions)
     .innerJoin(categories, eq(transactions.categoryId, categories.id))
-    .where(eq(transactions.id, id))
+    .where(and(eq(transactions.id, id), eq(transactions.projectId, projectId)))
     .limit(1);
 
   return row ?? null;
@@ -125,11 +128,14 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
   }>(
     '/api/transactions',
     async (request) => {
+      const projectId = request.projectId!;
       const { period, categoryId, pic, search } = request.query;
       const limit = Math.min(Math.max(Number.parseInt(request.query.limit ?? '50', 10) || 50, 1), 200);
       const offset = Math.max(Number.parseInt(request.query.offset ?? '0', 10) || 0, 0);
-      const where = transactionListFilters({ period, categoryId, pic, search });
-      const periodOnly = period ? eq(transactions.period, period) : undefined;
+      const where = transactionListFilters({ period, categoryId, pic, search }, projectId);
+      const periodOnly = period
+        ? and(eq(transactions.projectId, projectId), eq(transactions.period, period))
+        : eq(transactions.projectId, projectId);
 
       const rows = await db
         .select({
@@ -177,6 +183,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
     '/api/transactions',
     { preHandler: requireApiToken },
     async (request, reply) => {
+      const projectId = request.projectId!;
       const body = request.body;
 
       if (
@@ -212,6 +219,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
       const [created] = await db
         .insert(transactions)
         .values({
+          projectId,
           date: body.date,
           categoryId: body.categoryId,
           subCategory: body.subCategory?.trim() ?? '',
@@ -236,6 +244,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
   app.put<{ Params: { id: string }; Body: UpdateTransactionBody }>(
     '/api/transactions/:id',
     async (request, reply) => {
+      const projectId = request.projectId!;
       const id = Number.parseInt(request.params.id, 10);
       const body = request.body;
 
@@ -267,7 +276,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(400).send({ error: 'Category not found' });
       }
 
-      const existing = await getTransactionWithCategory(id);
+      const existing = await getTransactionWithCategory(id, projectId);
       if (!existing) {
         return reply.code(404).send({ error: 'Transaction not found' });
       }
@@ -282,7 +291,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
           cost: String(Math.round(body.cost)),
           pic: body.pic,
         })
-        .where(eq(transactions.id, id))
+        .where(and(eq(transactions.id, id), eq(transactions.projectId, projectId)))
         .returning();
 
       if (!updated) {
@@ -303,18 +312,21 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
   );
 
   app.delete<{ Params: { id: string } }>('/api/transactions/:id', async (request, reply) => {
+    const projectId = request.projectId!;
     const id = Number.parseInt(request.params.id, 10);
 
     if (!Number.isFinite(id)) {
       return reply.code(400).send({ error: 'Invalid transaction id' });
     }
 
-    const existing = await getTransactionWithCategory(id);
+    const existing = await getTransactionWithCategory(id, projectId);
     if (!existing) {
       return reply.code(404).send({ error: 'Transaction not found' });
     }
 
-    await db.delete(transactions).where(eq(transactions.id, id));
+    await db
+      .delete(transactions)
+      .where(and(eq(transactions.id, id), eq(transactions.projectId, projectId)));
 
     const sheetsSync = await deleteTransactionFromSheet(
       toSheetRow(existing, existing.categoryName),
@@ -330,6 +342,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
   app.patch<{ Params: { id: string }; Body: UpdateStatusBody }>(
     '/api/transactions/:id/status',
     async (request, reply) => {
+      const projectId = request.projectId!;
       const id = Number.parseInt(request.params.id, 10);
       const { status } = request.body ?? {};
 
@@ -344,7 +357,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
       const [updated] = await db
         .update(transactions)
         .set({ status })
-        .where(eq(transactions.id, id))
+        .where(and(eq(transactions.id, id), eq(transactions.projectId, projectId)))
         .returning();
 
       if (!updated) {
@@ -359,13 +372,14 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
   app.patch<{ Params: { id: string } }>(
     '/api/transactions/:id/reimburse',
     async (request, reply) => {
+      const projectId = request.projectId!;
       const id = Number.parseInt(request.params.id, 10);
 
       if (!Number.isFinite(id)) {
         return reply.code(400).send({ error: 'Invalid transaction id' });
       }
 
-      const existing = await getTransactionWithCategory(id);
+      const existing = await getTransactionWithCategory(id, projectId);
       if (!existing) {
         return reply.code(404).send({ error: 'Transaction not found' });
       }
@@ -374,6 +388,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
         existing.categoryId,
         existing.period,
         existing.subCategory,
+        projectId,
       );
       if (!planPic) {
         return reply.code(400).send({ error: 'No plan PIC for this category' });
@@ -386,7 +401,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
       const [updated] = await db
         .update(transactions)
         .set({ pic: planPic, reimbursedFromPic: existing.pic })
-        .where(eq(transactions.id, id))
+        .where(and(eq(transactions.id, id), eq(transactions.projectId, projectId)))
         .returning();
 
       if (!updated) {
@@ -410,13 +425,14 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
   app.patch<{ Params: { id: string } }>(
     '/api/transactions/:id/unreimburse',
     async (request, reply) => {
+      const projectId = request.projectId!;
       const id = Number.parseInt(request.params.id, 10);
 
       if (!Number.isFinite(id)) {
         return reply.code(400).send({ error: 'Invalid transaction id' });
       }
 
-      const existing = await getTransactionWithCategory(id);
+      const existing = await getTransactionWithCategory(id, projectId);
       if (!existing) {
         return reply.code(404).send({ error: 'Transaction not found' });
       }
@@ -429,7 +445,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
       const [updated] = await db
         .update(transactions)
         .set({ pic: reimbursedFrom, reimbursedFromPic: null })
-        .where(eq(transactions.id, id))
+        .where(and(eq(transactions.id, id), eq(transactions.projectId, projectId)))
         .returning();
 
       if (!updated) {

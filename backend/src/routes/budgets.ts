@@ -132,27 +132,28 @@ const checklistSelectFields = {
   isBalancing: planChecklist.isBalancing,
 };
 
-async function fetchChecklistForPeriod(period: string) {
+async function fetchChecklistForPeriod(period: string, projectId: number) {
   return db
     .select(checklistSelectFields)
     .from(planChecklist)
     .leftJoin(categories, eq(planChecklist.categoryId, categories.id))
-    .where(eq(planChecklist.period, period))
+    .where(and(eq(planChecklist.period, period), eq(planChecklist.projectId, projectId)))
     .orderBy(desc(planChecklist.isBalancing), asc(planChecklist.id));
 }
 
-async function fetchChecklistItemById(id: number) {
+async function fetchChecklistItemById(id: number, projectId: number) {
   const [row] = await db
     .select(checklistSelectFields)
     .from(planChecklist)
     .leftJoin(categories, eq(planChecklist.categoryId, categories.id))
-    .where(eq(planChecklist.id, id))
+    .where(and(eq(planChecklist.id, id), eq(planChecklist.projectId, projectId)))
     .limit(1);
   return row ?? null;
 }
 
 async function syncBalancingChecklist(
   period: string,
+  projectId: number,
   incomeRows: typeof incomes.$inferSelect[],
   budgetRows: typeof budgets.$inferSelect[],
   subcategoryRows: typeof budgetSubcategories.$inferSelect[],
@@ -166,12 +167,20 @@ async function syncBalancingChecklist(
   const [existing] = await db
     .select()
     .from(planChecklist)
-    .where(and(eq(planChecklist.period, period), eq(planChecklist.isBalancing, true)))
+    .where(
+      and(
+        eq(planChecklist.period, period),
+        eq(planChecklist.projectId, projectId),
+        eq(planChecklist.isBalancing, true),
+      ),
+    )
     .limit(1);
 
   if (!transfer) {
     if (existing) {
-      await db.delete(planChecklist).where(eq(planChecklist.id, existing.id));
+      await db
+        .delete(planChecklist)
+        .where(and(eq(planChecklist.id, existing.id), eq(planChecklist.projectId, projectId)));
     }
     return;
   }
@@ -187,11 +196,12 @@ async function syncBalancingChecklist(
         pocket: transfer.pocket.toUpperCase(),
         subcategoryName: BALANCING_ITEM_NAME,
       })
-      .where(eq(planChecklist.id, existing.id));
+      .where(and(eq(planChecklist.id, existing.id), eq(planChecklist.projectId, projectId)));
     return;
   }
 
   await db.insert(planChecklist).values({
+    projectId,
     period,
     categoryId: null,
     subcategoryName: BALANCING_ITEM_NAME,
@@ -208,13 +218,17 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Querystring: { period?: string } }>(
     '/api/plan',
     async (request, reply) => {
+      const projectId = request.projectId!;
       const period = request.query.period?.trim();
 
       if (!period) {
         return reply.code(400).send({ error: 'period query parameter is required' });
       }
 
-      const incomeRows = await db.select().from(incomes).where(eq(incomes.period, period));
+      const incomeRows = await db
+        .select()
+        .from(incomes)
+        .where(and(eq(incomes.period, period), eq(incomes.projectId, projectId)));
 
       const budgetRows = await db
         .select({
@@ -228,10 +242,13 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
         })
         .from(budgets)
         .innerJoin(categories, eq(budgets.categoryId, categories.id))
-        .where(eq(budgets.period, period))
+        .where(and(eq(budgets.period, period), eq(budgets.projectId, projectId)))
         .orderBy(categories.id);
 
-      const budgetRowsRaw = await db.select().from(budgets).where(eq(budgets.period, period));
+      const budgetRowsRaw = await db
+        .select()
+        .from(budgets)
+        .where(and(eq(budgets.period, period), eq(budgets.projectId, projectId)));
 
       const subcategoryRows = await db
         .select({
@@ -244,16 +261,16 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
           period: budgetSubcategories.period,
         })
         .from(budgetSubcategories)
-        .where(eq(budgetSubcategories.period, period))
+        .where(and(eq(budgetSubcategories.period, period), eq(budgetSubcategories.projectId, projectId)))
         .orderBy(budgetSubcategories.categoryId, budgetSubcategories.name);
 
       const subcategoryRowsRaw = await db
         .select()
         .from(budgetSubcategories)
-        .where(eq(budgetSubcategories.period, period));
+        .where(and(eq(budgetSubcategories.period, period), eq(budgetSubcategories.projectId, projectId)));
 
-      await syncBalancingChecklist(period, incomeRows, budgetRowsRaw, subcategoryRowsRaw);
-      const checklistRows = await fetchChecklistForPeriod(period);
+      await syncBalancingChecklist(period, projectId, incomeRows, budgetRowsRaw, subcategoryRowsRaw);
+      const checklistRows = await fetchChecklistForPeriod(period, projectId);
 
       return {
         period,
@@ -266,6 +283,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
   );
 
   app.post<{ Body: ChecklistBody }>('/api/plan/checklist', async (request, reply) => {
+    const projectId = request.projectId!;
     const body = request.body ?? {};
     const period = body.period?.trim();
     const subcategoryName = body.subcategoryName?.trim();
@@ -315,6 +333,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
     const [created] = await db
       .insert(planChecklist)
       .values({
+        projectId,
         period,
         categoryId: categoryId ?? null,
         subcategoryName,
@@ -327,13 +346,14 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
       })
       .returning();
 
-    const row = await fetchChecklistItemById(created.id);
+    const row = await fetchChecklistItemById(created.id, projectId);
     return reply.code(201).send({ item: row });
   });
 
   app.patch<{ Params: { id: string }; Body: ChecklistPatchBody }>(
     '/api/plan/checklist/:id',
     async (request, reply) => {
+      const projectId = request.projectId!;
       const id = Number.parseInt(request.params.id, 10);
       if (!Number.isFinite(id)) {
         return reply.code(400).send({ error: 'Invalid checklist id' });
@@ -347,19 +367,20 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
       const [updated] = await db
         .update(planChecklist)
         .set({ done })
-        .where(eq(planChecklist.id, id))
+        .where(and(eq(planChecklist.id, id), eq(planChecklist.projectId, projectId)))
         .returning();
 
       if (!updated) {
         return reply.code(404).send({ error: 'Checklist item not found' });
       }
 
-      const row = await fetchChecklistItemById(id);
+      const row = await fetchChecklistItemById(id, projectId);
       return { item: row };
     },
   );
 
   app.delete<{ Params: { id: string } }>('/api/plan/checklist/:id', async (request, reply) => {
+    const projectId = request.projectId!;
     const id = Number.parseInt(request.params.id, 10);
     if (!Number.isFinite(id)) {
       return reply.code(400).send({ error: 'Invalid checklist id' });
@@ -368,7 +389,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
     const [existing] = await db
       .select({ id: planChecklist.id, isBalancing: planChecklist.isBalancing })
       .from(planChecklist)
-      .where(eq(planChecklist.id, id))
+      .where(and(eq(planChecklist.id, id), eq(planChecklist.projectId, projectId)))
       .limit(1);
 
     if (!existing) {
@@ -378,11 +399,14 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: 'Balancing item cannot be deleted' });
     }
 
-    await db.delete(planChecklist).where(eq(planChecklist.id, id));
+    await db
+      .delete(planChecklist)
+      .where(and(eq(planChecklist.id, id), eq(planChecklist.projectId, projectId)));
     return { ok: true };
   });
 
   app.post<{ Body: PlanBody }>('/api/budgets', async (request, reply) => {
+    const projectId = request.projectId!;
     const {
       period,
       incomes: incomeInputs,
@@ -399,7 +423,9 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
     const allowedPockets = new Set(allowedPocketRows.map((row) => row.name.toUpperCase()));
 
     if (Array.isArray(incomeInputs)) {
-      await db.delete(incomes).where(eq(incomes.period, trimmedPeriod));
+      await db
+        .delete(incomes)
+        .where(and(eq(incomes.period, trimmedPeriod), eq(incomes.projectId, projectId)));
 
       for (const income of incomeInputs) {
         const source = income.source?.trim();
@@ -408,6 +434,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
         }
 
         await db.insert(incomes).values({
+          projectId,
           source,
           amount: String(Math.round(income.amount)),
           period: trimmedPeriod,
@@ -416,7 +443,9 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
     }
 
     if (Array.isArray(budgetInputs)) {
-      await db.delete(budgets).where(eq(budgets.period, trimmedPeriod));
+      await db
+        .delete(budgets)
+        .where(and(eq(budgets.period, trimmedPeriod), eq(budgets.projectId, projectId)));
 
       for (const budget of budgetInputs) {
         if (!budget.categoryId || budget.allocatedAmount == null) {
@@ -451,6 +480,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
         const amount = String(Math.round(budget.allocatedAmount));
 
         await db.insert(budgets).values({
+          projectId,
           categoryId: budget.categoryId,
           allocatedAmount: amount,
           pic,
@@ -461,7 +491,14 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
     }
 
     if (subcategoryInputs) {
-      await db.delete(budgetSubcategories).where(eq(budgetSubcategories.period, trimmedPeriod));
+      await db
+        .delete(budgetSubcategories)
+        .where(
+          and(
+            eq(budgetSubcategories.period, trimmedPeriod),
+            eq(budgetSubcategories.projectId, projectId),
+          ),
+        );
 
       for (const sub of subcategoryInputs) {
         const name = sub.name?.trim();
@@ -489,6 +526,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
         const amount = String(Math.round(sub.allocatedAmount ?? 0));
 
         await db.insert(budgetSubcategories).values({
+          projectId,
           categoryId: sub.categoryId,
           period: trimmedPeriod,
           name,
@@ -499,18 +537,30 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
-    const savedIncomes = await db.select().from(incomes).where(eq(incomes.period, trimmedPeriod));
-    const savedBudgets = await db.select().from(budgets).where(eq(budgets.period, trimmedPeriod));
+    const savedIncomes = await db
+      .select()
+      .from(incomes)
+      .where(and(eq(incomes.period, trimmedPeriod), eq(incomes.projectId, projectId)));
+    const savedBudgets = await db
+      .select()
+      .from(budgets)
+      .where(and(eq(budgets.period, trimmedPeriod), eq(budgets.projectId, projectId)));
     const savedSubs = await db
       .select()
       .from(budgetSubcategories)
-      .where(eq(budgetSubcategories.period, trimmedPeriod));
-    await syncBalancingChecklist(trimmedPeriod, savedIncomes, savedBudgets, savedSubs);
+      .where(
+        and(
+          eq(budgetSubcategories.period, trimmedPeriod),
+          eq(budgetSubcategories.projectId, projectId),
+        ),
+      );
+    await syncBalancingChecklist(trimmedPeriod, projectId, savedIncomes, savedBudgets, savedSubs);
 
     return reply.code(200).send({ ok: true, period: trimmedPeriod });
   });
 
   app.post<{ Body: TransferBody }>('/api/budgets/transfer', async (request, reply) => {
+    const projectId = request.projectId!;
     const { period, amount, from, to } = request.body ?? {};
 
     if (!period?.trim()) {
@@ -553,12 +603,17 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
         const periodBudgets = await tx
           .select()
           .from(budgets)
-          .where(eq(budgets.period, trimmedPeriod));
+          .where(and(eq(budgets.period, trimmedPeriod), eq(budgets.projectId, projectId)));
 
         const periodSubs = await tx
           .select()
           .from(budgetSubcategories)
-          .where(eq(budgetSubcategories.period, trimmedPeriod));
+          .where(
+            and(
+              eq(budgetSubcategories.period, trimmedPeriod),
+              eq(budgetSubcategories.projectId, projectId),
+            ),
+          );
 
         const periodTx = await tx
           .select({
@@ -568,7 +623,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
             status: transactions.status,
           })
           .from(transactions)
-          .where(eq(transactions.period, trimmedPeriod));
+          .where(and(eq(transactions.period, trimmedPeriod), eq(transactions.projectId, projectId)));
 
         const budgetByCategory = new Map(periodBudgets.map((row) => [row.categoryId, row]));
         const subsByCategory = new Map<number, typeof periodSubs>();
@@ -698,11 +753,18 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
             await tx
               .update(budgets)
               .set({ allocatedAmount: amountStr(nextAmount) })
-              .where(and(eq(budgets.categoryId, categoryId), eq(budgets.period, trimmedPeriod)));
+              .where(
+                and(
+                  eq(budgets.categoryId, categoryId),
+                  eq(budgets.period, trimmedPeriod),
+                  eq(budgets.projectId, projectId),
+                ),
+              );
             return;
           }
           if (nextAmount <= 0) return;
           await tx.insert(budgets).values({
+            projectId,
             categoryId,
             allocatedAmount: amountStr(nextAmount),
             pic: '',
@@ -724,7 +786,12 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
           await tx
             .update(budgetSubcategories)
             .set({ allocatedAmount: amountStr(next) })
-            .where(eq(budgetSubcategories.id, sourceRow.id));
+            .where(
+              and(
+                eq(budgetSubcategories.id, sourceRow.id),
+                eq(budgetSubcategories.projectId, projectId),
+              ),
+            );
         }
 
         if (toSubName) {
@@ -734,10 +801,16 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
             await tx
               .update(budgetSubcategories)
               .set({ allocatedAmount: amountStr(next) })
-              .where(eq(budgetSubcategories.id, destRow.id));
+              .where(
+                and(
+                  eq(budgetSubcategories.id, destRow.id),
+                  eq(budgetSubcategories.projectId, projectId),
+                ),
+              );
           } else {
             const destBudget = budgetByCategory.get(toCategoryId);
             await tx.insert(budgetSubcategories).values({
+              projectId,
               categoryId: toCategoryId,
               period: trimmedPeriod,
               name: toSubName,
@@ -782,6 +855,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
         const [fromTx] = await tx
           .insert(transactions)
           .values({
+            projectId,
             date: moveDate,
             categoryId: fromCategoryId,
             subCategory: fromSubName,
@@ -796,6 +870,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
         const [toTx] = await tx
           .insert(transactions)
           .values({
+            projectId,
             date: moveDate,
             categoryId: toCategoryId,
             subCategory: toSubName,
@@ -844,6 +919,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post<{ Body: CloseMonthBody }>('/api/budgets/close-month', async (request, reply) => {
+    const projectId = request.projectId!;
     const period = request.body?.period?.trim();
     if (!period) {
       return reply.code(400).send({ error: 'period is required' });
@@ -857,7 +933,13 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
     const alreadyClosedIncomes = await db
       .select({ id: incomes.id })
       .from(incomes)
-      .where(and(eq(incomes.period, toPeriod), ilike(incomes.source, `Carryover from ${period}%`)))
+      .where(
+        and(
+          eq(incomes.projectId, projectId),
+          eq(incomes.period, toPeriod),
+          ilike(incomes.source, `Carryover from ${period}%`),
+        ),
+      )
       .limit(1);
 
     if (alreadyClosedIncomes.length > 0) {
@@ -869,6 +951,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
       .from(transactions)
       .where(
         and(
+          eq(transactions.projectId, projectId),
           eq(transactions.period, toPeriod),
           or(
             ilike(transactions.detail, `Carryover from ${period}%`),
@@ -900,11 +983,16 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
         const allCategories = await tx.select().from(categories);
         const categoryNameById = new Map(allCategories.map((c) => [c.id, c.name]));
 
-        const periodBudgets = await tx.select().from(budgets).where(eq(budgets.period, period));
+        const periodBudgets = await tx
+          .select()
+          .from(budgets)
+          .where(and(eq(budgets.period, period), eq(budgets.projectId, projectId)));
         const periodSubs = await tx
           .select()
           .from(budgetSubcategories)
-          .where(eq(budgetSubcategories.period, period));
+          .where(
+            and(eq(budgetSubcategories.period, period), eq(budgetSubcategories.projectId, projectId)),
+          );
         const periodTx = await tx
           .select({
             categoryId: transactions.categoryId,
@@ -913,7 +1001,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
             status: transactions.status,
           })
           .from(transactions)
-          .where(eq(transactions.period, period));
+          .where(and(eq(transactions.period, period), eq(transactions.projectId, projectId)));
 
         const budgetByCategory = new Map(periodBudgets.map((row) => [row.categoryId, row]));
         const subsByCategory = new Map<number, typeof periodSubs>();
@@ -1000,11 +1088,19 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
           throw new Error(`Nothing to close for ${period} — all buckets are settled`);
         }
 
-        const nextBudgets = await tx.select().from(budgets).where(eq(budgets.period, toPeriod));
+        const nextBudgets = await tx
+          .select()
+          .from(budgets)
+          .where(and(eq(budgets.period, toPeriod), eq(budgets.projectId, projectId)));
         const nextSubs = await tx
           .select()
           .from(budgetSubcategories)
-          .where(eq(budgetSubcategories.period, toPeriod));
+          .where(
+            and(
+              eq(budgetSubcategories.period, toPeriod),
+              eq(budgetSubcategories.projectId, projectId),
+            ),
+          );
         const nextBudgetByCategory = new Map(nextBudgets.map((row) => [row.categoryId, row]));
         const nextSubsByCategory = new Map<number, typeof nextSubs>();
         for (const row of nextSubs) {
@@ -1029,11 +1125,18 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
             await tx
               .update(budgets)
               .set({ allocatedAmount: amountStr(nextAmount) })
-              .where(and(eq(budgets.categoryId, categoryId), eq(budgets.period, toPeriod)));
+              .where(
+                and(
+                  eq(budgets.categoryId, categoryId),
+                  eq(budgets.period, toPeriod),
+                  eq(budgets.projectId, projectId),
+                ),
+              );
             existing.allocatedAmount = amountStr(nextAmount);
             return;
           }
           await tx.insert(budgets).values({
+            projectId,
             categoryId,
             allocatedAmount: amountStr(amount),
             pic,
@@ -1042,6 +1145,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
           });
           nextBudgetByCategory.set(categoryId, {
             id: 0,
+            projectId,
             categoryId,
             allocatedAmount: amountStr(amount),
             pic,
@@ -1064,13 +1168,19 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
             await tx
               .update(budgetSubcategories)
               .set({ allocatedAmount: amountStr(nextAmount) })
-              .where(eq(budgetSubcategories.id, existing.id));
+              .where(
+                and(
+                  eq(budgetSubcategories.id, existing.id),
+                  eq(budgetSubcategories.projectId, projectId),
+                ),
+              );
             existing.allocatedAmount = amountStr(nextAmount);
             return;
           }
           const [inserted] = await tx
             .insert(budgetSubcategories)
             .values({
+              projectId,
               categoryId,
               period: toPeriod,
               name,
@@ -1105,6 +1215,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
             const [created] = await tx
               .insert(transactions)
               .values({
+                projectId,
                 date: moveDate,
                 categoryId: bucket.categoryId,
                 subCategory: bucket.subcategoryName,
@@ -1128,6 +1239,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
             const [created] = await tx
               .insert(transactions)
               .values({
+                projectId,
                 date: moveDate,
                 categoryId: bucket.categoryId,
                 subCategory: bucket.subcategoryName,
@@ -1158,12 +1270,13 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
           await tx
             .insert(incomes)
             .values({
+              projectId,
               source,
               amount: amountStr(amount),
               period: toPeriod,
             })
             .onConflictDoUpdate({
-              target: [incomes.source, incomes.period],
+              target: [incomes.projectId, incomes.source, incomes.period],
               set: { amount: amountStr(amount) },
             });
         }

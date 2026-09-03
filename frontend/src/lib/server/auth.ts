@@ -13,6 +13,8 @@ export interface SessionUser {
   pic: SessionPic;
   name?: string;
   auth: 'google' | 'password';
+  /** Active workspace; null until user picks a project after login. */
+  projectId: number | null;
 }
 
 function sessionSecret(): string {
@@ -50,11 +52,16 @@ function decodeSession(token: string): SessionUser | null {
     const raw = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as SessionUser;
     if (!raw?.email || typeof raw.pic !== 'string' || !raw.pic.trim()) return null;
     if (raw.auth !== 'google' && raw.auth !== 'password') return null;
+    const projectId =
+      typeof raw.projectId === 'number' && Number.isFinite(raw.projectId) && raw.projectId > 0
+        ? Math.trunc(raw.projectId)
+        : null;
     return {
       email: String(raw.email).toLowerCase(),
       pic: String(raw.pic).trim(),
       name: raw.name ? String(raw.name) : undefined,
       auth: raw.auth,
+      projectId,
     };
   } catch {
     return null;

@@ -2,10 +2,11 @@ import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { db } from './index.js';
 import { budgets, categories, transactions } from './schema.js';
 import { isValidPic, type Pic } from '../lib/pic.js';
+import { getProjectById, listProjects } from '../lib/project.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_CSV =
@@ -223,14 +224,15 @@ function mapRow(cells: string[]): ParsedCsvRow | { error: string } {
   };
 }
 
-async function loadPlanPicMap(): Promise<Map<string, Pic>> {
+async function loadPlanPicMap(projectId: number): Promise<Map<string, Pic>> {
   const rows = await db
     .select({
       categoryId: budgets.categoryId,
       period: budgets.period,
       pic: budgets.pic,
     })
-    .from(budgets);
+    .from(budgets)
+    .where(eq(budgets.projectId, projectId));
 
   const map = new Map<string, Pic>();
   for (const row of rows) {
@@ -251,10 +253,29 @@ async function loadCategoryMap(): Promise<Map<string, number>> {
   return map;
 }
 
+async function resolveImportProjectId(): Promise<number> {
+  const fromEnv = Number.parseInt(process.env.IMPORT_PROJECT_ID ?? '', 10);
+  if (Number.isFinite(fromEnv) && fromEnv > 0) {
+    const project = await getProjectById(fromEnv);
+    if (!project) {
+      console.error(`Project ${fromEnv} not found (IMPORT_PROJECT_ID).`);
+      process.exit(1);
+    }
+    return project.id;
+  }
+
+  const [first] = await listProjects();
+  if (!first) {
+    console.error('No projects exist. Create a project first.');
+    process.exit(1);
+  }
+  return first.id;
+}
+
 async function main(): Promise<void> {
   const confirmed = process.argv.includes('--yes') || process.env.IMPORT_CONFIRM === 'true';
   if (!confirmed) {
-    console.error('Refusing to run without --yes (truncates all transactions first).');
+    console.error('Refusing to run without --yes (deletes this project\'s transactions first).');
     console.error('Usage: npm run db:import-detail -- --yes');
     process.exit(1);
   }
@@ -273,7 +294,8 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const [categoryMap, planPicMap] = await Promise.all([loadCategoryMap(), loadPlanPicMap()]);
+  const projectId = await resolveImportProjectId();
+  const [categoryMap, planPicMap] = await Promise.all([loadCategoryMap(), loadPlanPicMap(projectId)]);
   const toInsert: (typeof transactions.$inferInsert)[] = [];
   const skipped: string[] = [];
   let planPicFallbacks = 0;
@@ -298,6 +320,7 @@ async function main(): Promise<void> {
     if (!parseExplicitPic(mapped.picRaw)) planPicFallbacks += 1;
 
     toInsert.push({
+      projectId,
       date: mapped.date,
       categoryId,
       detail: mapped.detail,
@@ -314,8 +337,8 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  console.log(`Truncating transactions table…`);
-  await db.execute(sql`TRUNCATE TABLE transactions RESTART IDENTITY`);
+  console.log(`Deleting existing transactions for project ${projectId}…`);
+  await db.delete(transactions).where(eq(transactions.projectId, projectId));
 
   console.log(`Inserting ${toInsert.length} transactions from ${path.basename(csvPath)}…`);
   await db.insert(transactions).values(toInsert);

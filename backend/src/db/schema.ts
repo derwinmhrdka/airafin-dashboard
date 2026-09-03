@@ -9,6 +9,15 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
 
+/** Household / workspace. Financial rows are scoped by project. */
+export const projects = pgTable('projects', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  /** Optional photo as data URL or absolute URL. */
+  photo: text('photo'),
+  createdAt: text('created_at').notNull(),
+});
+
 export const categories = pgTable('categories', {
   id: serial('id').primaryKey(),
   name: text('name').notNull().unique(),
@@ -24,17 +33,29 @@ export const incomes = pgTable(
   'incomes',
   {
     id: serial('id').primaryKey(),
+    projectId: integer('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
     source: text('source').notNull(),
     amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
     period: text('period').notNull(),
   },
-  (table) => [uniqueIndex('incomes_source_period_idx').on(table.source, table.period)],
+  (table) => [
+    uniqueIndex('incomes_project_source_period_idx').on(
+      table.projectId,
+      table.source,
+      table.period,
+    ),
+  ],
 );
 
 export const budgets = pgTable(
   'budgets',
   {
     id: serial('id').primaryKey(),
+    projectId: integer('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
     categoryId: integer('category_id')
       .notNull()
       .references(() => categories.id),
@@ -43,13 +64,22 @@ export const budgets = pgTable(
     pocket: text('pocket').notNull().default(''),
     period: text('period').notNull(),
   },
-  (table) => [uniqueIndex('budgets_category_period_idx').on(table.categoryId, table.period)],
+  (table) => [
+    uniqueIndex('budgets_project_category_period_idx').on(
+      table.projectId,
+      table.categoryId,
+      table.period,
+    ),
+  ],
 );
 
 export const budgetSubcategories = pgTable(
   'budget_subcategories',
   {
     id: serial('id').primaryKey(),
+    projectId: integer('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
     categoryId: integer('category_id')
       .notNull()
       .references(() => categories.id),
@@ -62,7 +92,8 @@ export const budgetSubcategories = pgTable(
     pocket: text('pocket').notNull().default(''),
   },
   (table) => [
-    uniqueIndex('budget_subcategories_category_period_name_idx').on(
+    uniqueIndex('budget_subcategories_project_cat_period_name_idx').on(
+      table.projectId,
       table.categoryId,
       table.period,
       table.name,
@@ -72,6 +103,9 @@ export const budgetSubcategories = pgTable(
 
 export const transactions = pgTable('transactions', {
   id: serial('id').primaryKey(),
+  projectId: integer('project_id')
+    .notNull()
+    .references(() => projects.id, { onDelete: 'cascade' }),
   date: date('date').notNull(),
   categoryId: integer('category_id')
     .notNull()
@@ -89,6 +123,9 @@ export const transactions = pgTable('transactions', {
 /** PIC-to-PIC transfer checklist when a plan is created. */
 export const planChecklist = pgTable('plan_checklist', {
   id: serial('id').primaryKey(),
+  projectId: integer('project_id')
+    .notNull()
+    .references(() => projects.id, { onDelete: 'cascade' }),
   period: text('period').notNull(),
   categoryId: integer('category_id').references(() => categories.id),
   subcategoryName: text('subcategory_name').notNull(),
@@ -118,6 +155,9 @@ export const notifications = pgTable(
   'notifications',
   {
     id: serial('id').primaryKey(),
+    projectId: integer('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
     toPic: text('to_pic').notNull(),
     fromPic: text('from_pic').notNull(),
     type: text('type').notNull(),
@@ -128,9 +168,12 @@ export const notifications = pgTable(
     resolvedAt: text('resolved_at'),
     createdAt: text('created_at').notNull(),
   },
-  (table) => [uniqueIndex('notifications_ref_key_idx').on(table.refKey)],
+  (table) => [
+    uniqueIndex('notifications_project_ref_key_idx').on(table.projectId, table.refKey),
+  ],
 );
 
+export type Project = typeof projects.$inferSelect;
 export type Category = typeof categories.$inferSelect;
 export type Pocket = typeof pockets.$inferSelect;
 export type Income = typeof incomes.$inferSelect;

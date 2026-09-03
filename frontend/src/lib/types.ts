@@ -21,6 +21,13 @@ export interface AuthEmailSetting {
   isSuperUser?: boolean;
 }
 
+export interface Project {
+  id: number;
+  name: string;
+  photo: string | null;
+  createdAt: string;
+}
+
 export interface AppNotification {
   id: number;
   toPic: string;

@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { budgets, categories, transactions } from '../db/schema.js';
 import {
@@ -36,14 +36,15 @@ async function loadCategoryMap(): Promise<Map<string, number>> {
   return map;
 }
 
-async function loadPlanPicMap(): Promise<Map<string, Pic>> {
+async function loadPlanPicMap(projectId: number): Promise<Map<string, Pic>> {
   const rows = await db
     .select({
       categoryId: budgets.categoryId,
       period: budgets.period,
       pic: budgets.pic,
     })
-    .from(budgets);
+    .from(budgets)
+    .where(eq(budgets.projectId, projectId));
 
   const map = new Map<string, Pic>();
   for (const row of rows) {
@@ -70,7 +71,7 @@ function sheetRowsInPeriod(
   return result;
 }
 
-export async function syncDbToSheet(period: string): Promise<SyncResult> {
+export async function syncDbToSheet(period: string, projectId: number): Promise<SyncResult> {
   const trimmed = period.trim();
   if (!trimmed) {
     return { ok: false, period: trimmed, direction: 'db-to-sheet', error: 'period is required' };
@@ -97,7 +98,7 @@ export async function syncDbToSheet(period: string): Promise<SyncResult> {
       })
       .from(transactions)
       .innerJoin(categories, eq(transactions.categoryId, categories.id))
-      .where(eq(transactions.period, trimmed));
+      .where(and(eq(transactions.period, trimmed), eq(transactions.projectId, projectId)));
 
     const sheetValues = await readDetailSheetRows();
     const existing = sheetRowsInPeriod(sheetValues, trimmed);
@@ -127,7 +128,7 @@ export async function syncDbToSheet(period: string): Promise<SyncResult> {
   }
 }
 
-export async function syncSheetToDb(period: string): Promise<SyncResult> {
+export async function syncSheetToDb(period: string, projectId: number): Promise<SyncResult> {
   const trimmed = period.trim();
   if (!trimmed) {
     return { ok: false, period: trimmed, direction: 'sheet-to-db', error: 'period is required' };
@@ -145,7 +146,7 @@ export async function syncSheetToDb(period: string): Promise<SyncResult> {
   try {
     const [categoryMap, planPicMap, sheetValues] = await Promise.all([
       loadCategoryMap(),
-      loadPlanPicMap(),
+      loadPlanPicMap(projectId),
       readDetailSheetRows(),
     ]);
 
@@ -171,6 +172,7 @@ export async function syncSheetToDb(period: string): Promise<SyncResult> {
 
       const pic = resolvePic(mapped.picRaw, categoryId, mapped.period, planPicMap);
       toInsert.push({
+        projectId,
         date: mapped.date,
         categoryId,
         detail: mapped.detail,
@@ -184,10 +186,12 @@ export async function syncSheetToDb(period: string): Promise<SyncResult> {
     const beforeRows = await db
       .select({ id: transactions.id })
       .from(transactions)
-      .where(eq(transactions.period, trimmed));
+      .where(and(eq(transactions.period, trimmed), eq(transactions.projectId, projectId)));
     const deletedCount = beforeRows.length;
 
-    await db.delete(transactions).where(eq(transactions.period, trimmed));
+    await db
+      .delete(transactions)
+      .where(and(eq(transactions.period, trimmed), eq(transactions.projectId, projectId)));
 
     if (toInsert.length > 0) {
       await db.insert(transactions).values(toInsert);

@@ -26,6 +26,7 @@ export const POST: RequestHandler = async ({ request, cookies, url }) => {
       pic,
       name: pic,
       auth: 'password',
+      projectId: null,
     },
     secure,
   );

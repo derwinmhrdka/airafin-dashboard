@@ -6,6 +6,7 @@ declare global {
         pic: string;
         name?: string;
         auth: 'google' | 'password';
+        projectId: number | null;
       } | null;
     }
   }

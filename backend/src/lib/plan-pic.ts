@@ -27,6 +27,7 @@ export async function getPlanPicForTransaction(
   categoryId: number,
   period: string,
   subCategory: string,
+  projectId: number,
 ): Promise<string> {
   const sub = subCategory.trim();
   if (sub) {
@@ -35,6 +36,7 @@ export async function getPlanPicForTransaction(
       .from(budgetSubcategories)
       .where(
         and(
+          eq(budgetSubcategories.projectId, projectId),
           eq(budgetSubcategories.categoryId, categoryId),
           eq(budgetSubcategories.period, period),
           eq(budgetSubcategories.name, sub),
@@ -49,7 +51,13 @@ export async function getPlanPicForTransaction(
   const [budget] = await db
     .select({ pic: budgets.pic })
     .from(budgets)
-    .where(and(eq(budgets.categoryId, categoryId), eq(budgets.period, period)))
+    .where(
+      and(
+        eq(budgets.projectId, projectId),
+        eq(budgets.categoryId, categoryId),
+        eq(budgets.period, period),
+      ),
+    )
     .limit(1);
 
   const mainPic = budget?.pic?.trim() ?? '';

@@ -9,6 +9,7 @@ import type {
   PlanChecklistItem,
   PlanData,
   PocketSetting,
+  Project,
   ReimbursementItem,
   Transaction,
 } from './types';
@@ -168,6 +169,51 @@ export function getNotifications(
   if (period) q.set('period', period);
   // Avoid stale badge/list in installed PWA (browser may cache GET).
   return fetchJson(`/api/notifications?${q}`, { cache: 'no-store' });
+}
+
+export function getProjects(): Promise<{ projects: Project[] }> {
+  return fetchJson('/api/projects');
+}
+
+export function createProject(input: {
+  name: string;
+  photo?: string | null;
+}): Promise<{ project: Project }> {
+  return fetchJson('/api/projects', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateProject(
+  id: number,
+  input: { name?: string; photo?: string | null },
+): Promise<{ project: Project }> {
+  return fetchJson(`/api/projects/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteProject(id: number, password: string): Promise<{ ok: boolean }> {
+  return fetchJson(`/api/projects/${id}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ password }),
+  });
+}
+
+export async function selectSessionProject(projectId: number | null): Promise<{ ok: boolean; projectId: number | null }> {
+  const res = await fetch('/auth/project', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify(projectId == null ? { clear: true } : { projectId }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? `Request failed (${res.status})`);
+  }
+  return res.json();
 }
 
 export function markNotificationRead(id: number): Promise<{ notification: AppNotification }> {
