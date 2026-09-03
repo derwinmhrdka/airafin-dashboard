@@ -49,7 +49,7 @@
 {:else}
   <div class="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-white dark:bg-black md:max-w-none">
     <header
-      class="sticky top-0 z-10 border-b border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-black md:px-8 md:py-4"
+      class="sticky top-0 z-10 border-b border-zinc-200 bg-white px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] dark:border-zinc-800 dark:bg-black md:px-8 md:pb-4 md:pt-[calc(1rem+env(safe-area-inset-top,0px))]"
     >
       <div class="md:flex md:items-start md:justify-between md:gap-8">
         <div class="mb-3 flex shrink-0 items-center justify-between gap-3 md:mb-0">
@@ -87,7 +87,7 @@
 
     <TabNav />
 
-    <main class="flex-1 px-4 py-4 md:px-8 md:py-6">
+    <main class="flex-1 px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] md:px-8 md:py-6 md:pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
       {@render children()}
     </main>
   </div>

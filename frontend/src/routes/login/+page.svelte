@@ -58,7 +58,7 @@
   <title>Sign in · Airafin</title>
 </svelte:head>
 
-<div class="flex min-h-dvh items-center justify-center bg-white px-4 dark:bg-black">
+<div class="flex min-h-dvh items-center justify-center bg-white px-4 pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] dark:bg-black">
   <div class="w-full max-w-sm border border-zinc-200 p-6 dark:border-zinc-800">
     <h1 class="text-sm font-semibold tracking-tight">Airafin</h1>
     <p class="mt-1 text-xs text-zinc-500">Sign in once — session lasts a year.</p>
