@@ -29,6 +29,23 @@ export interface Project {
   createdAt: string;
 }
 
+export interface InfoUpdatePage {
+  id?: number;
+  sortOrder?: number;
+  body: string;
+  photo: string | null;
+}
+
+export interface InfoUpdate {
+  id: number;
+  title: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  pageCount?: number;
+  pages?: InfoUpdatePage[];
+}
+
 export interface AppNotification {
   id: number;
   toPic: string;

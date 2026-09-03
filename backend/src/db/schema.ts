@@ -201,6 +201,44 @@ export type PicRow = typeof pics.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 
+/** Broadcast info popup managed by admins. */
+export const infoUpdates = pgTable('info_updates', {
+  id: serial('id').primaryKey(),
+  title: text('title').notNull(),
+  active: boolean('active').notNull().default(false),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
+export const infoUpdatePages = pgTable('info_update_pages', {
+  id: serial('id').primaryKey(),
+  infoUpdateId: integer('info_update_id')
+    .notNull()
+    .references(() => infoUpdates.id, { onDelete: 'cascade' }),
+  sortOrder: integer('sort_order').notNull().default(0),
+  body: text('body').notNull().default(''),
+  photo: text('photo'),
+});
+
+export const infoUpdateSkips = pgTable(
+  'info_update_skips',
+  {
+    id: serial('id').primaryKey(),
+    infoUpdateId: integer('info_update_id')
+      .notNull()
+      .references(() => infoUpdates.id, { onDelete: 'cascade' }),
+    email: text('email').notNull(),
+    skippedAt: text('skipped_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('info_update_skips_update_email_idx').on(table.infoUpdateId, table.email),
+  ],
+);
+
+export type InfoUpdate = typeof infoUpdates.$inferSelect;
+export type InfoUpdatePage = typeof infoUpdatePages.$inferSelect;
+export type InfoUpdateSkip = typeof infoUpdateSkips.$inferSelect;
+
 export type NewTransaction = typeof transactions.$inferInsert;
 export type NewIncome = typeof incomes.$inferInsert;
 export type NewBudget = typeof budgets.$inferInsert;

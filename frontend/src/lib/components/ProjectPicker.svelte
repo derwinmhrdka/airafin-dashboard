@@ -39,6 +39,47 @@
     void load();
   });
 
+  // Lock background scroll while the switcher is open (incl. iOS/PWA).
+  $effect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const scrollY = window.scrollY;
+
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    const prevBodyPosition = body.style.position;
+    const prevBodyTop = body.style.top;
+    const prevBodyWidth = body.style.width;
+    const prevBodyOverscroll = body.style.overscrollBehavior;
+
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.width = '100%';
+    body.style.overscrollBehavior = 'none';
+
+    const preventTouch = (e: TouchEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      // Allow scrolling inside the picker panel / dialogs only.
+      if (target.closest('[data-project-picker-scroll]')) return;
+      e.preventDefault();
+    };
+    document.addEventListener('touchmove', preventTouch, { passive: false });
+
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+      body.style.position = prevBodyPosition;
+      body.style.top = prevBodyTop;
+      body.style.width = prevBodyWidth;
+      body.style.overscrollBehavior = prevBodyOverscroll;
+      document.removeEventListener('touchmove', preventTouch);
+      window.scrollTo(0, scrollY);
+    };
+  });
+
   async function choose(project: Project) {
     busyId = project.id;
     error = '';
@@ -114,13 +155,13 @@
 </script>
 
 <div
-  class="fixed inset-0 z-50 flex items-stretch justify-center bg-zinc-950/80 p-4 pt-[calc(1rem+env(safe-area-inset-top,0px))] pb-[calc(1rem+env(safe-area-inset-bottom,0px))]"
+  class="fixed inset-0 z-50 flex items-stretch justify-center overflow-hidden overscroll-none bg-zinc-950/80 p-4 pt-[calc(1rem+env(safe-area-inset-top,0px))] pb-[calc(1rem+env(safe-area-inset-bottom,0px))]"
   role="dialog"
   aria-modal="true"
   aria-label="Select project"
 >
-  <div class="flex w-full max-w-lg flex-col overflow-hidden rounded-sm border border-zinc-700 bg-zinc-950 text-zinc-100 shadow-xl">
-    <div class="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+  <div class="flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-sm border border-zinc-700 bg-zinc-950 text-zinc-100 shadow-xl">
+    <div class="flex shrink-0 items-center justify-between border-b border-zinc-800 px-4 py-3">
       <div>
         <p class="text-[11px] uppercase tracking-wider text-zinc-500">Workspace</p>
         <h2 class="text-sm font-semibold tracking-tight">
@@ -138,8 +179,7 @@
       {/if}
     </div>
 
-    <div class="flex-1 overflow-y-auto p-4">
-      {#if loading}
+    <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4" data-project-picker-scroll>      {#if loading}
         <p class="py-8 text-center text-xs text-zinc-500">Loading projects…</p>
       {:else if error}
         <p class="py-4 text-center text-xs text-red-400">{error}</p>

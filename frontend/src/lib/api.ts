@@ -12,6 +12,8 @@ import type {
   Project,
   ReimbursementItem,
   Transaction,
+  InfoUpdate,
+  InfoUpdatePage,
 } from './types';
 
 function apiBase(): string {
@@ -261,6 +263,47 @@ export function copyProjectTemplate(
     method: 'POST',
     body: JSON.stringify(input),
   });
+}
+
+export function listInfoUpdates(): Promise<{ updates: InfoUpdate[] }> {
+  return fetchJson('/api/info-updates');
+}
+
+export function getInfoUpdate(id: number): Promise<{ update: InfoUpdate }> {
+  return fetchJson(`/api/info-updates/${id}`);
+}
+
+export function createInfoUpdate(input: {
+  title: string;
+  active?: boolean;
+  pages?: InfoUpdatePage[];
+}): Promise<{ update: InfoUpdate }> {
+  return fetchJson('/api/info-updates', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateInfoUpdate(
+  id: number,
+  input: { title?: string; active?: boolean; pages?: InfoUpdatePage[] },
+): Promise<{ update: InfoUpdate }> {
+  return fetchJson(`/api/info-updates/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteInfoUpdate(id: number): Promise<{ ok: boolean }> {
+  return fetchJson(`/api/info-updates/${id}`, { method: 'DELETE' });
+}
+
+export function getPendingInfoUpdate(): Promise<{ update: InfoUpdate | null }> {
+  return fetchJson('/api/info-updates/pending', { cache: 'no-store' });
+}
+
+export function skipInfoUpdate(id: number): Promise<{ ok: boolean }> {
+  return fetchJson(`/api/info-updates/${id}/skip`, { method: 'POST', body: '{}' });
 }
 
 export function markNotificationRead(id: number): Promise<{ notification: AppNotification }> {

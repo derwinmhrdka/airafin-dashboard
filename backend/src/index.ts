@@ -7,6 +7,7 @@ import { getProjectById, isProjectMember, parseProjectIdHeader } from './lib/pro
 import { budgetRoutes } from './routes/budgets.js';
 import { categoryRoutes } from './routes/categories.js';
 import { dashboardRoutes } from './routes/dashboard.js';
+import { infoUpdateRoutes } from './routes/info-updates.js';
 import { notificationRoutes } from './routes/notifications.js';
 import { projectRoutes } from './routes/projects.js';
 import { settingsRoutes } from './routes/settings.js';
@@ -30,7 +31,8 @@ function needsProjectId(url: string): boolean {
     path.startsWith('/api/projects') ||
     path.startsWith('/api/auth/') ||
     path.startsWith('/api/settings/') ||
-    path.startsWith('/api/categories');
+    path.startsWith('/api/categories') ||
+    path.startsWith('/api/info-updates');
 
   if (optional) return false;
   return true;
@@ -77,6 +79,7 @@ await app.register(budgetRoutes);
 await app.register(syncRoutes);
 await app.register(settingsRoutes);
 await app.register(notificationRoutes);
+await app.register(infoUpdateRoutes);
 
 await refreshPicCache();
 

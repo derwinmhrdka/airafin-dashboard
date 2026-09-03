@@ -96,6 +96,29 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
   }
 
+  const isInfoSkip = /^\/api\/info-updates\/\d+\/skip$/.test(path) && event.request.method === 'POST';
+  const isInfoAdminWrite =
+    path.startsWith('/api/info-updates') &&
+    !isInfoSkip &&
+    path !== '/api/info-updates/pending' &&
+    event.request.method !== 'GET' &&
+    event.request.method !== 'HEAD';
+  const isInfoAdminRead =
+    path.startsWith('/api/info-updates') &&
+    path !== '/api/info-updates/pending' &&
+    !isInfoSkip &&
+    (event.request.method === 'GET' || event.request.method === 'HEAD');
+
+  if (isInfoAdminWrite || isInfoAdminRead) {
+    const ok = await isAdminEmail(session?.email);
+    if (!ok) {
+      return new Response(JSON.stringify({ error: 'Admin only' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+  }
+
   if (!path.startsWith('/api/')) {
     return resolve(event);
   }
