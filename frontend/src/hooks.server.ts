@@ -1,6 +1,6 @@
 import { env } from '$env/dynamic/private';
 import { redirect, type Handle } from '@sveltejs/kit';
-import { isAuthenticated } from '$lib/server/auth';
+import { getSession } from '$lib/server/auth';
 
 /** Internal backend URL — must include http:// host (never a path like /api). */
 function resolveBackendUrl(): string {
@@ -15,6 +15,9 @@ function isPublicPath(path: string): boolean {
   return (
     path === '/login' ||
     path === '/auth/login' ||
+    path === '/auth/google' ||
+    path === '/auth/google/callback' ||
+    path === '/auth/logout' ||
     path.startsWith('/_app/') ||
     path.startsWith('/fonts/') ||
     path === '/favicon.ico' ||
@@ -24,7 +27,9 @@ function isPublicPath(path: string): boolean {
 
 export const handle: Handle = async ({ event, resolve }) => {
   const path = event.url.pathname;
-  const authed = isAuthenticated(event.cookies);
+  const session = getSession(event.cookies);
+  event.locals.session = session;
+  const authed = session != null;
 
   if (authed && path === '/login') {
     redirect(303, '/');

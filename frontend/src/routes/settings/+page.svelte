@@ -1,44 +1,55 @@
 <script lang="ts">
   import { page } from '$app/state';
   import {
+    createAuthEmail,
     createPocket,
+    deleteAuthEmail,
     deletePocket,
+    getAuthEmails,
     getPockets,
     syncDbToSheet,
     syncSheetToDb,
+    updateAuthEmailPic,
     updatePocketColor,
   } from '$lib/api';
   import ColorPicker from '$lib/components/ColorPicker.svelte';
+  import PicBadge from '$lib/components/PicBadge.svelte';
+  import { PICS, type Pic } from '$lib/pics';
   import { POCKET_COLORS } from '$lib/pocket-colors';
   import { periodFromUrl } from '$lib/period';
-  import type { PocketSetting } from '$lib/types';
+  import type { AuthEmailSetting, PocketSetting } from '$lib/types';
 
   const period = $derived(periodFromUrl(page.url.searchParams));
 
   let pockets = $state<PocketSetting[]>([]);
+  let authEmails = $state<AuthEmailSetting[]>([]);
   let pocketName = $state('');
   let pocketColor = $state(POCKET_COLORS[0]);
+  let authEmailInput = $state('');
+  let authEmailPic = $state<Pic>('Derwin');
   let loading = $state(true);
   let pocketBusy = $state(false);
+  let authBusy = $state(false);
   let colorBusyId = $state<number | null>(null);
   let syncing = $state<'db-to-sheet' | 'sheet-to-db' | null>(null);
   let success = $state('');
   let error = $state('');
 
-  async function loadPockets() {
+  async function loadSettings() {
     loading = true;
     try {
-      const res = await getPockets();
-      pockets = res.pockets;
+      const [pocketRes, emailRes] = await Promise.all([getPockets(), getAuthEmails()]);
+      pockets = pocketRes.pockets;
+      authEmails = emailRes.emails;
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to load pockets';
+      error = e instanceof Error ? e.message : 'Failed to load settings';
     } finally {
       loading = false;
     }
   }
 
   $effect(() => {
-    void loadPockets();
+    void loadSettings();
   });
 
   async function handleAddPocket() {
@@ -51,7 +62,7 @@
       await createPocket(name, pocketColor);
       pocketName = '';
       pocketColor = POCKET_COLORS[0];
-      await loadPockets();
+      await loadSettings();
       success = `Pocket ${name} saved`;
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to save pocket';
@@ -73,6 +84,56 @@
       error = e instanceof Error ? e.message : 'Failed to delete pocket';
     } finally {
       pocketBusy = false;
+    }
+  }
+
+  async function handleAddAuthEmail() {
+    const email = authEmailInput.trim().toLowerCase();
+    if (!email) return;
+    authBusy = true;
+    success = '';
+    error = '';
+    try {
+      await createAuthEmail(email, authEmailPic);
+      authEmailInput = '';
+      await loadSettings();
+      success = `${email} can now sign in as ${authEmailPic}`;
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to save email';
+    } finally {
+      authBusy = false;
+    }
+  }
+
+  async function handleUpdateAuthPic(item: AuthEmailSetting, pic: Pic) {
+    if (item.pic === pic) return;
+    authBusy = true;
+    success = '';
+    error = '';
+    try {
+      const { email } = await updateAuthEmailPic(item.id, pic);
+      authEmails = authEmails.map((row) => (row.id === item.id ? email : row));
+      success = `${email.email} → ${pic}`;
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to update PIC';
+    } finally {
+      authBusy = false;
+    }
+  }
+
+  async function handleDeleteAuthEmail(item: AuthEmailSetting) {
+    if (!confirm(`Remove login for "${item.email}"?`)) return;
+    authBusy = true;
+    success = '';
+    error = '';
+    try {
+      await deleteAuthEmail(item.id);
+      authEmails = authEmails.filter((row) => row.id !== item.id);
+      success = `${item.email} removed`;
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to remove email';
+    } finally {
+      authBusy = false;
     }
   }
 
@@ -160,6 +221,91 @@
       <span class="text-[11px] text-zinc-500">DETAIL tab → Database</span>
       {#if syncing === 'sheet-to-db'}<span class="mt-1 block text-[10px] text-zinc-500">Syncing…</span>{/if}
     </button>
+  </fieldset>
+
+  <fieldset class="space-y-2 border border-zinc-200 p-3 dark:border-zinc-800">
+    <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">Login emails</legend>
+    <p class="text-[11px] text-zinc-500">
+      Super user comes from AUTH_EMAIL. Register other Google emails here and assign a PIC.
+    </p>
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <input
+        type="email"
+        bind:value={authEmailInput}
+        placeholder="name@gmail.com"
+        class="min-w-0 flex-1 border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
+      />
+      <div class="flex items-center gap-2">
+        <div class="flex gap-1">
+          {#each PICS as p}
+            <button
+              type="button"
+              onclick={() => (authEmailPic = p)}
+              class="rounded-full transition ring-2 ring-offset-1 ring-offset-white dark:ring-offset-black
+                {authEmailPic === p ? 'ring-zinc-900 dark:ring-white' : 'ring-transparent opacity-50'}"
+              aria-label="PIC {p}"
+              aria-pressed={authEmailPic === p}
+            >
+              <PicBadge name={p} />
+            </button>
+          {/each}
+        </div>
+        <button
+          type="button"
+          onclick={handleAddAuthEmail}
+          disabled={authBusy || !authEmailInput.trim()}
+          class="ml-auto shrink-0 border border-zinc-300 px-3 py-2 text-xs disabled:opacity-50 sm:ml-0 dark:border-zinc-700"
+        >
+          + Add
+        </button>
+      </div>
+    </div>
+
+    {#if loading}
+      <p class="text-xs text-zinc-500">Loading…</p>
+    {:else if authEmails.length === 0}
+      <p class="text-xs text-zinc-500">No emails yet. Set AUTH_EMAIL in .env for the super user.</p>
+    {:else}
+      <div class="space-y-1">
+        {#each authEmails as item (item.id)}
+          <div class="flex items-center justify-between gap-2 border border-zinc-200 px-2 py-1.5 dark:border-zinc-800">
+            <div class="min-w-0">
+              <span class="block truncate text-sm">{item.email}</span>
+              {#if item.isSuperUser}
+                <span class="text-[10px] uppercase tracking-wider text-zinc-400">Super user</span>
+              {/if}
+            </div>
+            <div class="flex shrink-0 items-center gap-2">
+              <div class="flex gap-1">
+                {#each PICS as p}
+                  <button
+                    type="button"
+                    disabled={authBusy}
+                    onclick={() => handleUpdateAuthPic(item, p)}
+                    class="rounded-full transition ring-2 ring-offset-1 ring-offset-white dark:ring-offset-black
+                      {item.pic === p ? 'ring-zinc-900 dark:ring-white' : 'ring-transparent opacity-40 hover:opacity-80'}"
+                    aria-label="Set {item.email} to {p}"
+                    aria-pressed={item.pic === p}
+                  >
+                    <PicBadge name={p} />
+                  </button>
+                {/each}
+              </div>
+              {#if !item.isSuperUser}
+                <button
+                  type="button"
+                  onclick={() => handleDeleteAuthEmail(item)}
+                  disabled={authBusy}
+                  class="border border-red-200 px-2 py-1 text-[10px] text-red-600 disabled:opacity-50 dark:border-red-900 dark:text-red-400"
+                >
+                  Delete
+                </button>
+              {/if}
+            </div>
+          </div>
+        {/each}
+      </div>
+    {/if}
   </fieldset>
 
   <fieldset class="space-y-2 border border-zinc-200 p-3 dark:border-zinc-800">

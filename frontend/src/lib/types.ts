@@ -9,6 +9,13 @@ export interface PocketSetting {
   color: string;
 }
 
+export interface AuthEmailSetting {
+  id: number;
+  email: string;
+  pic: string;
+  isSuperUser?: boolean;
+}
+
 export interface SubcategorySummary {
   name: string;
   pic: string;

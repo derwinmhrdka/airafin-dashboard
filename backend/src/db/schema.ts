@@ -100,12 +100,20 @@ export const planChecklist = pgTable('plan_checklist', {
   isBalancing: boolean('is_balancing').notNull().default(false),
 });
 
+/** Google accounts allowed to sign in, mapped to a PIC. */
+export const authEmails = pgTable('auth_emails', {
+  id: serial('id').primaryKey(),
+  email: text('email').notNull().unique(),
+  pic: text('pic').notNull(),
+});
+
 export type Category = typeof categories.$inferSelect;
 export type Pocket = typeof pockets.$inferSelect;
 export type Income = typeof incomes.$inferSelect;
 export type Budget = typeof budgets.$inferSelect;
 export type BudgetSubcategory = typeof budgetSubcategories.$inferSelect;
 export type PlanChecklistItem = typeof planChecklist.$inferSelect;
+export type AuthEmail = typeof authEmails.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 
 export type NewTransaction = typeof transactions.$inferInsert;

@@ -1,8 +1,19 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { Cookies } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 
 const COOKIE_NAME = 'airafin_session';
+const OAUTH_STATE_COOKIE = 'airafin_oauth_state';
+const SESSION_MAX_AGE = 60 * 60 * 24 * 365; // 1 year — “one time login”
+
+export type SessionPic = 'Derwin' | 'Anggita';
+
+export interface SessionUser {
+  email: string;
+  pic: SessionPic;
+  name?: string;
+  auth: 'google' | 'password';
+}
 
 function sessionSecret(): string {
   return env.SESSION_SECRET ?? 'airafin-session-secret';
@@ -12,8 +23,8 @@ function dashboardPassword(): string {
   return env.DASHBOARD_PASSWORD?.trim() ?? '';
 }
 
-function expectedToken(): string {
-  return createHmac('sha256', sessionSecret()).update('airafin-authenticated').digest('hex');
+function sign(payload: string): string {
+  return createHmac('sha256', sessionSecret()).update(payload).digest('base64url');
 }
 
 function safeEqual(a: string, b: string): boolean {
@@ -23,24 +34,115 @@ function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(bufA, bufB);
 }
 
-export function authenticate(password: string): boolean {
+function encodeSession(user: SessionUser): string {
+  const payload = Buffer.from(JSON.stringify(user), 'utf8').toString('base64url');
+  return `${payload}.${sign(payload)}`;
+}
+
+function decodeSession(token: string): SessionUser | null {
+  const dot = token.lastIndexOf('.');
+  if (dot <= 0) return null;
+  const payload = token.slice(0, dot);
+  const sig = token.slice(dot + 1);
+  if (!safeEqual(sig, sign(payload))) return null;
+
+  try {
+    const raw = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as SessionUser;
+    if (!raw?.email || (raw.pic !== 'Derwin' && raw.pic !== 'Anggita')) return null;
+    if (raw.auth !== 'google' && raw.auth !== 'password') return null;
+    return {
+      email: String(raw.email).toLowerCase(),
+      pic: raw.pic,
+      name: raw.name ? String(raw.name) : undefined,
+      auth: raw.auth,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function resolveBackendUrl(): string {
+  const raw = env.API_URL?.trim();
+  if (raw && (raw.startsWith('http://') || raw.startsWith('https://'))) {
+    return raw.replace(/\/$/, '');
+  }
+  return 'http://localhost:3081';
+}
+
+/** Look up allowed Google email → PIC from backend settings. */
+export async function resolvePicFromEmail(email: string): Promise<SessionPic | null> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return null;
+
+  try {
+    const res = await fetch(`${resolveBackendUrl()}/api/auth/resolve-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: normalized }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { pic?: string };
+    if (data.pic === 'Derwin' || data.pic === 'Anggita') return data.pic;
+    return null;
+  } catch (e) {
+    console.error('resolvePicFromEmail failed:', e);
+    return null;
+  }
+}
+
+export function googleOAuthConfigured(): boolean {
+  return Boolean(env.GOOGLE_OAUTH_CLIENT_ID?.trim() && env.GOOGLE_OAUTH_CLIENT_SECRET?.trim());
+}
+
+export function authenticatePassword(password: string): boolean {
   const expected = dashboardPassword();
   if (!expected) return false;
   return safeEqual(password, expected);
 }
 
-export function isAuthenticated(cookies: Cookies): boolean {
+export function getSession(cookies: Cookies): SessionUser | null {
   const token = cookies.get(COOKIE_NAME);
-  if (!token) return false;
-  return safeEqual(token, expectedToken());
+  if (!token) return null;
+  return decodeSession(token);
 }
 
-export function setAuthCookie(cookies: Cookies, secure = false): void {
-  cookies.set(COOKIE_NAME, expectedToken(), {
+export function isAuthenticated(cookies: Cookies): boolean {
+  return getSession(cookies) != null;
+}
+
+export function setSessionCookie(
+  cookies: Cookies,
+  user: SessionUser,
+  secure = false,
+): void {
+  cookies.set(COOKIE_NAME, encodeSession(user), {
     path: '/',
     httpOnly: true,
     secure,
     sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 365,
+    maxAge: SESSION_MAX_AGE,
   });
+}
+
+export function clearSessionCookie(cookies: Cookies): void {
+  cookies.delete(COOKIE_NAME, { path: '/' });
+}
+
+export function createOAuthState(cookies: Cookies, secure = false): string {
+  const state = randomBytes(24).toString('base64url');
+  cookies.set(OAUTH_STATE_COOKIE, state, {
+    path: '/',
+    httpOnly: true,
+    secure,
+    sameSite: 'lax',
+    maxAge: 60 * 10,
+  });
+  return state;
+}
+
+export function consumeOAuthState(cookies: Cookies, state: string): boolean {
+  const expected = cookies.get(OAUTH_STATE_COOKIE);
+  cookies.delete(OAUTH_STATE_COOKIE, { path: '/' });
+  if (!expected || !state) return false;
+  return safeEqual(expected, state);
 }

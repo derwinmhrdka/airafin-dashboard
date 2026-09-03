@@ -30,6 +30,7 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-airafin}:${POSTGRES_PASSWORD:-airafin}@db:5432/${POSTGRES_DB:-airafin}
       API_SECRET_TOKEN: ${API_SECRET_TOKEN:-change-me-in-production}
+      AUTH_EMAIL: ${AUTH_EMAIL:-}
       GOOGLE_SHEETS_SPREADSHEET_ID: ${GOOGLE_SHEETS_SPREADSHEET_ID:-}
       GOOGLE_SERVICE_ACCOUNT_FILE: ${GOOGLE_SERVICE_ACCOUNT_FILE:-}
       PORT: 3081
@@ -56,6 +57,8 @@ services:
       ORIGIN: ${ORIGIN:-https://airafin.teknodika.com}
       DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD}
       SESSION_SECRET: ${SESSION_SECRET:-change-me-in-production}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
     ports:
       # 13080 on host — nginx owns public :3080 for IP→domain redirect
       - '127.0.0.1:13080:3080'

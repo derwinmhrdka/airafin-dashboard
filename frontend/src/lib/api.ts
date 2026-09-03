@@ -1,5 +1,6 @@
 import { env } from '$env/dynamic/public';
 import type {
+  AuthEmailSetting,
   Category,
   DashboardSummary,
   PlanChecklistItem,
@@ -90,6 +91,34 @@ export function updatePocketColor(id: number, color: string): Promise<{ pocket: 
 
 export function deletePocket(id: number): Promise<{ ok: boolean }> {
   return fetchJson(`/api/settings/pockets/${id}`, { method: 'DELETE' });
+}
+
+export function getAuthEmails(): Promise<{ emails: AuthEmailSetting[] }> {
+  return fetchJson('/api/settings/auth-emails');
+}
+
+export function createAuthEmail(
+  email: string,
+  pic: string,
+): Promise<{ email: AuthEmailSetting; created: boolean }> {
+  return fetchJson('/api/settings/auth-emails', {
+    method: 'POST',
+    body: JSON.stringify({ email, pic }),
+  });
+}
+
+export function updateAuthEmailPic(
+  id: number,
+  pic: string,
+): Promise<{ email: AuthEmailSetting }> {
+  return fetchJson(`/api/settings/auth-emails/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ pic }),
+  });
+}
+
+export function deleteAuthEmail(id: number): Promise<{ ok: boolean }> {
+  return fetchJson(`/api/settings/auth-emails/${id}`, { method: 'DELETE' });
 }
 
 export interface TransactionFilters {

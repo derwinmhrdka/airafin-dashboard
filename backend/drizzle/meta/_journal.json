@@ -78,6 +78,13 @@
       "when": 1750167200000,
       "tag": "0010_reimbursed_from_pic",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1750170800000,
+      "tag": "0011_auth_emails",
+      "breakpoints": true
     }
   ]
 }

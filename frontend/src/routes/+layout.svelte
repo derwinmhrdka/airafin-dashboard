@@ -3,10 +3,12 @@
   import { page } from '$app/state';
   import '../app.css';
   import PeriodSelector from '$lib/components/PeriodSelector.svelte';
+  import PicBadge from '$lib/components/PicBadge.svelte';
   import TabNav from '$lib/components/TabNav.svelte';
   import { currentPeriod, parsePeriodToDate } from '$lib/period';
 
-  let { children } = $props();
+  let { children, data } = $props();
+  let signingOut = $state(false);
 
   // Keep ?period= in the URL so all tabs share the same month/year.
   $effect(() => {
@@ -23,6 +25,15 @@
 
     goto(next, { replaceState: true, noScroll: true, keepFocus: true });
   });
+
+  async function signOut() {
+    signingOut = true;
+    try {
+      await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' });
+    } finally {
+      window.location.href = '/login';
+    }
+  }
 </script>
 
 <svelte:head>
@@ -39,12 +50,30 @@
     >
       <div class="md:flex md:items-start md:justify-between md:gap-8">
         <div class="mb-3 flex shrink-0 items-center justify-between gap-3 md:mb-0">
-          <h1 class="text-sm font-semibold tracking-tight md:text-base">Airafin</h1>
-          <span
-            class="shrink-0 rounded border border-zinc-200 px-2 py-0.5 font-mono text-[10px] text-zinc-500 dark:border-zinc-800"
-          >
-            v1
-          </span>
+          <div class="flex items-center gap-2">
+            <h1 class="text-sm font-semibold tracking-tight md:text-base">Airafin</h1>
+            <span
+              class="shrink-0 rounded border border-zinc-200 px-2 py-0.5 font-mono text-[10px] text-zinc-500 dark:border-zinc-800"
+            >
+              v1
+            </span>
+          </div>
+          {#if data.session}
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center gap-1.5" title={data.session.email}>
+                <PicBadge name={data.session.pic} />
+                <span class="text-[11px] font-medium text-zinc-600 dark:text-zinc-300">{data.session.pic}</span>
+              </span>
+              <button
+                type="button"
+                disabled={signingOut}
+                onclick={signOut}
+                class="text-[10px] text-zinc-400 underline-offset-2 hover:text-zinc-600 hover:underline disabled:opacity-50"
+              >
+                {signingOut ? '…' : 'Sign out'}
+              </button>
+            </div>
+          {/if}
         </div>
         <div class="min-w-0 md:max-w-sm md:flex-1 md:pt-0.5 lg:max-w-md">
           <PeriodSelector />
