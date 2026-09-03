@@ -391,32 +391,35 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
     const allowedPocketRows = await db.select({ name: pockets.name }).from(pockets);
     const allowedPockets = new Set(allowedPocketRows.map((row) => row.name.toUpperCase()));
 
-    if (incomeInputs?.length) {
+    if (Array.isArray(incomeInputs)) {
+      await db.delete(incomes).where(eq(incomes.period, trimmedPeriod));
+
       for (const income of incomeInputs) {
-        if (!income.source?.trim() || income.amount == null) {
-          return reply.code(400).send({ error: 'Each income requires source and amount' });
+        const source = income.source?.trim();
+        if (!source || income.amount == null || !Number.isFinite(income.amount) || income.amount <= 0) {
+          continue;
         }
 
-        await db
-          .insert(incomes)
-          .values({
-            source: income.source.trim(),
-            amount: String(Math.round(income.amount)),
-            period: trimmedPeriod,
-          })
-          .onConflictDoUpdate({
-            target: [incomes.source, incomes.period],
-            set: { amount: String(Math.round(income.amount)) },
-          });
+        await db.insert(incomes).values({
+          source,
+          amount: String(Math.round(income.amount)),
+          period: trimmedPeriod,
+        });
       }
     }
 
-    if (budgetInputs?.length) {
+    if (Array.isArray(budgetInputs)) {
+      await db.delete(budgets).where(eq(budgets.period, trimmedPeriod));
+
       for (const budget of budgetInputs) {
         if (!budget.categoryId || budget.allocatedAmount == null) {
           return reply
             .code(400)
             .send({ error: 'Each budget requires categoryId and allocatedAmount' });
+        }
+
+        if (!Number.isFinite(budget.allocatedAmount) || budget.allocatedAmount <= 0) {
+          continue;
         }
 
         const [category] = await db
@@ -440,19 +443,13 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
 
         const amount = String(Math.round(budget.allocatedAmount));
 
-        await db
-          .insert(budgets)
-          .values({
-            categoryId: budget.categoryId,
-            allocatedAmount: amount,
-            pic,
-            pocket: pocket.toUpperCase(),
-            period: trimmedPeriod,
-          })
-          .onConflictDoUpdate({
-            target: [budgets.categoryId, budgets.period],
-            set: { allocatedAmount: amount, pic, pocket: pocket.toUpperCase() },
-          });
+        await db.insert(budgets).values({
+          categoryId: budget.categoryId,
+          allocatedAmount: amount,
+          pic,
+          pocket: pocket.toUpperCase(),
+          period: trimmedPeriod,
+        });
       }
     }
 
