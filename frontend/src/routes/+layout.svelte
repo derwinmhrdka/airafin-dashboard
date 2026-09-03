@@ -2,13 +2,16 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import '../app.css';
+  import NotificationBell from '$lib/components/NotificationBell.svelte';
   import PeriodSelector from '$lib/components/PeriodSelector.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
   import TabNav from '$lib/components/TabNav.svelte';
-  import { currentPeriod, parsePeriodToDate } from '$lib/period';
+  import { currentPeriod, parsePeriodToDate, periodFromUrl } from '$lib/period';
 
   let { children, data } = $props();
   let signingOut = $state(false);
+
+  const period = $derived(periodFromUrl(page.url.searchParams));
 
   // Keep ?period= in the URL so all tabs share the same month/year.
   $effect(() => {
@@ -60,6 +63,7 @@
           </div>
           {#if data.session}
             <div class="flex items-center gap-2">
+              <NotificationBell pic={data.session.pic} {period} />
               <span class="inline-flex items-center gap-1.5" title={data.session.email}>
                 <PicBadge name={data.session.pic} />
                 <span class="text-[11px] font-medium text-zinc-600 dark:text-zinc-300">{data.session.pic}</span>

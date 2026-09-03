@@ -1,5 +1,6 @@
 import { env } from '$env/dynamic/public';
 import type {
+  AppNotification,
   AuthEmailSetting,
   Category,
   DashboardSummary,
@@ -119,6 +120,39 @@ export function updateAuthEmailPic(
 
 export function deleteAuthEmail(id: number): Promise<{ ok: boolean }> {
   return fetchJson(`/api/settings/auth-emails/${id}`, { method: 'DELETE' });
+}
+
+export function syncNotifications(period: string): Promise<{
+  ok: boolean;
+  period: string;
+  payDue: number;
+  paidReceivedCreated: number;
+  resolved: number;
+}> {
+  return fetchJson('/api/notifications/sync', {
+    method: 'POST',
+    body: JSON.stringify({ period }),
+  });
+}
+
+export function getNotifications(
+  pic: string,
+  period?: string,
+): Promise<{ pic: string; unreadCount: number; notifications: AppNotification[] }> {
+  const q = new URLSearchParams({ pic });
+  if (period) q.set('period', period);
+  return fetchJson(`/api/notifications?${q}`);
+}
+
+export function markNotificationRead(id: number): Promise<{ notification: AppNotification }> {
+  return fetchJson(`/api/notifications/${id}/read`, { method: 'PATCH' });
+}
+
+export function markAllNotificationsRead(pic: string): Promise<{ ok: boolean }> {
+  return fetchJson('/api/notifications/read-all', {
+    method: 'POST',
+    body: JSON.stringify({ pic }),
+  });
 }
 
 export interface TransactionFilters {

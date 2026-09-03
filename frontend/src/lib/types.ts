@@ -16,6 +16,17 @@ export interface AuthEmailSetting {
   isSuperUser?: boolean;
 }
 
+export interface AppNotification {
+  id: number;
+  toPic: string;
+  fromPic: string;
+  type: 'pay_due' | 'paid_received' | string;
+  amount: string;
+  period: string;
+  readAt: string | null;
+  createdAt: string;
+}
+
 export interface SubcategorySummary {
   name: string;
   pic: string;

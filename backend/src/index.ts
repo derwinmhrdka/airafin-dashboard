@@ -4,6 +4,7 @@ import Fastify from 'fastify';
 import { budgetRoutes } from './routes/budgets.js';
 import { categoryRoutes } from './routes/categories.js';
 import { dashboardRoutes } from './routes/dashboard.js';
+import { notificationRoutes } from './routes/notifications.js';
 import { settingsRoutes } from './routes/settings.js';
 import { syncRoutes } from './routes/sync.js';
 import { transactionRoutes } from './routes/transactions.js';
@@ -23,6 +24,7 @@ await app.register(dashboardRoutes);
 await app.register(budgetRoutes);
 await app.register(syncRoutes);
 await app.register(settingsRoutes);
+await app.register(notificationRoutes);
 
 app.setErrorHandler((error, request, reply) => {
   request.log.error({ err: error, url: request.url }, 'Unhandled route error');

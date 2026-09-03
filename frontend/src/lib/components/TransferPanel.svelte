@@ -5,6 +5,7 @@
     getReimbursements,
     markReimbursementPaid,
     markReimbursementUnpaid,
+    syncNotifications,
     updateChecklistItem,
   } from '$lib/api';
   import AmountInput from '$lib/components/AmountInput.svelte';
@@ -192,6 +193,11 @@
     if (checklistIds.size > 0) {
       await onChange();
     }
+    try {
+      await syncNotifications(period);
+    } catch {
+      /* non-blocking */
+    }
   }
 
   async function handleSettleDirected(senderPic: string, receiverPic: string, bulkKey: string) {
@@ -333,6 +339,11 @@
       formOpen = false;
       itemFocused = false;
       await onChange();
+      try {
+        await syncNotifications(period);
+      } catch {
+        /* non-blocking */
+      }
     } catch (e) {
       formError = e instanceof Error ? e.message : 'Failed to save';
     } finally {
@@ -345,6 +356,11 @@
     try {
       await updateChecklistItem(item.id, !item.done);
       await onChange();
+      try {
+        await syncNotifications(period);
+      } catch {
+        /* non-blocking */
+      }
     } finally {
       togglingId = null;
     }
@@ -369,6 +385,11 @@
         await markReimbursementPaid(item.id);
       }
       await loadReimbursements(period);
+      try {
+        await syncNotifications(period);
+      } catch {
+        /* non-blocking */
+      }
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to update reimbursement';
     } finally {

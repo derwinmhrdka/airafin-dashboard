@@ -107,6 +107,24 @@ export const authEmails = pgTable('auth_emails', {
   pic: text('pic').notNull(),
 });
 
+/** In-app notifications per PIC (pay due / paid received). */
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: serial('id').primaryKey(),
+    toPic: text('to_pic').notNull(),
+    fromPic: text('from_pic').notNull(),
+    type: text('type').notNull(),
+    amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
+    period: text('period').notNull(),
+    refKey: text('ref_key').notNull(),
+    readAt: text('read_at'),
+    resolvedAt: text('resolved_at'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [uniqueIndex('notifications_ref_key_idx').on(table.refKey)],
+);
+
 export type Category = typeof categories.$inferSelect;
 export type Pocket = typeof pockets.$inferSelect;
 export type Income = typeof incomes.$inferSelect;
@@ -114,6 +132,7 @@ export type Budget = typeof budgets.$inferSelect;
 export type BudgetSubcategory = typeof budgetSubcategories.$inferSelect;
 export type PlanChecklistItem = typeof planChecklist.$inferSelect;
 export type AuthEmail = typeof authEmails.$inferSelect;
+export type Notification = typeof notifications.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 
 export type NewTransaction = typeof transactions.$inferInsert;
