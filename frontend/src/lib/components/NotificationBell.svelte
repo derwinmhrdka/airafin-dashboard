@@ -7,6 +7,7 @@
   } from '$lib/api';
   import PicBadge from '$lib/components/PicBadge.svelte';
   import { formatCurrency } from '$lib/format';
+  import { NOTIFICATIONS_CHANGED_EVENT } from '$lib/notifications-events';
   import type { AppNotification } from '$lib/types';
 
   interface Props {
@@ -25,17 +26,21 @@
   let panelTop = $state(0);
   let panelMaxHeight = $state(320);
 
+  let refreshSeq = 0;
+
   async function refresh() {
     if (!pic) return;
+    const seq = ++refreshSeq;
     loading = true;
     try {
       const res = await getNotifications(pic, period);
+      if (seq !== refreshSeq) return;
       items = res.notifications;
       unreadCount = res.unreadCount;
     } catch {
       /* keep previous */
     } finally {
-      loading = false;
+      if (seq === refreshSeq) loading = false;
     }
   }
 
@@ -43,6 +48,40 @@
     void pic;
     void period;
     void refresh();
+  });
+
+  // Immediate refresh after settle/sync, when PWA returns to foreground, and light polling.
+  $effect(() => {
+    void pic;
+    void period;
+
+    const onChanged = () => {
+      void refresh();
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refresh();
+    };
+    const onPageShow = () => {
+      void refresh();
+    };
+
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, onChanged);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    window.addEventListener('pageshow', onPageShow);
+
+    const pollMs = 12_000;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refresh();
+    }, pollMs);
+
+    return () => {
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, onChanged);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+      window.removeEventListener('pageshow', onPageShow);
+      window.clearInterval(timer);
+    };
   });
 
   function placePanel() {

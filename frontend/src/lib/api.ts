@@ -1,4 +1,5 @@
 import { env } from '$env/dynamic/public';
+import { notifyNotificationsChanged } from './notifications-events';
 import type {
   AppNotification,
   AuthEmailSetting,
@@ -138,17 +139,25 @@ export function deleteAuthEmail(id: number): Promise<{ ok: boolean }> {
   return fetchJson(`/api/settings/auth-emails/${id}`, { method: 'DELETE' });
 }
 
-export function syncNotifications(period: string): Promise<{
+export async function syncNotifications(period: string): Promise<{
   ok: boolean;
   period: string;
   payDue: number;
   paidReceivedCreated: number;
   resolved: number;
 }> {
-  return fetchJson('/api/notifications/sync', {
+  const result = await fetchJson<{
+    ok: boolean;
+    period: string;
+    payDue: number;
+    paidReceivedCreated: number;
+    resolved: number;
+  }>('/api/notifications/sync', {
     method: 'POST',
     body: JSON.stringify({ period }),
   });
+  notifyNotificationsChanged(period);
+  return result;
 }
 
 export function getNotifications(
@@ -157,7 +166,8 @@ export function getNotifications(
 ): Promise<{ pic: string; unreadCount: number; notifications: AppNotification[] }> {
   const q = new URLSearchParams({ pic });
   if (period) q.set('period', period);
-  return fetchJson(`/api/notifications?${q}`);
+  // Avoid stale badge/list in installed PWA (browser may cache GET).
+  return fetchJson(`/api/notifications?${q}`, { cache: 'no-store' });
 }
 
 export function markNotificationRead(id: number): Promise<{ notification: AppNotification }> {

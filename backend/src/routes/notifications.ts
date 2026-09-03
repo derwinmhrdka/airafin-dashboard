@@ -2,7 +2,10 @@ import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/index.js';
 import { notifications } from '../db/schema.js';
-import { syncTransferNotifications } from '../lib/notifications.js';
+import {
+  syncOpenTransferNotifications,
+  syncTransferNotifications,
+} from '../lib/notifications.js';
 import { isValidPic } from '../lib/pic.js';
 
 export async function notificationRoutes(app: FastifyInstance): Promise<void> {
@@ -23,9 +26,8 @@ export async function notificationRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const period = request.query.period?.trim();
-      if (period) {
-        await syncTransferNotifications(period);
-      }
+      // Also re-sync any periods with lingering open pay_dues so settled debts clear.
+      await syncOpenTransferNotifications(period);
 
       const rows = await db
         .select()
@@ -36,6 +38,7 @@ export async function notificationRoutes(app: FastifyInstance): Promise<void> {
 
       const unreadCount = rows.filter((r) => !r.readAt).length;
 
+      reply.header('Cache-Control', 'no-store');
       return {
         pic,
         unreadCount,
@@ -62,9 +65,7 @@ export async function notificationRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const period = request.query.period?.trim();
-      if (period) {
-        await syncTransferNotifications(period);
-      }
+      await syncOpenTransferNotifications(period);
 
       const [row] = await db
         .select({ count: sql<number>`count(*)::int` })
@@ -77,6 +78,7 @@ export async function notificationRoutes(app: FastifyInstance): Promise<void> {
           ),
         );
 
+      reply.header('Cache-Control', 'no-store');
       return { pic, unreadCount: row?.count ?? 0 };
     },
   );

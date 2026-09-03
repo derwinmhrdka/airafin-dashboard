@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import {
   budgetSubcategories,
@@ -37,13 +37,9 @@ function payDueRefKey(period: string, senderPic: string, receiverPic: string): s
   return `pay_due:${period}:${senderPic}->${receiverPic}`;
 }
 
-function paidReceivedRefKey(
-  period: string,
-  senderPic: string,
-  receiverPic: string,
-  stamp: string,
-): string {
-  return `paid:${period}:${senderPic}->${receiverPic}:${stamp}`;
+/** Stable key so settle sync upserts one paid_received per cleared due (no stamp spam). */
+function paidReceivedRefKey(payDueRef: string): string {
+  return `paid_received:${payDueRef}`;
 }
 
 /** Collect pending directed amounts (plan + unsettled reimbursements), then net. */
@@ -152,7 +148,7 @@ export async function computePeriodTransferNets(period: string): Promise<Transfe
 
 /**
  * Upsert pay_due for current nets (to = payer).
- * When a pay_due clears, resolve it and create paid_received for the receiver.
+ * When a pay_due clears, resolve it and upsert paid_received for the receiver.
  */
 export async function syncTransferNotifications(period: string): Promise<{
   payDue: number;
@@ -179,18 +175,18 @@ export async function syncTransferNotifications(period: string): Promise<{
       .limit(1);
 
     if (existing) {
+      const amountChanged = toNumber(existing.amount) !== Math.round(net.total);
+      const wasResolved = Boolean(existing.resolvedAt);
       await db
         .update(notifications)
         .set({
           amount,
+          // Re-open only when debt is active again
           resolvedAt: null,
-          // Keep unread if amount increased meaningfully? Keep read_at as-is unless amount changed.
-          readAt:
-            existing.resolvedAt || toNumber(existing.amount) !== Math.round(net.total)
-              ? null
-              : existing.readAt,
+          readAt: wasResolved || amountChanged ? null : existing.readAt,
           toPic: net.senderPic,
           fromPic: net.receiverPic,
+          type: 'pay_due',
         })
         .where(eq(notifications.id, existing.id));
     } else {
@@ -212,10 +208,15 @@ export async function syncTransferNotifications(period: string): Promise<{
   const openPayDue = await db
     .select()
     .from(notifications)
-    .where(and(eq(notifications.type, 'pay_due'), eq(notifications.period, period)));
+    .where(
+      and(
+        eq(notifications.type, 'pay_due'),
+        eq(notifications.period, period),
+        isNull(notifications.resolvedAt),
+      ),
+    );
 
   for (const row of openPayDue) {
-    if (row.resolvedAt) continue;
     if (activeRefKeys.has(row.refKey)) continue;
 
     await db
@@ -224,15 +225,30 @@ export async function syncTransferNotifications(period: string): Promise<{
       .where(eq(notifications.id, row.id));
     resolved += 1;
 
-    // Notify the previous receiver that payment was made
-    const paidRef = paidReceivedRefKey(period, row.toPic, row.fromPic, stamp);
+    // Notify the previous receiver that payment was made (stable ref → upsert)
+    const paidRef = paidReceivedRefKey(row.refKey);
     const [already] = await db
-      .select({ id: notifications.id })
+      .select()
       .from(notifications)
       .where(eq(notifications.refKey, paidRef))
       .limit(1);
 
-    if (!already) {
+    if (already) {
+      await db
+        .update(notifications)
+        .set({
+          toPic: row.fromPic,
+          fromPic: row.toPic,
+          type: 'paid_received',
+          amount: row.amount,
+          period,
+          readAt: null,
+          resolvedAt: null,
+          createdAt: stamp,
+        })
+        .where(eq(notifications.id, already.id));
+      paidReceivedCreated += 1;
+    } else {
       await db.insert(notifications).values({
         toPic: row.fromPic,
         fromPic: row.toPic,
@@ -249,4 +265,27 @@ export async function syncTransferNotifications(period: string): Promise<{
   }
 
   return { payDue, paidReceivedCreated, resolved };
+}
+
+/** Sync the given period plus any periods that still have open pay_dues. */
+export async function syncOpenTransferNotifications(
+  primaryPeriod?: string,
+): Promise<string[]> {
+  const periods = new Set<string>();
+  if (primaryPeriod?.trim()) periods.add(primaryPeriod.trim());
+
+  const openDues = await db
+    .select({ period: notifications.period })
+    .from(notifications)
+    .where(and(eq(notifications.type, 'pay_due'), isNull(notifications.resolvedAt)));
+
+  for (const row of openDues) {
+    if (row.period) periods.add(row.period);
+  }
+
+  for (const period of periods) {
+    await syncTransferNotifications(period);
+  }
+
+  return [...periods];
 }
