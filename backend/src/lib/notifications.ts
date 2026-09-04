@@ -12,34 +12,29 @@ import { isNonSpendTransaction } from './budget-move.js';
 import { toNumber } from './money.js';
 import { isValidPic } from './pic.js';
 import { resolvePlanPicFromMaps, subcategoryPicKey } from './plan-pic.js';
+import { pushAppNotification } from './web-push.js';
 
 export type NotificationType = 'pay_due' | 'paid_received';
 
-export interface TransferNet {
+/** One pending transfer line (checklist or reimbursement) — not netted. */
+export interface TransferItemDue {
   senderPic: string;
   receiverPic: string;
-  total: number;
+  amount: number;
+  itemLabel: string;
+  refKey: string;
 }
 
 function nowIso(): string {
   return new Date().toISOString();
 }
 
-function peoplePairKey(a: string, b: string): string {
-  return a < b ? `${a}|${b}` : `${b}|${a}`;
+function checklistPayDueRefKey(projectId: number, checklistId: number): string {
+  return `pay_due:checklist:${projectId}:${checklistId}`;
 }
 
-function directedKey(sender: string, receiver: string): string {
-  return `${sender}\0${receiver}`;
-}
-
-function payDueRefKey(
-  projectId: number,
-  period: string,
-  senderPic: string,
-  receiverPic: string,
-): string {
-  return `pay_due:${projectId}:${period}:${senderPic}->${receiverPic}`;
+function txPayDueRefKey(projectId: number, txId: number): string {
+  return `pay_due:tx:${projectId}:${txId}`;
 }
 
 /** Stable key so settle sync upserts one paid_received per cleared due (no stamp spam). */
@@ -47,19 +42,27 @@ function paidReceivedRefKey(payDueRef: string): string {
   return `paid_received:${payDueRef}`;
 }
 
-/** Collect pending directed amounts (plan + unsettled reimbursements), then net. */
-export async function computePeriodTransferNets(
+function normalizeItemLabel(raw: string): string {
+  const trimmed = raw.trim().replace(/\s+/g, ' ');
+  if (!trimmed) return 'Item';
+  return trimmed;
+}
+
+/** Collect pending directed lines (plan checklist + unsettled reimbursements). No netting. */
+export async function computePeriodTransferItems(
   period: string,
   projectId: number,
-): Promise<TransferNet[]> {
-  const directed = new Map<string, number>();
+): Promise<TransferItemDue[]> {
+  const items: TransferItemDue[] = [];
 
   const checklist = await db
     .select({
+      id: planChecklist.id,
       senderPic: planChecklist.senderPic,
       receiverPic: planChecklist.receiverPic,
       amount: planChecklist.amount,
       done: planChecklist.done,
+      subcategoryName: planChecklist.subcategoryName,
     })
     .from(planChecklist)
     .where(and(eq(planChecklist.period, period), eq(planChecklist.projectId, projectId)));
@@ -69,8 +72,13 @@ export async function computePeriodTransferNets(
     if (!isValidPic(item.senderPic) || !isValidPic(item.receiverPic)) continue;
     const amt = toNumber(item.amount);
     if (amt <= 0) continue;
-    const key = directedKey(item.senderPic, item.receiverPic);
-    directed.set(key, (directed.get(key) ?? 0) + amt);
+    items.push({
+      senderPic: item.senderPic,
+      receiverPic: item.receiverPic,
+      amount: amt,
+      itemLabel: normalizeItemLabel(item.subcategoryName || 'Transfer'),
+      refKey: checklistPayDueRefKey(projectId, item.id),
+    });
   }
 
   const budgetRows = await db
@@ -99,8 +107,10 @@ export async function computePeriodTransferNets(
 
   const txRows = await db
     .select({
+      id: transactions.id,
       categoryId: transactions.categoryId,
       subCategory: transactions.subCategory,
+      detail: transactions.detail,
       cost: transactions.cost,
       pic: transactions.pic,
       status: transactions.status,
@@ -128,36 +138,43 @@ export async function computePeriodTransferNets(
 
     const amt = toNumber(tx.cost);
     if (amt <= 0) continue;
-    // planPic pays the person who paid (txPic)
-    const key = directedKey(planPic, txPic);
-    directed.set(key, (directed.get(key) ?? 0) + amt);
-  }
 
-  const peoplePairs = new Set<string>();
-  for (const key of directed.keys()) {
-    const [a, b] = key.split('\0');
-    peoplePairs.add(peoplePairKey(a, b));
-  }
+    const label =
+      tx.detail?.trim() ||
+      tx.subCategory?.trim() ||
+      'Reimbursement';
 
-  const nets: TransferNet[] = [];
-  for (const pair of peoplePairs) {
-    const [personA, personB] = pair.split('|');
-    const forward = directed.get(directedKey(personA, personB)) ?? 0;
-    const backward = directed.get(directedKey(personB, personA)) ?? 0;
-    const diff = forward - backward;
-    if (diff === 0) continue;
-    nets.push({
-      senderPic: diff > 0 ? personA : personB,
-      receiverPic: diff > 0 ? personB : personA,
-      total: Math.abs(diff),
+    items.push({
+      senderPic: planPic,
+      receiverPic: txPic,
+      amount: amt,
+      itemLabel: normalizeItemLabel(label),
+      refKey: txPayDueRefKey(projectId, tx.id),
     });
   }
 
-  return nets;
+  return items;
+}
+
+/** @deprecated Use computePeriodTransferItems — kept for any older imports. */
+export async function computePeriodTransferNets(
+  period: string,
+  projectId: number,
+): Promise<{ senderPic: string; receiverPic: string; total: number }[]> {
+  const items = await computePeriodTransferItems(period, projectId);
+  const directed = new Map<string, number>();
+  for (const item of items) {
+    const key = `${item.senderPic}\0${item.receiverPic}`;
+    directed.set(key, (directed.get(key) ?? 0) + item.amount);
+  }
+  return [...directed.entries()].map(([key, total]) => {
+    const [senderPic, receiverPic] = key.split('\0');
+    return { senderPic, receiverPic, total };
+  });
 }
 
 /**
- * Upsert pay_due for current nets (to = payer).
+ * Upsert pay_due per pending item (to = payer).
  * When a pay_due clears, resolve it and upsert paid_received for the receiver.
  */
 export async function syncTransferNotifications(
@@ -168,52 +185,71 @@ export async function syncTransferNotifications(
   paidReceivedCreated: number;
   resolved: number;
 }> {
-  const nets = await computePeriodTransferNets(period, projectId);
-  const activeRefKeys = new Set(
-    nets.map((n) => payDueRefKey(projectId, period, n.senderPic, n.receiverPic)),
-  );
+  const dues = await computePeriodTransferItems(period, projectId);
+  const activeRefKeys = new Set(dues.map((d) => d.refKey));
   const stamp = nowIso();
   let payDue = 0;
   let paidReceivedCreated = 0;
   let resolved = 0;
 
-  for (const net of nets) {
-    const refKey = payDueRefKey(projectId, period, net.senderPic, net.receiverPic);
-    const amount = String(Math.round(net.total));
+  for (const due of dues) {
+    const amount = String(Math.round(due.amount));
 
     const [existing] = await db
       .select()
       .from(notifications)
-      .where(and(eq(notifications.projectId, projectId), eq(notifications.refKey, refKey)))
+      .where(and(eq(notifications.projectId, projectId), eq(notifications.refKey, due.refKey)))
       .limit(1);
 
     if (existing) {
-      const amountChanged = toNumber(existing.amount) !== Math.round(net.total);
+      const amountChanged = toNumber(existing.amount) !== Math.round(due.amount);
+      const labelChanged = (existing.itemLabel ?? '') !== due.itemLabel;
       const wasResolved = Boolean(existing.resolvedAt);
       await db
         .update(notifications)
         .set({
           amount,
+          itemLabel: due.itemLabel,
           // Re-open only when debt is active again
           resolvedAt: null,
-          readAt: wasResolved || amountChanged ? null : existing.readAt,
-          toPic: net.senderPic,
-          fromPic: net.receiverPic,
+          readAt: wasResolved || amountChanged || labelChanged ? null : existing.readAt,
+          toPic: due.senderPic,
+          fromPic: due.receiverPic,
           type: 'pay_due',
         })
         .where(and(eq(notifications.id, existing.id), eq(notifications.projectId, projectId)));
+
+      if (wasResolved || amountChanged) {
+        void pushAppNotification({
+          toPic: due.senderPic,
+          type: 'pay_due',
+          itemLabel: due.itemLabel,
+          amount,
+          period,
+          refKey: due.refKey,
+        });
+      }
     } else {
       await db.insert(notifications).values({
         projectId,
-        toPic: net.senderPic,
-        fromPic: net.receiverPic,
+        toPic: due.senderPic,
+        fromPic: due.receiverPic,
         type: 'pay_due',
+        itemLabel: due.itemLabel,
         amount,
         period,
-        refKey,
+        refKey: due.refKey,
         readAt: null,
         resolvedAt: null,
         createdAt: stamp,
+      });
+      void pushAppNotification({
+        toPic: due.senderPic,
+        type: 'pay_due',
+        itemLabel: due.itemLabel,
+        amount,
+        period,
+        refKey: due.refKey,
       });
     }
     payDue += 1;
@@ -240,6 +276,13 @@ export async function syncTransferNotifications(
       .where(and(eq(notifications.id, row.id), eq(notifications.projectId, projectId)));
     resolved += 1;
 
+    // Only emit paid_received for per-item dues (skip legacy netted ref keys).
+    const isPerItem =
+      row.refKey.startsWith('pay_due:checklist:') || row.refKey.startsWith('pay_due:tx:');
+    if (!isPerItem) continue;
+
+    const itemLabel = normalizeItemLabel(row.itemLabel || 'Item');
+
     // Notify the previous receiver that payment was made (stable ref → upsert)
     const paidRef = paidReceivedRefKey(row.refKey);
     const [already] = await db
@@ -255,6 +298,7 @@ export async function syncTransferNotifications(
           toPic: row.fromPic,
           fromPic: row.toPic,
           type: 'paid_received',
+          itemLabel,
           amount: row.amount,
           period,
           readAt: null,
@@ -269,6 +313,7 @@ export async function syncTransferNotifications(
         toPic: row.fromPic,
         fromPic: row.toPic,
         type: 'paid_received',
+        itemLabel,
         amount: row.amount,
         period,
         refKey: paidRef,
@@ -278,6 +323,15 @@ export async function syncTransferNotifications(
       });
       paidReceivedCreated += 1;
     }
+
+    void pushAppNotification({
+      toPic: row.fromPic,
+      type: 'paid_received',
+      itemLabel,
+      amount: row.amount,
+      period,
+      refKey: paidRef,
+    });
   }
 
   return { payDue, paidReceivedCreated, resolved };

@@ -11,6 +11,7 @@
   import { getPics, getProjects, selectSessionProject } from '$lib/api';
   import { currentPeriod, parsePeriodToDate, periodFromUrl } from '$lib/period';
   import { setPicNames } from '$lib/pics';
+  import { ensureWebPushSubscription } from '$lib/web-push';
 
   let { children, data } = $props();
 
@@ -25,6 +26,7 @@
   let switchOpen = $state(false);
   let picsLoaded = false;
   let loadedProjectId: number | null = null;
+  let pushPicTried = '';
 
   $effect(() => {
     if (page.url.pathname === '/login') return;
@@ -35,6 +37,20 @@
       .catch(() => {
         picsLoaded = false;
       });
+  });
+
+  // Web Push: subscribe once per logged-in PIC (permission prompt on first visit).
+  $effect(() => {
+    const pic = data.session?.pic?.trim() ?? '';
+    if (!pic || page.url.pathname === '/login') return;
+    if (pushPicTried === pic) return;
+    pushPicTried = pic;
+    void ensureWebPushSubscription(pic).then((status) => {
+      if (status === 'error' || status === 'unsupported') {
+        // Allow a later retry after navigation / SW settle.
+        if (pushPicTried === pic) pushPicTried = '';
+      }
+    });
   });
 
   $effect(() => {

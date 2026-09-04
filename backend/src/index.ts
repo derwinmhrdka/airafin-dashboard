@@ -11,9 +11,11 @@ import { dashboardRoutes } from './routes/dashboard.js';
 import { infoUpdateRoutes } from './routes/info-updates.js';
 import { notificationRoutes } from './routes/notifications.js';
 import { projectRoutes } from './routes/projects.js';
+import { pushRoutes } from './routes/push.js';
 import { settingsRoutes } from './routes/settings.js';
 import { syncRoutes } from './routes/sync.js';
 import { transactionRoutes } from './routes/transactions.js';
+import { ensureWebPushConfigured } from './lib/web-push.js';
 
 const app = Fastify({
   logger: true,
@@ -34,7 +36,8 @@ function needsProjectId(url: string): boolean {
     path.startsWith('/api/settings/') ||
     path.startsWith('/api/categories') ||
     path.startsWith('/api/info-updates') ||
-    path.startsWith('/api/uploads');
+    path.startsWith('/api/uploads') ||
+    path.startsWith('/api/push');
 
   if (optional) return false;
   return true;
@@ -82,9 +85,13 @@ await app.register(budgetRoutes);
 await app.register(syncRoutes);
 await app.register(settingsRoutes);
 await app.register(notificationRoutes);
+await app.register(pushRoutes);
 await app.register(infoUpdateRoutes);
 
 await refreshPicCache();
+await ensureWebPushConfigured().catch((err) => {
+  app.log.warn({ err }, 'Web Push VAPID bootstrap failed');
+});
 
 app.setErrorHandler((error, request, reply) => {
   request.log.error({ err: error, url: request.url }, 'Unhandled route error');

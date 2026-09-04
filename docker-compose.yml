@@ -40,6 +40,8 @@ services:
       UPLOAD_DIR: /app/data/uploads
       PORT: 3081
       HOST: 0.0.0.0
+      ORIGIN: ${ORIGIN:-https://airafin.teknodika.com}
+      DOMAIN: ${DOMAIN:-airafin.teknodika.com}
     ports:
       # Localhost only — Telegram bot / internal API
       - '127.0.0.1:3081:3081'

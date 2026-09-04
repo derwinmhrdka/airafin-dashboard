@@ -26,6 +26,18 @@ body {
   font-family: var(--font-mono);
 }
 
+/* iOS/WebKit date inputs have a large intrinsic min-width — keep them aligned with other fields. */
+input[type='date'] {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+input[type='date']::-webkit-date-and-time-value {
+  text-align: left;
+}
+
 /* Full IDR amounts that scale down on narrow screens (no abbreviation). */
 .stat-amount {
   font-size: clamp(0.5rem, 2.35vw, 0.875rem);

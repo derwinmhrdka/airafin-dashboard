@@ -51,6 +51,7 @@ export interface AppNotification {
   toPic: string;
   fromPic: string;
   type: 'pay_due' | 'paid_received' | string;
+  itemLabel?: string;
   amount: string;
   period: string;
   readAt: string | null;

@@ -5,7 +5,6 @@
     markAllNotificationsRead,
     markNotificationRead,
   } from '$lib/api';
-  import PicBadge from '$lib/components/PicBadge.svelte';
   import { formatCurrency } from '$lib/format';
   import { NOTIFICATIONS_CHANGED_EVENT } from '$lib/notifications-events';
   import type { AppNotification } from '$lib/types';
@@ -147,14 +146,20 @@
     }
   }
 
+  function itemLabelFor(item: AppNotification): string {
+    const raw = (item.itemLabel ?? '').trim().replace(/\s+/g, ' ');
+    return raw || 'Item';
+  }
+
   function titleFor(item: AppNotification): string {
+    const label = itemLabelFor(item);
     if (item.type === 'pay_due') {
-      return `Bayar ke ${item.fromPic}`;
+      return `${label} needs payment`;
     }
     if (item.type === 'paid_received') {
-      return `${item.fromPic} sudah transfer`;
+      return `${label} just paid!`;
     }
-    return 'Notifikasi';
+    return 'Notification';
   }
 </script>
 
@@ -215,7 +220,6 @@
                   class="flex w-full items-start gap-2 px-3 py-2.5 text-left transition hover:bg-zinc-50 dark:hover:bg-zinc-900
                     {!item.readAt ? 'bg-amber-50/60 dark:bg-amber-950/20' : ''}"
                 >
-                  <PicBadge name={item.fromPic} />
                   <div class="min-w-0 flex-1">
                     <p class="truncate text-xs font-medium {!item.readAt ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-600 dark:text-zinc-300'}">
                       {titleFor(item)}

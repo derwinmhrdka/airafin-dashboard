@@ -472,7 +472,7 @@
   }
 
   const fieldClass =
-    'w-full border border-zinc-200 bg-white px-2.5 py-2 text-sm outline-none transition focus:border-zinc-400 dark:border-zinc-800 dark:bg-black dark:focus:border-zinc-600';
+    'w-full min-w-0 max-w-full border border-zinc-200 bg-white px-2.5 py-2 text-sm outline-none transition focus:border-zinc-400 dark:border-zinc-800 dark:bg-black dark:focus:border-zinc-600';
   const labelClass = 'text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-400';
 </script>
 
@@ -480,7 +480,7 @@
   <form
     bind:this={formEl}
     onsubmit={handleSubmit}
-    class="space-y-3.5 border p-3.5 scroll-mt-3 lg:sticky lg:top-4
+    class="min-w-0 space-y-3.5 border p-3.5 scroll-mt-3 lg:sticky lg:top-4
       {editingId != null
       ? 'border-amber-300 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/20'
       : 'border-zinc-200 dark:border-zinc-800'}"
@@ -519,9 +519,14 @@
       {/if}
     </div>
 
-    <label class="block space-y-1.5">
+    <label class="block min-w-0 space-y-1.5">
       <span class={labelClass}>Date</span>
-      <input type="date" bind:value={date} required class="box-border min-w-0 max-w-full {fieldClass}" />
+      <input
+        type="date"
+        bind:value={date}
+        required
+        class="box-border w-full min-w-0 max-w-full appearance-none {fieldClass}"
+      />
     </label>
 
     <label class="block space-y-1.5">

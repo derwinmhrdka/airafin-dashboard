@@ -127,6 +127,20 @@
       "when": 1750192400000,
       "tag": "0017_info_update_1_1_1",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1750196000000,
+      "tag": "0018_notification_item_label",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1750199600000,
+      "tag": "0019_web_push",
+      "breakpoints": true
     }
   ]
 }

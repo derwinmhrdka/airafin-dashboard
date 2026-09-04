@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  index,
   integer,
   numeric,
   pgTable,
@@ -176,6 +177,8 @@ export const notifications = pgTable(
     toPic: text('to_pic').notNull(),
     fromPic: text('from_pic').notNull(),
     type: text('type').notNull(),
+    /** Checklist subcategory or reimbursement detail — used in notification copy. */
+    itemLabel: text('item_label').notNull().default(''),
     amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
     period: text('period').notNull(),
     refKey: text('ref_key').notNull(),
@@ -200,6 +203,33 @@ export type AuthEmail = typeof authEmails.$inferSelect;
 export type PicRow = typeof pics.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
+
+/** Key/value app config (e.g. auto-generated VAPID keys — no .env required). */
+export const appSettings = pgTable('app_settings', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+});
+
+/** Browser Web Push subscriptions keyed by PIC. */
+export const pushSubscriptions = pgTable(
+  'push_subscriptions',
+  {
+    id: serial('id').primaryKey(),
+    pic: text('pic').notNull(),
+    endpoint: text('endpoint').notNull(),
+    p256dh: text('p256dh').notNull(),
+    auth: text('auth').notNull(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('push_subscriptions_endpoint_idx').on(table.endpoint),
+    index('push_subscriptions_pic_idx').on(table.pic),
+  ],
+);
+
+export type AppSetting = typeof appSettings.$inferSelect;
+export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
 
 /** Broadcast info popup managed by admins. */
 export const infoUpdates = pgTable('info_updates', {

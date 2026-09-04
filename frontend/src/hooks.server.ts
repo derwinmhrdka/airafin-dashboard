@@ -23,10 +23,14 @@ function isPublicPath(path: string): boolean {
     path === '/auth/google' ||
     path === '/auth/google/callback' ||
     path === '/auth/logout' ||
-    path.startsWith('/_app/') ||
-    path.startsWith('/fonts/') ||
+    path === '/sw.js' ||
+    path === '/manifest.webmanifest' ||
     path === '/favicon.ico' ||
-    path === '/robots.txt'
+    path === '/favicon.svg' ||
+    path === '/robots.txt' ||
+    path.startsWith('/icons/') ||
+    path.startsWith('/_app/') ||
+    path.startsWith('/fonts/')
   );
 }
 

@@ -55,6 +55,7 @@ export async function notificationRoutes(app: FastifyInstance): Promise<void> {
           toPic: r.toPic,
           fromPic: r.fromPic,
           type: r.type,
+          itemLabel: r.itemLabel ?? '',
           amount: r.amount,
           period: r.period,
           readAt: r.readAt,
