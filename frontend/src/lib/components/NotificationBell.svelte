@@ -8,11 +8,7 @@
   import { formatCurrency } from '$lib/format';
   import { NOTIFICATIONS_CHANGED_EVENT } from '$lib/notifications-events';
   import type { AppNotification } from '$lib/types';
-  import {
-    ensureWebPushSubscription,
-    pushPermission,
-    pushSupported,
-  } from '$lib/web-push';
+  import { ensureWebPushSubscription, pushPermission } from '$lib/web-push';
 
   interface Props {
     pic: string;
@@ -29,19 +25,8 @@
   let buttonEl = $state<HTMLButtonElement | null>(null);
   let panelTop = $state(0);
   let panelMaxHeight = $state(320);
-  let pushState = $state<'unknown' | 'unsupported' | 'default' | 'granted' | 'denied'>('unknown');
-  let pushBusy = $state(false);
-  let pushHint = $state('');
 
   let refreshSeq = 0;
-
-  function refreshPushState() {
-    if (!pushSupported()) {
-      pushState = 'unsupported';
-      return;
-    }
-    pushState = pushPermission() as 'default' | 'granted' | 'denied';
-  }
 
   async function refresh() {
     if (!pic) return;
@@ -63,7 +48,6 @@
     void pic;
     void period;
     void refresh();
-    refreshPushState();
   });
 
   // Immediate refresh after settle/sync, when PWA returns to foreground, and light polling.
@@ -75,14 +59,10 @@
       void refresh();
     };
     const onVisible = () => {
-      if (document.visibilityState === 'visible') {
-        void refresh();
-        refreshPushState();
-      }
+      if (document.visibilityState === 'visible') void refresh();
     };
     const onPageShow = () => {
       void refresh();
-      refreshPushState();
     };
 
     window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, onChanged);
@@ -121,7 +101,6 @@
   $effect(() => {
     if (!open) return;
     placePanel();
-    refreshPushState();
     const onResize = () => placePanel();
     const handler = (e: MouseEvent) => onDocClick(e);
     window.addEventListener('resize', onResize);
@@ -138,34 +117,10 @@
     open = !open;
     if (open) {
       requestAnimationFrame(placePanel);
-      refreshPushState();
-      // Re-sync subscription if already allowed (no prompt).
       if (pushPermission() === 'granted') {
         void ensureWebPushSubscription(pic);
       }
       await refresh();
-    }
-  }
-
-  async function handleEnablePush(e: MouseEvent) {
-    e.stopPropagation();
-    if (pushBusy || !pic) return;
-    pushBusy = true;
-    pushHint = '';
-    try {
-      const status = await ensureWebPushSubscription(pic);
-      refreshPushState();
-      if (status === 'subscribed') {
-        pushHint = 'Push enabled';
-      } else if (status === 'denied') {
-        pushHint = 'Blocked in browser settings';
-      } else if (status === 'unsupported') {
-        pushHint = 'Not supported here (use installed app on iPhone)';
-      } else {
-        pushHint = 'Could not enable — try again';
-      }
-    } finally {
-      pushBusy = false;
     }
   }
 
@@ -253,39 +208,6 @@
           </button>
         {/if}
       </div>
-
-      {#if pushState !== 'granted' && pushState !== 'unknown'}
-        <div class="border-b border-zinc-100 px-3 py-2.5 dark:border-zinc-800">
-          {#if pushState === 'unsupported'}
-            <p class="text-[11px] leading-snug text-zinc-500">
-              Push needs an installed app (Add to Home Screen) on iPhone, or a supported browser.
-            </p>
-          {:else if pushState === 'denied'}
-            <p class="text-[11px] leading-snug text-zinc-500">
-              Notifications blocked. Enable them in browser / phone settings for this site.
-            </p>
-          {:else}
-            <button
-              type="button"
-              onclick={handleEnablePush}
-              disabled={pushBusy}
-              class="w-full border border-zinc-900 bg-zinc-900 px-2.5 py-2 text-left text-[11px] font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60 dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
-            >
-              {pushBusy ? 'Enabling…' : 'Enable push notifications'}
-            </button>
-            <p class="mt-1.5 text-[10px] leading-snug text-zinc-400">
-              Tap Allow when the browser asks.
-            </p>
-          {/if}
-          {#if pushHint}
-            <p class="mt-1.5 text-[10px] text-zinc-500">{pushHint}</p>
-          {/if}
-        </div>
-      {:else if pushState === 'granted' && pushHint}
-        <div class="border-b border-zinc-100 px-3 py-2 dark:border-zinc-800">
-          <p class="text-[10px] text-emerald-600 dark:text-emerald-400">{pushHint}</p>
-        </div>
-      {/if}
 
       <div class="overflow-y-auto" style="max-height: calc({panelMaxHeight}px - 2.5rem);">
         {#if loading && items.length === 0}

@@ -64,6 +64,18 @@ async function postSubscribe(pic: string, subscription: PushSubscription): Promi
   return res.ok;
 }
 
+async function postUnsubscribe(endpoint: string): Promise<void> {
+  try {
+    await fetch('/api/push/unsubscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint }),
+    });
+  } catch {
+    /* ignore */
+  }
+}
+
 /**
  * Request permission (if needed), subscribe, and store on server for this PIC.
  * Safe to call repeatedly; no-ops when unsupported or denied.
@@ -98,5 +110,35 @@ export async function ensureWebPushSubscription(pic: string): Promise<'subscribe
     return ok ? 'subscribed' : 'error';
   } catch {
     return 'error';
+  }
+}
+
+/** Unsubscribe this browser and remove endpoint from server. */
+export async function disableWebPushSubscription(): Promise<'disabled' | 'unsupported' | 'error'> {
+  if (!pushSupported()) return 'unsupported';
+
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    if (subscription) {
+      const endpoint = subscription.endpoint;
+      await subscription.unsubscribe();
+      await postUnsubscribe(endpoint);
+    }
+    return 'disabled';
+  } catch {
+    return 'error';
+  }
+}
+
+/** True when permission granted and this browser has an active push subscription. */
+export async function hasActivePushSubscription(): Promise<boolean> {
+  if (!pushSupported() || Notification.permission !== 'granted') return false;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    return Boolean(subscription);
+  } catch {
+    return false;
   }
 }

@@ -18,9 +18,19 @@
   import { POCKET_COLORS } from '$lib/pocket-colors';
   import { periodFromUrl } from '$lib/period';
   import type { PicSetting, PocketSetting } from '$lib/types';
+  import {
+    disableWebPushSubscription,
+    ensureWebPushSubscription,
+    hasActivePushSubscription,
+    pushPermission,
+    pushSupported,
+  } from '$lib/web-push';
 
   const period = $derived(periodFromUrl(page.url.searchParams));
   const isAdmin = $derived(page.data.isAdmin === true);
+  const sessionPic = $derived(
+    typeof page.data.session?.pic === 'string' ? page.data.session.pic.trim() : '',
+  );
 
   let pockets = $state<PocketSetting[]>([]);
   let pics = $state<PicSetting[]>([]);
@@ -35,6 +45,50 @@
   let syncing = $state<'db-to-sheet' | 'sheet-to-db' | null>(null);
   let success = $state('');
   let error = $state('');
+  let pushEnabled = $state(false);
+  let pushBusy = $state(false);
+  let pushSupportedHere = $state(true);
+
+  async function refreshPushEnabled() {
+    pushSupportedHere = pushSupported() && pushPermission() !== 'unsupported';
+    if (!pushSupportedHere) {
+      pushEnabled = false;
+      return;
+    }
+    pushEnabled = await hasActivePushSubscription();
+  }
+
+  async function handlePushToggle(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const next = input.checked;
+    if (pushBusy || !sessionPic) {
+      input.checked = pushEnabled;
+      return;
+    }
+
+    pushBusy = true;
+    success = '';
+    error = '';
+    try {
+      if (next) {
+        const status = await ensureWebPushSubscription(sessionPic);
+        if (status !== 'subscribed') {
+          input.checked = false;
+          pushEnabled = false;
+          return;
+        }
+        pushEnabled = true;
+      } else {
+        await disableWebPushSubscription();
+        pushEnabled = false;
+      }
+    } catch {
+      input.checked = pushEnabled;
+    } finally {
+      pushBusy = false;
+      await refreshPushEnabled();
+    }
+  }
 
   async function loadSettings() {
     await withDeferredLoading(
@@ -58,6 +112,7 @@
 
   $effect(() => {
     void loadSettings();
+    void refreshPushEnabled();
   });
 
   async function handleAddPocket() {
@@ -191,6 +246,20 @@
 
 <section class="space-y-4">
   <p class="text-[11px] uppercase tracking-wider text-zinc-500">Settings · {period}</p>
+
+  <label
+    class="flex items-center justify-between gap-3 border border-zinc-200 px-3 py-3 dark:border-zinc-800
+      {!pushSupportedHere || !sessionPic || pushBusy ? 'opacity-60' : ''}"
+  >
+    <span class="text-sm font-medium">Enable Push Notification</span>
+    <input
+      type="checkbox"
+      class="h-4 w-4 accent-zinc-900 dark:accent-zinc-100"
+      checked={pushEnabled}
+      disabled={!pushSupportedHere || !sessionPic || pushBusy || pushPermission() === 'denied'}
+      onchange={handlePushToggle}
+    />
+  </label>
 
   <fieldset class="space-y-2 border border-zinc-200 p-3 dark:border-zinc-800">
     <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">Sync</legend>
