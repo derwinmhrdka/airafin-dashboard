@@ -20,6 +20,12 @@ export function pushSupported(): boolean {
   );
 }
 
+/** Current browser notification permission, or unsupported. */
+export function pushPermission(): NotificationPermission | 'unsupported' {
+  if (!pushSupported()) return 'unsupported';
+  return Notification.permission;
+}
+
 export async function registerPushServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (!pushSupported()) return null;
   try {
