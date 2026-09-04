@@ -17,6 +17,8 @@
   {#each tabs as tab}
     <a
       href={withPeriodParam(tab.href, period)}
+      data-sveltekit-preload-data="hover"
+      data-sveltekit-preload-code="hover"
       aria-label={tab.label}
       title={tab.label}
       class="flex items-center justify-center border-b-2 px-2 py-3 text-center text-xs font-medium transition-colors md:px-4 md:py-3.5 md:text-sm

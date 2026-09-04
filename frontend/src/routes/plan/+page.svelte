@@ -9,6 +9,7 @@
   } from '$lib/api';
   import AmountInput from '$lib/components/AmountInput.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
+  import { withDeferredLoading } from '$lib/deferred-loading';
   import { formatAmountInput, formatCurrency, parseAmountInput } from '$lib/format';
   import {
     MAIN_SUB_LABEL,
@@ -61,7 +62,8 @@
   let pocketOptions = $state<Pocket[]>([...DEFAULT_POCKETS]);
   let subcategoryInputs = $state<Record<number, SubcategoryRow[]>>({});
   let newCategoryName = $state('');
-  let loading = $state(true);
+  let loading = $state(false);
+  let hydrated = $state(false);
   let saving = $state(false);
   let addingCategory = $state(false);
   let error = $state('');
@@ -181,24 +183,30 @@
   }
 
   async function loadData(activePeriod: string) {
-    loading = true;
     error = '';
     success = '';
-    try {
-      const [catRes, plan, pocketRes] = await Promise.all([
-        getCategories(),
-        getPlan(activePeriod),
-        getPockets(),
-      ]);
-      categories = catRes.categories;
-      pocketOptions = pocketRes.pockets.map((p) => p.name);
-      if (pocketOptions.length === 0) pocketOptions = [...DEFAULT_POCKETS];
-      applyPlanToForm(plan);
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to load plan';
-    } finally {
-      loading = false;
-    }
+    await withDeferredLoading(
+      (v) => {
+        loading = v;
+      },
+      async () => {
+        try {
+          const [catRes, plan, pocketRes] = await Promise.all([
+            getCategories(),
+            getPlan(activePeriod),
+            getPockets(),
+          ]);
+          categories = catRes.categories;
+          pocketOptions = pocketRes.pockets.map((p) => p.name);
+          if (pocketOptions.length === 0) pocketOptions = [...DEFAULT_POCKETS];
+          applyPlanToForm(plan);
+        } catch (e) {
+          error = e instanceof Error ? e.message : 'Failed to load plan';
+        } finally {
+          hydrated = true;
+        }
+      },
+    );
   }
 
   $effect(() => {
@@ -320,7 +328,7 @@
 </script>
 
 <section class="mx-auto w-full space-y-4 md:space-y-6">
-  {#if loading}
+  {#if loading || !hydrated}
     <div class="h-48 animate-pulse border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900"></div>
   {:else}
     <div class="flex flex-wrap items-center justify-between gap-2">

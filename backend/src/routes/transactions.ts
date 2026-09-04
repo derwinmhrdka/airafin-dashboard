@@ -2,6 +2,7 @@ import { count, desc, eq, and, ilike, notInArray, type SQL } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/index.js';
 import { categories, transactions } from '../db/schema.js';
+import { autoDoneChecklistForDetailSpend } from '../lib/checklist-auto-done.js';
 import { getPlanPicForTransaction } from '../lib/plan-pic.js';
 import {
   appendTransactionToSheet,
@@ -188,7 +189,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
       const q = request.query.q?.trim() ?? '';
       if (q.length < 3) return { suggestions: [] };
 
-      const limit = Math.min(Math.max(Number.parseInt(request.query.limit ?? '5', 10) || 5, 1), 10);
+      const limit = Math.min(Math.max(Number.parseInt(request.query.limit ?? '3', 10) || 3, 1), 10);
       const escaped = q.replace(/[%_\\]/g, '\\$&');
 
       const rows = await db
@@ -279,6 +280,14 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
         })
         .returning();
 
+      await autoDoneChecklistForDetailSpend({
+        projectId,
+        period: created.period,
+        categoryId: created.categoryId,
+        subcategoryName: created.subCategory,
+        amount: Math.round(Number(created.cost)),
+      });
+
       const sheetsSync = await appendTransactionToSheet(toSheetRow(created, category.name));
 
       if (sheetsSync.status === 'failed') {
@@ -345,6 +354,14 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
       if (!updated) {
         return reply.code(404).send({ error: 'Transaction not found' });
       }
+
+      await autoDoneChecklistForDetailSpend({
+        projectId,
+        period: updated.period,
+        categoryId: updated.categoryId,
+        subcategoryName: updated.subCategory,
+        amount: Math.round(Number(updated.cost)),
+      });
 
       const sheetsSync = await updateTransactionInSheet(
         toSheetRow(updated, category.name),

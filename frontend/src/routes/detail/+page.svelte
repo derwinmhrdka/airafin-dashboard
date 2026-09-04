@@ -14,6 +14,7 @@
     suggestTransactions,
     updateTransaction,
   } from '$lib/api';
+  import { withDeferredLoading } from '$lib/deferred-loading';
   import { formatAmountInput, formatCurrency, formatDate, parseAmountInput } from '$lib/format';
   import { MAIN_SUB_LABEL } from '$lib/plan-allocations';
   import { periodFromUrl } from '$lib/period';
@@ -33,7 +34,7 @@
   let total = $state(0);
   let monthTotal = $state(0);
   let hasMore = $state(false);
-  let loading = $state(true);
+  let loading = $state(false);
   let filterLoading = $state(false);
   let loadingMore = $state(false);
   let saving = $state(false);
@@ -168,7 +169,7 @@
     const seq = ++suggestSeq;
     suggestLoading = true;
     try {
-      const res = await suggestTransactions(q, 5);
+      const res = await suggestTransactions(q, 3);
       if (seq !== suggestSeq) return;
       suggestions = res.suggestions;
       suggestOpen = res.suggestions.length > 0;
@@ -232,12 +233,12 @@
   async function loadTransactions(
     activePeriod: string,
     reset = false,
-    opts?: { filterOnly?: boolean },
+    opts?: { filterOnly?: boolean; soft?: boolean },
   ) {
     if (reset) {
       if (opts?.filterOnly) {
         filterLoading = true;
-      } else {
+      } else if (!opts?.soft) {
         loading = true;
       }
     } else {
@@ -270,40 +271,45 @@
 
   async function loadData(activePeriod: string) {
     error = '';
-    loading = true;
-    try {
-      const [catRes, plan, summary] = await Promise.all([
-        getCategories(),
-        getPlan(activePeriod),
-        getSummary(activePeriod),
-      ]);
-      categories = catRes.categories;
-      categoryPicById = Object.fromEntries(
-        plan.budgets
-          .filter((b) => b.pic && isKnownPic(b.pic, picList))
-          .map((b) => [b.categoryId, b.pic as Pic]),
-      );
-      subPicByKey = Object.fromEntries(
-        (plan.subcategories ?? [])
-          .filter((s) => s.pic && isKnownPic(s.pic, picList))
-          .map((s) => [`${s.categoryId}|${s.name.trim().toLowerCase()}`, s.pic as Pic]),
-      );
-      subcategoriesByCategory = Object.fromEntries(
-        categories.map((cat) => [
-          cat.id,
-          (plan.subcategories ?? [])
-            .filter((s) => s.categoryId === cat.id)
-            .map((s) => s.name),
-        ]),
-      );
-      applySummary(summary);
-      if (!categoryId && categories.length) categoryId = defaultCategoryId(categories);
-      pic = defaultPicForSelection(categoryId);
-      await loadTransactions(activePeriod, true);
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to load data';
-      loading = false;
-    }
+    await withDeferredLoading(
+      (v) => {
+        loading = v;
+      },
+      async () => {
+        try {
+          const [catRes, plan, summary] = await Promise.all([
+            getCategories(),
+            getPlan(activePeriod),
+            getSummary(activePeriod),
+          ]);
+          categories = catRes.categories;
+          categoryPicById = Object.fromEntries(
+            plan.budgets
+              .filter((b) => b.pic && isKnownPic(b.pic, picList))
+              .map((b) => [b.categoryId, b.pic as Pic]),
+          );
+          subPicByKey = Object.fromEntries(
+            (plan.subcategories ?? [])
+              .filter((s) => s.pic && isKnownPic(s.pic, picList))
+              .map((s) => [`${s.categoryId}|${s.name.trim().toLowerCase()}`, s.pic as Pic]),
+          );
+          subcategoriesByCategory = Object.fromEntries(
+            categories.map((cat) => [
+              cat.id,
+              (plan.subcategories ?? [])
+                .filter((s) => s.categoryId === cat.id)
+                .map((s) => s.name),
+            ]),
+          );
+          applySummary(summary);
+          if (!categoryId && categories.length) categoryId = defaultCategoryId(categories);
+          pic = defaultPicForSelection(categoryId);
+          await loadTransactions(activePeriod, true, { soft: true });
+        } catch (e) {
+          error = e instanceof Error ? e.message : 'Failed to load data';
+        }
+      },
+    );
   }
 
   async function refreshSubRemaining(activePeriod: string) {
@@ -653,10 +659,10 @@
           <button
             type="button"
             onclick={() => (pic = p)}
-            class="inline-flex items-center gap-2 border px-2.5 py-1.5 text-xs transition
+            class="inline-flex items-center gap-2 border bg-transparent px-2.5 py-1.5 text-xs transition
               {pic === p
-              ? 'border-zinc-900 bg-zinc-900 text-white dark:border-white dark:bg-white dark:text-zinc-900'
-              : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-400 dark:border-zinc-800 dark:bg-black dark:text-zinc-300 dark:hover:border-zinc-600'}"
+              ? 'border-zinc-900 text-zinc-900 dark:border-white dark:text-zinc-100'
+              : 'border-transparent text-zinc-500 opacity-45 hover:opacity-70 dark:text-zinc-400'}"
             aria-pressed={pic === p}
             aria-label="Paid by {p}"
           >

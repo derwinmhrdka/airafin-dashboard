@@ -1,16 +1,18 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { categoryChartFill } from '$lib/chart-colors';
-  import AllocationBar from '$lib/components/AllocationBar.svelte';
   import CategoryProgress from '$lib/components/CategoryProgress.svelte';
   import HBarChart from '$lib/components/HBarChart.svelte';
+  import PieChart from '$lib/components/PieChart.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
   import StatCard from '$lib/components/StatCard.svelte';
   import { getSummary } from '$lib/api';
+  import { withDeferredLoading } from '$lib/deferred-loading';
   import { formatCurrency } from '$lib/format';
   import { planVsExpenseSlices } from '$lib/plan-vs-expense';
   import { periodFromUrl } from '$lib/period';
   import type { CategorySummary, DashboardSummary } from '$lib/types';
+  import { peekOverviewPaint, rememberOverviewPaint } from '$lib/overview-paint';
 
   const period = $derived(periodFromUrl(page.url.searchParams));
 
@@ -19,12 +21,12 @@
     return c.subcategories?.some((s) => s.allocated > 0 || s.spent > 0) ?? false;
   }
 
-  let summary = $state<DashboardSummary | null>(null);
-  let loading = $state(true);
+  let summary = $state<DashboardSummary | null>(peekOverviewPaint(period));
+  let loading = $state(false);
   let error = $state('');
   /** 'general' or categoryId string */
   let planVsScope = $state('general');
-  /** Category name filter from Plan Allocation bar */
+  /** Category name filter from Plan Allocation pie */
   let allocationFilter = $state<string | null>(null);
 
   const chartCategories = $derived(
@@ -83,18 +85,27 @@
   );
 
   async function loadData(activePeriod: string) {
-    loading = true;
     error = '';
     allocationFilter = null;
-    try {
-      const summaryRes = await getSummary(activePeriod);
-      summary = summaryRes;
-    } catch (e) {
-      summary = null;
-      error = e instanceof Error ? e.message : 'Failed to load summary';
-    } finally {
-      loading = false;
-    }
+    await withDeferredLoading(
+      (v) => {
+        loading = v;
+      },
+      async () => {
+        try {
+          const next = await getSummary(activePeriod);
+          summary = next;
+          rememberOverviewPaint(activePeriod, next);
+        } catch (e) {
+          summary = null;
+          error = e instanceof Error ? e.message : 'Failed to load summary';
+        }
+      },
+    );
+  }
+
+  function setAllocationFilter(label: string | null) {
+    allocationFilter = label;
   }
 
   $effect(() => {
@@ -102,7 +113,7 @@
   });
 </script>
 
-{#if loading}
+{#if loading || (!summary && !error)}
   <div class="space-y-3">
     <div class="grid grid-cols-3 gap-2">
       {#each Array(3) as _}
@@ -162,28 +173,26 @@
           <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Plan Allocation</h2>
           <p class="mt-1 text-[10px] text-zinc-500">
             Share of plan per category ({formatCurrency(summary.totalBudgetAllocated)}). Tap a
-            segment to filter below.
+            segment to filter · tap again to reset.
           </p>
         </div>
-        <AllocationBar
+        <PieChart
           slices={allocationSlices}
           selected={allocationFilter}
           emptyLabel="No plan yet"
-          onSelect={(label) => {
-            allocationFilter = label;
-          }}
+          onSelect={setAllocationFilter}
         />
       </article>
     </div>
 
-    <div class="space-y-2 md:space-y-3" data-allocation-filtered>
+    <div class="space-y-2 md:space-y-3">
       <div class="flex items-center justify-between gap-2">
         <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">By Category</h2>
         {#if allocationFilter}
           <button
             type="button"
-            class="text-[10px] text-zinc-500 underline-offset-2 transition-opacity hover:underline"
-            onclick={() => (allocationFilter = null)}
+            class="text-[10px] text-zinc-500 underline-offset-2 hover:underline"
+            onclick={() => setAllocationFilter(null)}
           >
             Show all
           </button>
@@ -191,9 +200,7 @@
       </div>
       <div class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
         {#each visibleCategories as item, i (item.categoryId)}
-          <div class="allocation-card" style="animation-delay: {Math.min(i, 6) * 40}ms">
-            <CategoryProgress {item} index={0} />
-          </div>
+          <CategoryProgress {item} index={i} />
         {:else}
           <p
             class="border border-dashed border-zinc-200 px-3 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800 md:col-span-full"
@@ -233,7 +240,7 @@
                     </div>
                     <div class="mb-2 h-1.5 overflow-hidden bg-zinc-100 dark:bg-zinc-900">
                       <div
-                        class="h-full transition-all duration-700 ease-out {overBudget ? 'bg-red-600' : 'bg-zinc-700 dark:bg-zinc-300'}"
+                        class="h-full transition-[width] duration-500 ease-out {overBudget ? 'bg-red-600' : 'bg-zinc-700 dark:bg-zinc-300'}"
                         style="width: {pct}%"
                       ></div>
                     </div>
@@ -290,26 +297,3 @@
     Unable to load overview. Try refreshing the page.
   </p>
 {/if}
-
-<style>
-  .allocation-card {
-    animation: allocationIn 280ms ease-out both;
-  }
-
-  @keyframes allocationIn {
-    from {
-      opacity: 0;
-      transform: translateY(6px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .allocation-card {
-      animation: none;
-    }
-  }
-</style>

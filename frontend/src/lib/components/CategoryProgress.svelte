@@ -6,10 +6,12 @@
 
   interface Props {
     item: CategorySummary;
-    index: number;
+    index?: number;
+    /** Entrance animation — off when toggling filters to avoid jank. */
+    animate?: boolean;
   }
 
-  let { item, index }: Props = $props();
+  let { item, index = 0, animate = true }: Props = $props();
 
   const style = $derived(categoryStyle(item.categoryName));
   const pct = $derived(
@@ -22,8 +24,8 @@
 </script>
 
 <article
-  class="animate-in border border-zinc-200 p-3 dark:border-zinc-800"
-  style="animation: fadeUp 0.4s ease {index * 60}ms both"
+  class="border border-zinc-200 p-3 dark:border-zinc-800 {animate ? 'animate-in' : ''}"
+  style={animate ? `animation: fadeUp 0.35s ease ${index * 40}ms both` : undefined}
 >
   <div class="mb-2 flex items-center justify-between gap-2">
     <span class="rounded px-2 py-0.5 text-xs font-medium {style.bg} {style.text}">
@@ -36,7 +38,7 @@
 
   <div class="mb-2 h-1.5 overflow-hidden bg-zinc-100 dark:bg-zinc-900">
     <div
-      class="h-full transition-all duration-700 ease-out {overBudget ? 'bg-red-600' : style.bar}"
+      class="h-full transition-[width] duration-500 ease-out {overBudget ? 'bg-red-600' : style.bar}"
       style="width: {pct}%"
     ></div>
   </div>

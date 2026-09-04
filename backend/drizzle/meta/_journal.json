@@ -120,6 +120,13 @@
       "when": 1750188800000,
       "tag": "0016_info_updates",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1750192400000,
+      "tag": "0017_info_update_1_1_1",
+      "breakpoints": true
     }
   ]
 }

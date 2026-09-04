@@ -11,6 +11,7 @@
   } from '$lib/api';
   import AmountInput from '$lib/components/AmountInput.svelte';
   import TransferPanel from '$lib/components/TransferPanel.svelte';
+  import { withDeferredLoading } from '$lib/deferred-loading';
   import { formatAmountInput, formatCurrency, parseAmountInput } from '$lib/format';
   import { MAIN_SUB_LABEL } from '$lib/plan-allocations';
   import { periodFromUrl, shiftPeriod } from '$lib/period';
@@ -36,7 +37,8 @@
   let pocketOptions = $state<Pocket[]>([...DEFAULT_POCKETS]);
   let pocketColors = $state<Record<string, string>>({});
   let checklistItems = $state<PlanChecklistItem[]>([]);
-  let loading = $state(true);
+  let loading = $state(false);
+  let hydrated = $state(false);
   let error = $state('');
   let success = $state('');
 
@@ -295,27 +297,33 @@
   }
 
   async function loadData(activePeriod: string) {
-    loading = true;
     error = '';
     success = '';
-    try {
-      const [catRes, plan, pocketRes] = await Promise.all([
-        getCategories(),
-        getPlan(activePeriod),
-        getPockets(),
-      ]);
-      categories = catRes.categories;
-      pocketOptions = pocketRes.pockets.map((p) => p.name);
-      if (pocketOptions.length === 0) pocketOptions = [...DEFAULT_POCKETS];
-      pocketColors = Object.fromEntries(
-        pocketRes.pockets.map((p) => [p.name.toUpperCase(), p.color || '#71717a']),
-      );
-      applyPlanSubcategories(plan);
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to load transfer data';
-    } finally {
-      loading = false;
-    }
+    await withDeferredLoading(
+      (v) => {
+        loading = v;
+      },
+      async () => {
+        try {
+          const [catRes, plan, pocketRes] = await Promise.all([
+            getCategories(),
+            getPlan(activePeriod),
+            getPockets(),
+          ]);
+          categories = catRes.categories;
+          pocketOptions = pocketRes.pockets.map((p) => p.name);
+          if (pocketOptions.length === 0) pocketOptions = [...DEFAULT_POCKETS];
+          pocketColors = Object.fromEntries(
+            pocketRes.pockets.map((p) => [p.name.toUpperCase(), p.color || '#71717a']),
+          );
+          applyPlanSubcategories(plan);
+        } catch (e) {
+          error = e instanceof Error ? e.message : 'Failed to load transfer data';
+        } finally {
+          hydrated = true;
+        }
+      },
+    );
   }
 
   $effect(() => {
@@ -553,7 +561,7 @@
     </div>
   {/if}
 
-  {#if loading}
+  {#if loading || !hydrated}
     <div class="h-32 animate-pulse border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900"></div>
   {:else}
     <TransferPanel

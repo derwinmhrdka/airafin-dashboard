@@ -12,6 +12,7 @@
   const isLast = $derived(pageIndex >= pages.length - 1);
 
   async function load() {
+    if (loaded) return;
     try {
       const res = await getPendingInfoUpdate();
       update = res.update;

@@ -21,7 +21,28 @@ function apiBase(): string {
   return env.PUBLIC_API_URL ?? '';
 }
 
-async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
+const GET_CACHE_TTL_MS = 25_000;
+const getCache = new Map<string, { at: number; data: unknown }>();
+
+function clearGetCache() {
+  getCache.clear();
+}
+
+async function fetchJson<T>(
+  path: string,
+  init?: RequestInit,
+  opts?: { memoryCache?: boolean },
+): Promise<T> {
+  const method = (init?.method ?? 'GET').toUpperCase();
+  const useCache = method === 'GET' && opts?.memoryCache === true;
+
+  if (useCache) {
+    const hit = getCache.get(path);
+    if (hit && Date.now() - hit.at < GET_CACHE_TTL_MS) {
+      return hit.data as T;
+    }
+  }
+
   const headers = new Headers(init?.headers);
   if (init?.body != null && init.body !== '' && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
@@ -37,17 +58,29 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(body.error ?? `Request failed (${res.status})`);
   }
 
-  return res.json() as Promise<T>;
+  const data = (await res.json()) as T;
+
+  if (method !== 'GET') {
+    clearGetCache();
+  } else if (useCache) {
+    getCache.set(path, { at: Date.now(), data });
+  }
+
+  return data;
 }
 
 export function getSummary(period: string): Promise<DashboardSummary> {
-  return fetchJson(`/api/dashboard/summary?period=${encodeURIComponent(period)}`);
+  return fetchJson(`/api/dashboard/summary?period=${encodeURIComponent(period)}`, undefined, {
+    memoryCache: true,
+  });
 }
 
 export function getReimbursements(
   period: string,
 ): Promise<{ period: string; reimbursements: ReimbursementItem[] }> {
-  return fetchJson(`/api/dashboard/reimbursements?period=${encodeURIComponent(period)}`);
+  return fetchJson(`/api/dashboard/reimbursements?period=${encodeURIComponent(period)}`, undefined, {
+    memoryCache: true,
+  });
 }
 
 export function markReimbursementPaid(id: number): Promise<{
@@ -65,7 +98,7 @@ export function markReimbursementUnpaid(id: number): Promise<{
 }
 
 export function getCategories(): Promise<{ categories: Category[] }> {
-  return fetchJson('/api/categories');
+  return fetchJson('/api/categories', undefined, { memoryCache: true });
 }
 
 export function createCategory(name: string): Promise<{ category: Category }> {
@@ -76,7 +109,7 @@ export function createCategory(name: string): Promise<{ category: Category }> {
 }
 
 export function getPockets(): Promise<{ pockets: PocketSetting[] }> {
-  return fetchJson('/api/settings/pockets');
+  return fetchJson('/api/settings/pockets', undefined, { memoryCache: true });
 }
 
 export function createPocket(
@@ -101,7 +134,7 @@ export function deletePocket(id: number): Promise<{ ok: boolean }> {
 }
 
 export function getPics(): Promise<{ pics: PicSetting[] }> {
-  return fetchJson('/api/settings/pics');
+  return fetchJson('/api/settings/pics', undefined, { memoryCache: true });
 }
 
 export function createPic(name: string): Promise<{ pic: PicSetting; created: boolean }> {
@@ -186,7 +219,7 @@ export function getNotifications(
 
 export function getProjects(opts?: { all?: boolean }): Promise<{ projects: Project[] }> {
   const q = opts?.all ? '?all=1' : '';
-  return fetchJson(`/api/projects${q}`);
+  return fetchJson(`/api/projects${q}`, undefined, { memoryCache: true });
 }
 
 export function createProject(input: {
@@ -341,14 +374,16 @@ export function getTransactions(
 
 export function suggestTransactions(
   q: string,
-  limit = 5,
+  limit = 3,
 ): Promise<{ suggestions: TransactionSuggestion[] }> {
   const params = new URLSearchParams({ q: q.trim(), limit: String(limit) });
   return fetchJson(`/api/transactions/suggest?${params}`, { cache: 'no-store' });
 }
 
 export function getPlan(period: string): Promise<PlanData> {
-  return fetchJson(`/api/plan?period=${encodeURIComponent(period)}`);
+  return fetchJson(`/api/plan?period=${encodeURIComponent(period)}`, undefined, {
+    memoryCache: true,
+  });
 }
 
 export function createTransaction(body: {

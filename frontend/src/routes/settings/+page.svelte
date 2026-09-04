@@ -13,6 +13,7 @@
   } from '$lib/api';
   import ColorPicker from '$lib/components/ColorPicker.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
+  import { withDeferredLoading } from '$lib/deferred-loading';
   import { setPicNames } from '$lib/pics';
   import { POCKET_COLORS } from '$lib/pocket-colors';
   import { periodFromUrl } from '$lib/period';
@@ -26,7 +27,8 @@
   let pocketName = $state('');
   let pocketColor = $state(POCKET_COLORS[0]);
   let picNameInput = $state('');
-  let loading = $state(true);
+  let loading = $state(false);
+  let hydrated = $state(false);
   let pocketBusy = $state(false);
   let picBusy = $state(false);
   let colorBusyId = $state<number | null>(null);
@@ -35,17 +37,23 @@
   let error = $state('');
 
   async function loadSettings() {
-    loading = true;
-    try {
-      const [pocketRes, picRes] = await Promise.all([getPockets(), getPics()]);
-      pockets = pocketRes.pockets;
-      pics = picRes.pics;
-      setPicNames(picRes.pics.map((p) => p.name));
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to load settings';
-    } finally {
-      loading = false;
-    }
+    await withDeferredLoading(
+      (v) => {
+        loading = v;
+      },
+      async () => {
+        try {
+          const [pocketRes, picRes] = await Promise.all([getPockets(), getPics()]);
+          pockets = pocketRes.pockets;
+          pics = picRes.pics;
+          setPicNames(picRes.pics.map((p) => p.name));
+        } catch (e) {
+          error = e instanceof Error ? e.message : 'Failed to load settings';
+        } finally {
+          hydrated = true;
+        }
+      },
+    );
   }
 
   $effect(() => {
@@ -229,7 +237,7 @@
         </button>
       </div>
     {/if}
-    {#if loading}
+    {#if loading || (!hydrated && pics.length === 0)}
       <p class="text-xs text-zinc-500">Loading…</p>
     {:else if pics.length === 0}
       <p class="text-xs text-zinc-500">No PICs yet.</p>
@@ -280,7 +288,7 @@
       </div>
     </div>
 
-    {#if loading}
+    {#if loading || (!hydrated && pockets.length === 0)}
       <p class="text-xs text-zinc-500">Loading pockets…</p>
     {:else if pockets.length === 0}
       <p class="text-xs text-zinc-500">No pockets yet.</p>

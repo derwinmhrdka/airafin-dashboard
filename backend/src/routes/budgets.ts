@@ -21,6 +21,7 @@ import {
   deficitDetail,
   isBudgetMoveTransaction,
 } from '../lib/budget-move.js';
+import { hasMatchingDetailSpend } from '../lib/checklist-auto-done.js';
 import { appendTransactionToSheet } from '../lib/google-sheets.js';
 import {
   BALANCING_ITEM_NAME,
@@ -330,6 +331,14 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
+    const autoDone = await hasMatchingDetailSpend({
+      projectId,
+      period,
+      categoryId: categoryId ?? null,
+      subcategoryName,
+      amount,
+    });
+
     const [created] = await db
       .insert(planChecklist)
       .values({
@@ -341,7 +350,7 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
         senderPic,
         receiverPic,
         pocket,
-        done: false,
+        done: autoDone,
         isBalancing: false,
       })
       .returning();

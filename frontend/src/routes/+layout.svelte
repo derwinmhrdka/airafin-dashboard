@@ -23,31 +23,41 @@
   let projectName = $state<string | null>(null);
   let projectPhoto = $state<string | null>(null);
   let switchOpen = $state(false);
+  let picsLoaded = false;
+  let loadedProjectId: number | null = null;
 
   $effect(() => {
     if (page.url.pathname === '/login') return;
+    if (picsLoaded) return;
+    picsLoaded = true;
     void getPics()
       .then((res) => setPicNames(res.pics.map((p) => p.name)))
-      .catch(() => {});
+      .catch(() => {
+        picsLoaded = false;
+      });
   });
 
   $effect(() => {
-    const id = data.session?.projectId;
+    const id = data.session?.projectId ?? null;
+    const admin = data.isAdmin === true;
     if (!id) {
       projectName = null;
       projectPhoto = null;
+      loadedProjectId = null;
       return;
     }
-    // Assigned list for name chip; on admin fall back to all-projects if needed.
+    if (id === loadedProjectId && projectName != null) return;
+    loadedProjectId = id;
     void getProjects()
       .then(async (res) => {
         let p = res.projects.find((x) => x.id === id);
-        if (!p && isAdminRoute && data.isAdmin) {
+        if (!p && admin) {
           const all = await getProjects({ all: true }).catch(() => null);
           p = all?.projects.find((x) => x.id === id);
         }
         if (!p) {
-          if (isAdminRoute) {
+          loadedProjectId = null;
+          if (window.location.pathname.startsWith('/admin')) {
             projectName = null;
             projectPhoto = null;
             return;
@@ -64,6 +74,7 @@
         projectPhoto = p.photo ?? null;
       })
       .catch(() => {
+        loadedProjectId = null;
         projectName = null;
         projectPhoto = null;
       });

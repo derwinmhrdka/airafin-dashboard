@@ -11,9 +11,20 @@
     slices: PieSlice[];
     size?: number;
     emptyLabel?: string;
+    /** When set with onSelect, slices become clickable filters. */
+    selected?: string | null;
+    onSelect?: (label: string | null) => void;
   }
 
-  let { slices, size = 152, emptyLabel = 'No data' }: Props = $props();
+  let {
+    slices,
+    size = 152,
+    emptyLabel = 'No data',
+    selected = null,
+    onSelect,
+  }: Props = $props();
+
+  const interactive = $derived(typeof onSelect === 'function');
 
   const cx = 50;
   const cy = 50;
@@ -55,6 +66,11 @@
       return { ...slice, path, pct };
     });
   }
+
+  function toggle(label: string) {
+    if (!onSelect) return;
+    onSelect(selected === label ? null : label);
+  }
 </script>
 
 <div class="flex flex-col items-center gap-3">
@@ -73,15 +89,39 @@
         </text>
       </svg>
     {:else}
-      <svg viewBox="0 0 100 100" class="h-full w-full" role="img" aria-label="Pie chart">
+      <svg
+        viewBox="0 0 100 100"
+        class="h-full w-full"
+        role={interactive ? 'listbox' : 'img'}
+        aria-label={interactive ? 'Plan allocation. Click a slice to filter.' : 'Pie chart'}
+        aria-multiselectable={interactive ? 'false' : undefined}
+      >
         {#each arcs as arc (arc.label)}
-          <path d={arc.path} fill={arc.color} class="transition-opacity hover:opacity-90" />
+          {@const isSelected = selected === arc.label}
+          {@const dimmed = selected != null && !isSelected}
+          <path
+            d={arc.path}
+            fill={arc.color}
+            role={interactive ? 'option' : undefined}
+            aria-selected={interactive ? isSelected : undefined}
+            class="transition-opacity duration-150 ease-out
+              {interactive ? 'cursor-pointer' : ''}
+              {dimmed ? 'opacity-30' : 'opacity-100'}"
+            onclick={interactive
+              ? (e) => {
+                  e.stopPropagation();
+                  toggle(arc.label);
+                }
+              : undefined}
+          >
+            <title>{arc.label}: {formatCurrency(arc.value)}</title>
+          </path>
         {/each}
         <circle
           cx={cx}
           cy={cy}
           r="22"
-          class="fill-white dark:fill-black"
+          class="pointer-events-none fill-white dark:fill-black"
         />
       </svg>
     {/if}
@@ -90,20 +130,46 @@
   {#if arcs.length > 0}
     <ul class="w-full space-y-1">
       {#each arcs as arc (arc.label)}
-        <li class="flex items-center justify-between gap-2 text-[11px]">
-          <span class="flex min-w-0 items-center gap-1.5">
-            <span
-              class="h-2 w-2 shrink-0 rounded-full"
-              style="background-color: {arc.color}"
-            ></span>
-            <span class="truncate text-zinc-600 dark:text-zinc-400">{arc.label}</span>
-          </span>
-          <span class="shrink-0 font-mono tabular-nums text-zinc-800 dark:text-zinc-200">
-            {formatCurrency(arc.value)}
-            <span class="text-zinc-400">({Math.round(arc.pct * 100)}%)</span>
-          </span>
+        {@const isSelected = selected === arc.label}
+        {@const dimmed = selected != null && !isSelected}
+        <li>
+          {#if interactive}
+            <button
+              type="button"
+              class="flex w-full items-center justify-between gap-2 text-left text-[11px] transition-opacity duration-150
+                {dimmed ? 'opacity-40' : 'opacity-100'}
+                {isSelected ? 'font-medium' : ''}"
+              onclick={() => toggle(arc.label)}
+            >
+              <span class="flex min-w-0 items-center gap-1.5">
+                <span class="h-2 w-2 shrink-0 rounded-full" style="background-color: {arc.color}"></span>
+                <span class="truncate text-zinc-600 dark:text-zinc-400">{arc.label}</span>
+              </span>
+              <span class="shrink-0 font-mono tabular-nums text-zinc-800 dark:text-zinc-200">
+                {formatCurrency(arc.value)}
+                <span class="text-zinc-400">({Math.round(arc.pct * 100)}%)</span>
+              </span>
+            </button>
+          {:else}
+            <div class="flex items-center justify-between gap-2 text-[11px]">
+              <span class="flex min-w-0 items-center gap-1.5">
+                <span class="h-2 w-2 shrink-0 rounded-full" style="background-color: {arc.color}"></span>
+                <span class="truncate text-zinc-600 dark:text-zinc-400">{arc.label}</span>
+              </span>
+              <span class="shrink-0 font-mono tabular-nums text-zinc-800 dark:text-zinc-200">
+                {formatCurrency(arc.value)}
+                <span class="text-zinc-400">({Math.round(arc.pct * 100)}%)</span>
+              </span>
+            </div>
+          {/if}
         </li>
       {/each}
     </ul>
+    {#if interactive && selected}
+      <p class="w-full text-[10px] text-zinc-400">
+        Filtering <span class="font-medium text-zinc-600 dark:text-zinc-300">{selected}</span>
+        · tap again to reset
+      </p>
+    {/if}
   {/if}
 </div>
