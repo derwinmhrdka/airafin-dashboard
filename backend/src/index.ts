@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import Fastify from 'fastify';
 import { refreshPicCache } from './lib/pic.js';
 import { emailIsAdmin } from './lib/auth-emails.js';
+import { registerUploadRoutes } from './lib/photo-storage.js';
 import { getProjectById, isProjectMember, parseProjectIdHeader } from './lib/project.js';
 import { budgetRoutes } from './routes/budgets.js';
 import { categoryRoutes } from './routes/categories.js';
@@ -16,7 +17,7 @@ import { transactionRoutes } from './routes/transactions.js';
 
 const app = Fastify({
   logger: true,
-  bodyLimit: 2 * 1048576, // 2MB for project photo data URLs
+  bodyLimit: 2 * 1048576, // upload payload (data URL → file on disk)
 });
 
 await app.register(cors, {
@@ -32,7 +33,8 @@ function needsProjectId(url: string): boolean {
     path.startsWith('/api/auth/') ||
     path.startsWith('/api/settings/') ||
     path.startsWith('/api/categories') ||
-    path.startsWith('/api/info-updates');
+    path.startsWith('/api/info-updates') ||
+    path.startsWith('/api/uploads');
 
   if (optional) return false;
   return true;
@@ -71,6 +73,7 @@ app.addHook('onRequest', async (request, reply) => {
   request.projectId = projectId;
 });
 
+await registerUploadRoutes(app);
 await app.register(projectRoutes);
 await app.register(categoryRoutes);
 await app.register(transactionRoutes);

@@ -1,8 +1,9 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { categoryChartFill } from '$lib/chart-colors';
+  import AllocationBar from '$lib/components/AllocationBar.svelte';
   import CategoryProgress from '$lib/components/CategoryProgress.svelte';
-  import PieChart from '$lib/components/PieChart.svelte';
+  import HBarChart from '$lib/components/HBarChart.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
   import StatCard from '$lib/components/StatCard.svelte';
   import { getSummary } from '$lib/api';
@@ -23,6 +24,8 @@
   let error = $state('');
   /** 'general' or categoryId string */
   let planVsScope = $state('general');
+  /** Category name filter from Plan Allocation bar */
+  let allocationFilter = $state<string | null>(null);
 
   const chartCategories = $derived(
     summary?.categories.filter(categoryHasData) ?? [],
@@ -62,6 +65,12 @@
       })),
   );
 
+  const visibleCategories = $derived(
+    (summary?.categories ?? [])
+      .filter(categoryHasData)
+      .filter((c) => allocationFilter == null || c.categoryName === allocationFilter),
+  );
+
   const pocketGroups = $derived.by(() =>
     (summary?.picPocketTotals ?? [])
       .map((row) => ({
@@ -76,6 +85,7 @@
   async function loadData(activePeriod: string) {
     loading = true;
     error = '';
+    allocationFilter = null;
     try {
       const summaryRes = await getSummary(activePeriod);
       summary = summaryRes;
@@ -126,7 +136,7 @@
     <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
       <article class="border border-zinc-200 p-3 dark:border-zinc-800">
         <div class="mb-3 space-y-2">
-          <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Plan vs Expenses</h2>
+          <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Spent vs Remaining</h2>
           <label class="block space-y-1">
             <span class="text-[10px] text-zinc-500">Category</span>
             <select
@@ -144,30 +154,53 @@
             {formatCurrency(planVsNumbers.spent)}
           </p>
         </div>
-        <PieChart slices={planVsSlices} emptyLabel="No plan data" />
+        <HBarChart slices={planVsSlices} emptyLabel="No plan data" />
       </article>
 
       <article class="border border-zinc-200 p-3 dark:border-zinc-800">
         <div class="mb-3">
           <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Plan Allocation</h2>
           <p class="mt-1 text-[10px] text-zinc-500">
-            Share of plan per category ({formatCurrency(summary.totalBudgetAllocated)}).
+            Share of plan per category ({formatCurrency(summary.totalBudgetAllocated)}). Tap a
+            segment to filter below.
           </p>
         </div>
-        <PieChart slices={allocationSlices} emptyLabel="No plan yet" />
+        <AllocationBar
+          slices={allocationSlices}
+          selected={allocationFilter}
+          emptyLabel="No plan yet"
+          onSelect={(label) => {
+            allocationFilter = label;
+          }}
+        />
       </article>
     </div>
 
-    <div class="space-y-2 md:space-y-3">
-      <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">By Category</h2>
+    <div class="space-y-2 md:space-y-3" data-allocation-filtered>
+      <div class="flex items-center justify-between gap-2">
+        <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">By Category</h2>
+        {#if allocationFilter}
+          <button
+            type="button"
+            class="text-[10px] text-zinc-500 underline-offset-2 transition-opacity hover:underline"
+            onclick={() => (allocationFilter = null)}
+          >
+            Show all
+          </button>
+        {/if}
+      </div>
       <div class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
-      {#each summary.categories.filter(categoryHasData) as item, i}
-        <CategoryProgress {item} index={i} />
-      {:else}
-        <p class="border border-dashed border-zinc-200 px-3 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800 md:col-span-full">
-          No plan yet
-        </p>
-      {/each}
+        {#each visibleCategories as item, i (item.categoryId)}
+          <div class="allocation-card" style="animation-delay: {Math.min(i, 6) * 40}ms">
+            <CategoryProgress {item} index={0} />
+          </div>
+        {:else}
+          <p
+            class="border border-dashed border-zinc-200 px-3 py-6 text-center text-sm text-zinc-500 dark:border-zinc-800 md:col-span-full"
+          >
+            No plan yet
+          </p>
+        {/each}
       </div>
     </div>
 
@@ -257,3 +290,26 @@
     Unable to load overview. Try refreshing the page.
   </p>
 {/if}
+
+<style>
+  .allocation-card {
+    animation: allocationIn 280ms ease-out both;
+  }
+
+  @keyframes allocationIn {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .allocation-card {
+      animation: none;
+    }
+  }
+</style>

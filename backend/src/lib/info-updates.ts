@@ -1,23 +1,16 @@
 import { and, asc, desc, eq, notInArray, sql } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { infoUpdatePages, infoUpdates, infoUpdateSkips } from '../db/schema.js';
+import {
+  deleteManagedPhotos,
+  persistPhotoInput,
+  pruneReplacedPhotos,
+} from './photo-storage.js';
 
-const MAX_PHOTO = 900_000;
 const MAX_PAGES = 12;
 
 function nowIso(): string {
   return new Date().toISOString();
-}
-
-function normalizePhoto(raw: string | null | undefined): string | null {
-  if (raw == null) return null;
-  const photo = String(raw).trim();
-  if (!photo) return null;
-  if (photo.length > MAX_PHOTO) throw new Error('Photo is too large');
-  if (photo.startsWith('data:image/') || photo.startsWith('https://') || photo.startsWith('http://')) {
-    return photo;
-  }
-  throw new Error('Photo must be an image data URL or http(s) URL');
 }
 
 export type PageInput = { body?: string; photo?: string | null };
@@ -103,31 +96,45 @@ export async function updateInfoUpdate(
 
 async function replacePages(infoUpdateId: number, pages: PageInput[]) {
   if (pages.length > MAX_PAGES) throw new Error(`Max ${MAX_PAGES} pages`);
-  await db.delete(infoUpdatePages).where(eq(infoUpdatePages.infoUpdateId, infoUpdateId));
-  if (pages.length === 0) {
-    const [page] = await db
-      .insert(infoUpdatePages)
-      .values({ infoUpdateId, sortOrder: 0, body: '', photo: null })
-      .returning();
-    return [page];
+
+  const oldRows = await db
+    .select({ photo: infoUpdatePages.photo })
+    .from(infoUpdatePages)
+    .where(eq(infoUpdatePages.infoUpdateId, infoUpdateId));
+  const previous = oldRows.map((r) => r.photo);
+
+  const list = pages.length === 0 ? [{ body: '', photo: null as string | null }] : pages;
+  const persisted: (string | null)[] = [];
+  for (const p of list) {
+    persisted.push(await persistPhotoInput(p.photo, 'info'));
   }
+
+  await db.delete(infoUpdatePages).where(eq(infoUpdatePages.infoUpdateId, infoUpdateId));
+
   const inserted = await db
     .insert(infoUpdatePages)
     .values(
-      pages.map((p, i) => ({
+      list.map((p, i) => ({
         infoUpdateId,
         sortOrder: i,
         body: String(p.body ?? '').trim(),
-        photo: normalizePhoto(p.photo),
+        photo: persisted[i] ?? null,
       })),
     )
     .returning();
+
+  await pruneReplacedPhotos(previous, persisted);
   return inserted.sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
 }
 
 export async function deleteInfoUpdate(id: number) {
-  const deleted = await db.delete(infoUpdates).where(eq(infoUpdates.id, id)).returning();
-  return deleted[0] ?? null;
+  const existing = await getInfoUpdateWithPages(id);
+  if (!existing) return null;
+
+  const photos = existing.pages.map((p) => p.photo);
+  const [deleted] = await db.delete(infoUpdates).where(eq(infoUpdates.id, id)).returning();
+  await deleteManagedPhotos(photos);
+  return deleted ?? null;
 }
 
 /** Next active info the user has not skipped (oldest active first). */

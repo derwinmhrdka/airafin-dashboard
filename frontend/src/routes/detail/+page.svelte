@@ -9,13 +9,16 @@
     deleteTransaction,
     getCategories,
     getPlan,
+    getSummary,
     getTransactions,
+    suggestTransactions,
     updateTransaction,
   } from '$lib/api';
   import { formatAmountInput, formatCurrency, formatDate, parseAmountInput } from '$lib/format';
+  import { MAIN_SUB_LABEL } from '$lib/plan-allocations';
   import { periodFromUrl } from '$lib/period';
   import { defaultPic, isKnownPic, picNames, type Pic } from '$lib/pics';
-  import type { Category, Transaction } from '$lib/types';
+  import type { Category, DashboardSummary, Transaction, TransactionSuggestion } from '$lib/types';
 
   const period = $derived(periodFromUrl(page.url.searchParams));
   const picList = $derived($picNames);
@@ -25,6 +28,7 @@
   let categoryPicById = $state<Record<number, Pic>>({});
   let subPicByKey = $state<Record<string, Pic>>({});
   let subcategoriesByCategory = $state<Record<number, string[]>>({});
+  let subSisaByKey = $state<Record<string, number>>({});
   let transactions = $state<Transaction[]>([]);
   let total = $state(0);
   let monthTotal = $state(0);
@@ -52,6 +56,14 @@
 
   let editingId = $state<number | null>(null);
   let formEl = $state<HTMLFormElement | null>(null);
+
+  let suggestions = $state<TransactionSuggestion[]>([]);
+  let suggestOpen = $state(false);
+  let suggestLoading = $state(false);
+  let suggestIndex = $state(-1);
+  let suggestSeq = 0;
+  let skipSuggest = $state(false);
+  let skipPicAuto = $state(false);
 
   function defaultPicForSelection(catId: number, sub: string = subCategory): Pic {
     const trimmed = sub.trim();
@@ -87,6 +99,23 @@
 
   const subCategoryOptions = $derived(subcategoriesByCategory[categoryId] ?? []);
 
+  const selectedSubRemaining = $derived.by(() => {
+    if (subCategoryOptions.length === 0) return null;
+    const key = `${categoryId}|${(subCategory.trim() || MAIN_SUB_LABEL).toLowerCase()}`;
+    const value = subSisaByKey[key];
+    return value === undefined ? null : value;
+  });
+
+  function applySummary(summary: DashboardSummary) {
+    const map: Record<string, number> = {};
+    for (const cat of summary.categories) {
+      for (const sub of cat.subcategories ?? []) {
+        map[`${cat.categoryId}|${sub.name.trim().toLowerCase()}`] = sub.sisa;
+      }
+    }
+    subSisaByKey = map;
+  }
+
   function expectedPlanPic(tx: Transaction): Pic | '' {
     const sub = tx.subCategory?.trim();
     if (sub) {
@@ -118,7 +147,80 @@
     subCategory = '';
     detail = '';
     cost = '';
+    skipPicAuto = false;
     pic = defaultPicForSelection(categoryId);
+    clearSuggestions();
+  }
+
+  function clearSuggestions() {
+    suggestions = [];
+    suggestOpen = false;
+    suggestIndex = -1;
+    suggestLoading = false;
+  }
+
+  async function loadSuggestions(query: string) {
+    const q = query.trim();
+    if (q.length < 3) {
+      clearSuggestions();
+      return;
+    }
+    const seq = ++suggestSeq;
+    suggestLoading = true;
+    try {
+      const res = await suggestTransactions(q, 5);
+      if (seq !== suggestSeq) return;
+      suggestions = res.suggestions;
+      suggestOpen = res.suggestions.length > 0;
+      suggestIndex = res.suggestions.length > 0 ? 0 : -1;
+    } catch {
+      if (seq !== suggestSeq) return;
+      clearSuggestions();
+    } finally {
+      if (seq === suggestSeq) suggestLoading = false;
+    }
+  }
+
+  function applySuggestion(item: TransactionSuggestion) {
+    skipSuggest = true;
+    skipPicAuto = true;
+    detail = item.detail;
+    if (!cost.trim()) {
+      cost = formatAmountInput(item.cost);
+    }
+    if (categories.some((c) => c.id === item.categoryId)) {
+      categoryId = item.categoryId;
+      const opts = subcategoriesByCategory[item.categoryId] ?? [];
+      const sub = item.subCategory?.trim() ?? '';
+      subCategory = sub && opts.includes(sub) ? sub : '';
+    }
+    if (isKnownPic(item.pic, picList)) {
+      pic = item.pic;
+    } else {
+      pic = defaultPicForSelection(categoryId, subCategory);
+    }
+    clearSuggestions();
+  }
+
+  function onDetailInput() {
+    skipSuggest = false;
+  }
+
+  function onDetailKeydown(e: KeyboardEvent) {
+    if (!suggestOpen || suggestions.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      suggestIndex = (suggestIndex + 1) % suggestions.length;
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      suggestIndex = (suggestIndex - 1 + suggestions.length) % suggestions.length;
+    } else if (e.key === 'Enter' && suggestIndex >= 0 && suggestIndex < suggestions.length) {
+      e.preventDefault();
+      applySuggestion(suggestions[suggestIndex]!);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      clearSuggestions();
+    }
   }
 
   function sheetsMessage(sync?: { status: string; error?: string }): string {
@@ -170,18 +272,22 @@
     error = '';
     loading = true;
     try {
-      const [catRes, plan] = await Promise.all([getCategories(), getPlan(activePeriod)]);
+      const [catRes, plan, summary] = await Promise.all([
+        getCategories(),
+        getPlan(activePeriod),
+        getSummary(activePeriod),
+      ]);
       categories = catRes.categories;
       categoryPicById = Object.fromEntries(
         plan.budgets
           .filter((b) => b.pic && isKnownPic(b.pic, picList))
           .map((b) => [b.categoryId, b.pic as Pic]),
-        );
-        subPicByKey = Object.fromEntries(
-          (plan.subcategories ?? [])
-            .filter((s) => s.pic && isKnownPic(s.pic, picList))
-            .map((s) => [`${s.categoryId}|${s.name.trim().toLowerCase()}`, s.pic as Pic]),
-        );
+      );
+      subPicByKey = Object.fromEntries(
+        (plan.subcategories ?? [])
+          .filter((s) => s.pic && isKnownPic(s.pic, picList))
+          .map((s) => [`${s.categoryId}|${s.name.trim().toLowerCase()}`, s.pic as Pic]),
+      );
       subcategoriesByCategory = Object.fromEntries(
         categories.map((cat) => [
           cat.id,
@@ -190,12 +296,21 @@
             .map((s) => s.name),
         ]),
       );
+      applySummary(summary);
       if (!categoryId && categories.length) categoryId = defaultCategoryId(categories);
       pic = defaultPicForSelection(categoryId);
       await loadTransactions(activePeriod, true);
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load data';
       loading = false;
+    }
+  }
+
+  async function refreshSubRemaining(activePeriod: string) {
+    try {
+      applySummary(await getSummary(activePeriod));
+    } catch {
+      /* keep last known */
     }
   }
 
@@ -223,6 +338,15 @@
   });
 
   $effect(() => {
+    const q = detail;
+    if (skipSuggest) return;
+    const timer = setTimeout(() => {
+      void loadSuggestions(q);
+    }, 350);
+    return () => clearTimeout(timer);
+  });
+
+  $effect(() => {
     filterCategory;
     filterPic;
     debouncedSearch;
@@ -240,12 +364,13 @@
     } else if (subCategory && !subCategoryOptions.includes(subCategory)) {
       subCategory = '';
     }
-    if (editingId == null) {
+    if (editingId == null && !skipPicAuto) {
       pic = defaultPicForSelection(categoryId, subCategory);
     }
   });
 
   function startEdit(tx: Transaction) {
+    skipSuggest = true;
     editingId = tx.id;
     date = tx.date;
     categoryId = tx.categoryId;
@@ -257,6 +382,7 @@
       : defaultPicForSelection(tx.categoryId, tx.subCategory ?? '');
     error = '';
     success = '';
+    clearSuggestions();
     queueMicrotask(() => {
       formEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
@@ -302,6 +428,7 @@
         cost = '';
       }
       await loadTransactions(period, true);
+      void refreshSubRemaining(period);
     } catch (e) {
       error = e instanceof Error ? e.message : editingId != null ? 'Failed to update' : 'Failed to save';
     } finally {
@@ -330,19 +457,24 @@
       total = Math.max(0, total - 1);
       monthTotal = Math.max(0, monthTotal - 1);
       hasMore = transactions.length < total;
+      void refreshSubRemaining(period);
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to delete';
     } finally {
       deletingId = null;
     }
   }
+
+  const fieldClass =
+    'w-full border border-zinc-200 bg-white px-2.5 py-2 text-sm outline-none transition focus:border-zinc-400 dark:border-zinc-800 dark:bg-black dark:focus:border-zinc-600';
+  const labelClass = 'text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-400';
 </script>
 
 <section class="space-y-4 lg:grid lg:grid-cols-[minmax(17rem,22rem)_minmax(0,1fr)] lg:items-start lg:gap-6 xl:gap-8">
   <form
     bind:this={formEl}
     onsubmit={handleSubmit}
-    class="space-y-3 border p-3 scroll-mt-3 lg:sticky lg:top-4
+    class="space-y-3.5 border p-3.5 scroll-mt-3 lg:sticky lg:top-4
       {editingId != null
       ? 'border-amber-300 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/20'
       : 'border-zinc-200 dark:border-zinc-800'}"
@@ -381,38 +513,20 @@
       {/if}
     </div>
 
-    <label class="block space-y-1">
-      <span class="text-[11px] text-zinc-500">Date</span>
-      <input
-        type="date"
-        bind:value={date}
-        required
-        class="box-border w-full min-w-0 max-w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
-      />
+    <label class="block space-y-1.5">
+      <span class={labelClass}>Date</span>
+      <input type="date" bind:value={date} required class="box-border min-w-0 max-w-full {fieldClass}" />
     </label>
 
-    <label class="block space-y-1">
-      <span class="text-[11px] text-zinc-500">Detail</span>
-      <input
-        type="text"
-        bind:value={detail}
-        required
-        placeholder="What was this for?"
-        class="w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
-      />
-    </label>
-
-    <label class="block space-y-1">
-      <span class="text-[11px] text-zinc-500">Cost</span>
-      <AmountInput bind:value={cost} required />
-    </label>
-
-    <label class="block space-y-1">
-      <span class="text-[11px] text-zinc-500">Category</span>
+    <label class="block space-y-1.5">
+      <span class={labelClass}>Category</span>
       <select
         bind:value={categoryId}
         required
-        class="w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
+        class={fieldClass}
+        onchange={() => {
+          skipPicAuto = false;
+        }}
       >
         {#each categories as cat}
           <option value={cat.id}>{cat.name}</option>
@@ -421,32 +535,139 @@
     </label>
 
     {#if subCategoryOptions.length > 0}
-      <label class="block space-y-1">
-        <span class="text-[11px] text-zinc-500">Sub Category</span>
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between gap-2">
+          <label for="detail-sub-category" class={labelClass}>Sub Category</label>
+          {#if selectedSubRemaining != null}
+            <span
+              class="inline-flex items-center gap-1 font-mono text-[10px] font-light tabular-nums
+                {selectedSubRemaining < 0
+                ? 'text-red-500/90 dark:text-red-400/90'
+                : 'text-zinc-400'}"
+              title="Remaining balance"
+              aria-label="Remaining {formatCurrency(selectedSubRemaining)}"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+                class="opacity-70"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 6v12" />
+                <path d="M8 10h6a2 2 0 1 1 0 4H8" />
+              </svg>
+              {formatCurrency(selectedSubRemaining)}
+            </span>
+          {/if}
+        </div>
         <select
+          id="detail-sub-category"
           bind:value={subCategory}
-          class="w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
+          class={fieldClass}
+          onchange={() => {
+            skipPicAuto = false;
+          }}
         >
-          <option value="">Main (default)</option>
+          <option value="">{MAIN_SUB_LABEL}</option>
           {#each subCategoryOptions as name}
             <option value={name}>{name}</option>
           {/each}
         </select>
-      </label>
+      </div>
     {/if}
 
-    <label class="block space-y-1">
-      <span class="text-[11px] text-zinc-500">Paid by</span>
-      <select
-        bind:value={pic}
-        class="w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
-        aria-label="Paid by"
-      >
-        {#each picList as p}
-          <option value={p}>{p}</option>
-        {/each}
-      </select>
+    <div class="relative space-y-1.5">
+      <label for="detail-text" class={labelClass}>Detail</label>
+      <input
+        id="detail-text"
+        type="text"
+        bind:value={detail}
+        required
+        placeholder="What was this for?"
+        autocomplete="off"
+        class={fieldClass}
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={suggestOpen}
+        aria-controls="detail-suggestions"
+        aria-activedescendant={suggestIndex >= 0 ? `detail-suggestion-${suggestIndex}` : undefined}
+        oninput={onDetailInput}
+        onkeydown={onDetailKeydown}
+        onblur={() => {
+          // Delay so mousedown/click on suggestion can fire first.
+          setTimeout(() => clearSuggestions(), 150);
+        }}
+      />
+      {#if suggestOpen && suggestions.length > 0}
+        <ul
+          id="detail-suggestions"
+          role="listbox"
+          class="absolute z-30 mt-1 max-h-52 w-full overflow-y-auto border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-950"
+        >
+          {#each suggestions as item, i (item.id)}
+            <li role="option" aria-selected={suggestIndex === i} id="detail-suggestion-{i}">
+              <button
+                type="button"
+                class="flex w-full items-center justify-between gap-3 px-2.5 py-2 text-left text-xs transition
+                  {suggestIndex === i
+                  ? 'bg-zinc-100 dark:bg-zinc-900'
+                  : 'hover:bg-zinc-50 dark:hover:bg-zinc-900/70'}"
+                onmousedown={(e) => {
+                  e.preventDefault();
+                  applySuggestion(item);
+                }}
+                onmouseenter={() => (suggestIndex = i)}
+              >
+                <span class="min-w-0 truncate font-medium text-zinc-800 dark:text-zinc-100">
+                  {item.detail}
+                </span>
+                <span class="shrink-0 font-mono tabular-nums text-zinc-500">
+                  {formatCurrency(item.cost)}
+                </span>
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {:else if suggestLoading && detail.trim().length >= 3}
+        <p class="text-[10px] font-light text-zinc-400">Looking up…</p>
+      {/if}
+    </div>
+
+    <label class="block space-y-1.5">
+      <span class={labelClass}>Cost</span>
+      <AmountInput bind:value={cost} required class={fieldClass} />
     </label>
+
+    <div class="space-y-1.5">
+      <span class={labelClass} id="detail-paid-by-label">Paid By</span>
+      <div class="flex flex-wrap gap-2" role="group" aria-labelledby="detail-paid-by-label">
+        {#each picList as p}
+          <button
+            type="button"
+            onclick={() => (pic = p)}
+            class="inline-flex items-center gap-2 border px-2.5 py-1.5 text-xs transition
+              {pic === p
+              ? 'border-zinc-900 bg-zinc-900 text-white dark:border-white dark:bg-white dark:text-zinc-900'
+              : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-400 dark:border-zinc-800 dark:bg-black dark:text-zinc-300 dark:hover:border-zinc-600'}"
+            aria-pressed={pic === p}
+            aria-label="Paid by {p}"
+          >
+            <span class="scale-110">
+              <PicBadge name={p} />
+            </span>
+            <span class="font-medium">{p}</span>
+          </button>
+        {/each}
+      </div>
+    </div>
 
     {#if error}
       <p class="text-xs text-red-600 dark:text-red-400">{error}</p>

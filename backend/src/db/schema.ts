@@ -13,7 +13,7 @@ import {
 export const projects = pgTable('projects', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
-  /** Optional photo as data URL or absolute URL. */
+  /** Optional photo path (`/api/uploads/...`), legacy data URL, or absolute URL. */
   photo: text('photo'),
   createdAt: text('created_at').notNull(),
 });
@@ -217,6 +217,7 @@ export const infoUpdatePages = pgTable('info_update_pages', {
     .references(() => infoUpdates.id, { onDelete: 'cascade' }),
   sortOrder: integer('sort_order').notNull().default(0),
   body: text('body').notNull().default(''),
+  /** `/api/uploads/...` path, legacy data URL, or http(s) URL. */
   photo: text('photo'),
 });
 

@@ -1,4 +1,4 @@
-import { count, desc, eq, and, ilike, type SQL } from 'drizzle-orm';
+import { count, desc, eq, and, ilike, notInArray, type SQL } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/index.js';
 import { categories, transactions } from '../db/schema.js';
@@ -13,6 +13,7 @@ import { isValidPic } from '../lib/pic.js';
 
 const VALID_STATUS = ['Done', 'On Going', 'Not Yet'] as const;
 type Status = (typeof VALID_STATUS)[number];
+const SUGGEST_EXCLUDED_STATUS = ['Transfer', 'Carryover'] as const;
 
 interface CreateTransactionBody {
   date: string;
@@ -179,8 +180,55 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  app.post<{ Body: CreateTransactionBody }>(
-    '/api/transactions',
+  /** Recent similar details (for Quick Insert autocomplete). */
+  app.get<{ Querystring: { q?: string; limit?: string } }>(
+    '/api/transactions/suggest',
+    async (request) => {
+      const projectId = request.projectId!;
+      const q = request.query.q?.trim() ?? '';
+      if (q.length < 3) return { suggestions: [] };
+
+      const limit = Math.min(Math.max(Number.parseInt(request.query.limit ?? '5', 10) || 5, 1), 10);
+      const escaped = q.replace(/[%_\\]/g, '\\$&');
+
+      const rows = await db
+        .select({
+          id: transactions.id,
+          date: transactions.date,
+          categoryId: transactions.categoryId,
+          categoryName: categories.name,
+          subCategory: transactions.subCategory,
+          detail: transactions.detail,
+          cost: transactions.cost,
+          pic: transactions.pic,
+        })
+        .from(transactions)
+        .innerJoin(categories, eq(transactions.categoryId, categories.id))
+        .where(
+          and(
+            eq(transactions.projectId, projectId),
+            ilike(transactions.detail, `%${escaped}%`),
+            notInArray(transactions.status, [...SUGGEST_EXCLUDED_STATUS]),
+          ),
+        )
+        .orderBy(desc(transactions.date), desc(transactions.id))
+        .limit(40);
+
+      const seen = new Set<string>();
+      const suggestions: typeof rows = [];
+      for (const row of rows) {
+        const key = row.detail.trim().toLowerCase();
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        suggestions.push(row);
+        if (suggestions.length >= limit) break;
+      }
+
+      return { suggestions };
+    },
+  );
+
+  app.post<{ Body: CreateTransactionBody }>(    '/api/transactions',
     { preHandler: requireApiToken },
     async (request, reply) => {
       const projectId = request.projectId!;

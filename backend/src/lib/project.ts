@@ -9,9 +9,9 @@ import {
   projects,
 } from '../db/schema.js';
 import { authEmailExists } from './auth-emails.js';
+import { deleteManagedPhoto, persistPhotoInput, pruneReplacedPhotos } from './photo-storage.js';
 
 const MAX_NAME = 64;
-const MAX_PHOTO_CHARS = 900_000; // ~0.9MB data URL
 
 export function nowIso(): string {
   return new Date().toISOString();
@@ -67,7 +67,7 @@ export async function createProject(input: {
   if (!name) throw new Error('name is required');
   if (name.length > MAX_NAME) throw new Error('Project name is too long');
 
-  const photo = normalizePhoto(input.photo);
+  const photo = await persistPhotoInput(input.photo, 'projects');
   const [created] = await db
     .insert(projects)
     .values({ name, photo, createdAt: nowIso() })
@@ -94,8 +94,10 @@ export async function updateProject(
     if (name.length > MAX_NAME) throw new Error('Project name is too long');
     patch.name = name;
   }
+  let nextPhoto: string | null | undefined;
   if (input.photo !== undefined) {
-    patch.photo = normalizePhoto(input.photo);
+    nextPhoto = await persistPhotoInput(input.photo, 'projects');
+    patch.photo = nextPhoto;
   }
 
   const [updated] = await db
@@ -103,6 +105,10 @@ export async function updateProject(
     .set(patch)
     .where(eq(projects.id, id))
     .returning();
+
+  if (nextPhoto !== undefined) {
+    await pruneReplacedPhotos([existing.photo], [nextPhoto]);
+  }
   return updated ?? null;
 }
 
@@ -116,6 +122,7 @@ export async function deleteProject(id: number): Promise<{ ok: true } | { error:
   }
 
   await db.delete(projects).where(eq(projects.id, id));
+  await deleteManagedPhoto(existing.photo);
   return { ok: true };
 }
 
@@ -282,19 +289,6 @@ export async function copyPlanTemplate(input: {
       checklist: checklistRows.length,
     },
   };
-}
-
-function normalizePhoto(raw: string | null | undefined): string | null {
-  if (raw == null) return null;
-  const photo = String(raw).trim();
-  if (!photo) return null;
-  if (photo.length > MAX_PHOTO_CHARS) {
-    throw new Error('Photo is too large (max ~700KB)');
-  }
-  if (photo.startsWith('data:image/') || photo.startsWith('https://') || photo.startsWith('http://')) {
-    return photo;
-  }
-  throw new Error('Photo must be an image data URL or http(s) URL');
 }
 
 export function parseProjectIdHeader(raw: string | string[] | undefined): number | null {

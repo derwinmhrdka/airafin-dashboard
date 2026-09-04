@@ -110,6 +110,17 @@ export interface Transaction {
   status: string;
 }
 
+export interface TransactionSuggestion {
+  id: number;
+  date: string;
+  categoryId: number;
+  categoryName: string;
+  subCategory: string;
+  detail: string;
+  cost: string;
+  pic: string;
+}
+
 export interface ReimbursementItem extends Transaction {
   planPic: string;
   paidBy: string;

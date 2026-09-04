@@ -6,5 +6,7 @@ build
 .env.*
 !.env.example
 backend/secrets/
+backend/data/uploads/*
+!backend/data/uploads/.gitignore
 *.log
 .DS_Store

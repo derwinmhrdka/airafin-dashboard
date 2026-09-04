@@ -14,6 +14,7 @@ import type {
   Transaction,
   InfoUpdate,
   InfoUpdatePage,
+  TransactionSuggestion,
 } from './types';
 
 function apiBase(): string {
@@ -336,6 +337,14 @@ export function getTransactions(
   if (opts?.pic) params.set('pic', opts.pic);
   if (opts?.search?.trim()) params.set('search', opts.search.trim());
   return fetchJson(`/api/transactions?${params}`);
+}
+
+export function suggestTransactions(
+  q: string,
+  limit = 5,
+): Promise<{ suggestions: TransactionSuggestion[] }> {
+  const params = new URLSearchParams({ q: q.trim(), limit: String(limit) });
+  return fetchJson(`/api/transactions/suggest?${params}`, { cache: 'no-store' });
 }
 
 export function getPlan(period: string): Promise<PlanData> {
