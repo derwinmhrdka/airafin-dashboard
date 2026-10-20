@@ -61,6 +61,7 @@ export async function exchangeGoogleCode(input: {
 export async function fetchGoogleUserInfo(accessToken: string): Promise<{
   email: string;
   name?: string;
+  picture?: string;
   email_verified?: boolean;
 }> {
   const res = await fetch(GOOGLE_USERINFO_URL, {
@@ -75,6 +76,7 @@ export async function fetchGoogleUserInfo(accessToken: string): Promise<{
   const data = (await res.json()) as {
     email?: string;
     name?: string;
+    picture?: string;
     email_verified?: boolean;
   };
 
@@ -85,6 +87,7 @@ export async function fetchGoogleUserInfo(accessToken: string): Promise<{
   return {
     email: data.email,
     name: data.name,
+    picture: data.picture,
     email_verified: data.email_verified,
   };
 }

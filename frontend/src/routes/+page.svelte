@@ -24,7 +24,7 @@
   let loading = $state(false);
   let error = $state('');
   /** Plan allocation chart: category split, or overall spent vs remaining */
-  let allocationView = $state<'categories' | 'all'>('categories');
+  let allocationView = $state<'categories' | 'all'>('all');
   /** Category name filter from Plan Allocation pie */
   let allocationFilter = $state<string | null>(null);
 

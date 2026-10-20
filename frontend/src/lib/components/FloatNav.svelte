@@ -26,7 +26,11 @@
   });
 
   const period = $derived(periodFromUrl(page.url.searchParams));
-  const currentIcon = $derived(tabs.find((tab) => tab.href === page.url.pathname)?.icon ?? 'overview');
+  const currentIcon = $derived(
+    page.url.pathname === '/me'
+      ? 'me'
+      : (tabs.find((tab) => tab.href === page.url.pathname)?.icon ?? 'overview'),
+  );
 
   const RING_R = 26;
   const RING_C = 2 * Math.PI * RING_R;
@@ -127,7 +131,7 @@
   onclick={() => (open = false)}
 ></button>
 
-{#snippet navIcon(icon: (typeof tabs)[number]['icon'])}
+{#snippet navIcon(icon: (typeof tabs)[number]['icon'] | 'me')}
   <svg viewBox="0 0 24 24" class="ico" aria-hidden="true">
     {#if icon === 'overview'}
       <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -145,6 +149,9 @@
     {:else if icon === 'plan'}
       <rect x="4" y="5" width="16" height="15" rx="2" />
       <path d="M4 10h16M8 3.5v4M16 3.5v4" />
+    {:else if icon === 'me'}
+      <circle cx="12" cy="8" r="3" />
+      <path d="M5.5 19c.9-2.8 3-4.2 6.5-4.2s5.6 1.4 6.5 4.2" />
     {:else}
       <circle cx="12" cy="12" r="3" />
       <path

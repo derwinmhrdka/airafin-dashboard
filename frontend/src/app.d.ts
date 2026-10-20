@@ -5,6 +5,7 @@ declare global {
         email: string;
         pic: string;
         name?: string;
+        picture?: string;
         auth: 'google' | 'password';
         projectId: number | null;
       } | null;

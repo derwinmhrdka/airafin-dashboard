@@ -9,6 +9,7 @@
   import InfoUpdatePopup from '$lib/components/InfoUpdatePopup.svelte';
   import TabNav from '$lib/components/TabNav.svelte';
   import FloatNav from '$lib/components/FloatNav.svelte';
+  import { loadAvatarPref } from '$lib/avatar';
   import { floatNavEnabled } from '$lib/float-nav';
   import { getPics, getProjects, selectSessionProject } from '$lib/api';
   import { currentPeriod, parsePeriodToDate, periodFromUrl } from '$lib/period';
@@ -28,6 +29,11 @@
   let switchOpen = $state(false);
   let picsLoaded = false;
   let loadedProjectId: number | null = null;
+
+  $effect(() => {
+    const pic = data.session?.pic;
+    if (pic) loadAvatarPref(pic);
+  });
 
   $effect(() => {
     if (page.url.pathname === '/login') return;
@@ -152,7 +158,12 @@
             </span>
           </button>
           {#if data.session}
-            <ProfileMenu pic={data.session.pic} email={data.session.email} isAdmin={data.isAdmin} />
+            <ProfileMenu
+              pic={data.session.pic}
+              email={data.session.email}
+              picture={data.session.picture}
+              isAdmin={data.isAdmin}
+            />
           {/if}
         </div>
       </div>
@@ -198,7 +209,12 @@
               {#if data.session.projectId}
                 <NotificationBell pic={data.session.pic} {period} />
               {/if}
-              <ProfileMenu pic={data.session.pic} email={data.session.email} isAdmin={data.isAdmin} />
+              <ProfileMenu
+                pic={data.session.pic}
+                email={data.session.email}
+                picture={data.session.picture}
+                isAdmin={data.isAdmin}
+              />
             </div>
           {/if}
         </div>

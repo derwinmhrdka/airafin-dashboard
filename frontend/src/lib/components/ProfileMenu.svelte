@@ -1,16 +1,17 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import PicBadge from '$lib/components/PicBadge.svelte';
+  import UserAvatar from '$lib/components/UserAvatar.svelte';
   import { periodFromUrl, withPeriodParam } from '$lib/period';
 
   interface Props {
     pic: string;
     email: string;
+    picture?: string;
     isAdmin?: boolean;
   }
 
-  let { pic, email, isAdmin = false }: Props = $props();
+  let { pic, email, picture = '', isAdmin = false }: Props = $props();
 
   let open = $state(false);
   let signingOut = $state(false);
@@ -51,6 +52,11 @@
     if (open) requestAnimationFrame(placePanel);
   }
 
+  async function goProfile() {
+    open = false;
+    await goto(withPeriodParam('/me', period));
+  }
+
   async function goAdmin() {
     open = false;
     await goto(withPeriodParam('/admin', period));
@@ -71,15 +77,13 @@
     type="button"
     bind:this={buttonEl}
     onclick={toggleOpen}
-    class="rounded-full ring-2 ring-offset-1 ring-offset-white transition
+    class="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full p-0 leading-none ring-2 ring-offset-1 ring-offset-white transition
       {open ? 'ring-zinc-900 dark:ring-white' : 'ring-transparent hover:ring-zinc-300 dark:ring-offset-black dark:hover:ring-zinc-600'}"
     aria-label="Profile menu"
     aria-expanded={open}
     title={pic}
   >
-    <span class="inline-flex scale-125">
-      <PicBadge name={pic} />
-    </span>
+    <UserAvatar nickname={pic} {picture} size={32} />
   </button>
 
   {#if open}
@@ -90,11 +94,18 @@
       aria-label="Profile"
     >
       <div class="flex flex-col items-center gap-2 border-b border-zinc-200 px-3 py-3 dark:border-zinc-800">
-        <span class="inline-flex scale-150">
-          <PicBadge name={pic} />
-        </span>
+        <UserAvatar nickname={pic} {picture} size={56} />
         <span class="max-w-full truncate text-[10px] text-zinc-400" title={email}>{email}</span>
       </div>
+
+      <button
+        type="button"
+        role="menuitem"
+        onclick={goProfile}
+        class="flex w-full items-center justify-center border-b border-zinc-200 px-3 py-2.5 text-xs font-medium text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-900"
+      >
+        Profile
+      </button>
 
       {#if isAdmin}
         <button

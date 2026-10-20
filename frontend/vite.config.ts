@@ -7,4 +7,8 @@ export default defineConfig({
   server: {
     port: 5173,
   },
+  ssr: {
+    // Package is ESM but imports its own files without .js extensions.
+    noExternal: ['animal-avatar-generator'],
+  },
 });

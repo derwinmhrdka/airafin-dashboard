@@ -49,7 +49,7 @@ export const GET: RequestHandler = async ({ cookies, url, request }) => {
   const forwarded = request.headers.get('x-forwarded-proto');
   const secure = url.protocol === 'https:' || forwarded === 'https';
 
-  let profile: { email: string; name?: string; email_verified?: boolean };
+  let profile: { email: string; name?: string; picture?: string; email_verified?: boolean };
   try {
     const tokens = await exchangeGoogleCode({
       code,
@@ -79,6 +79,7 @@ export const GET: RequestHandler = async ({ cookies, url, request }) => {
       email: profile.email.toLowerCase(),
       pic,
       name: profile.name,
+      picture: profile.picture,
       auth: 'google',
       projectId: null,
     },

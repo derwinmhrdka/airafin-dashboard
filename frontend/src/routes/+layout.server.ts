@@ -9,6 +9,7 @@ export async function load({ cookies }) {
           email: session.email,
           pic: session.pic,
           name: session.name,
+          picture: session.picture,
           auth: session.auth,
           projectId: session.projectId,
         }

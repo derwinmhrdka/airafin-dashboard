@@ -3,10 +3,10 @@ import { writable } from 'svelte/store';
 
 const KEY = 'airafin.float-nav';
 
-export const floatNavEnabled = writable(false);
+export const floatNavEnabled = writable(true);
 
 if (browser) {
-  floatNavEnabled.set(localStorage.getItem(KEY) === '1');
+  floatNavEnabled.set(localStorage.getItem(KEY) !== '0');
 }
 
 export function setFloatNavEnabled(on: boolean) {

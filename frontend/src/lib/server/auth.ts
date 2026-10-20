@@ -12,9 +12,23 @@ export interface SessionUser {
   email: string;
   pic: SessionPic;
   name?: string;
+  /** Google profile photo. Absent for password login. */
+  picture?: string;
   auth: 'google' | 'password';
   /** Active workspace; null until user picks a project after login. */
   projectId: number | null;
+}
+
+function googlePicture(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:') return undefined;
+    if (!url.hostname.endsWith('googleusercontent.com')) return undefined;
+    return url.toString();
+  } catch {
+    return undefined;
+  }
 }
 
 function sessionSecret(): string {
@@ -60,6 +74,7 @@ function decodeSession(token: string): SessionUser | null {
       email: String(raw.email).toLowerCase(),
       pic: String(raw.pic).trim(),
       name: raw.name ? String(raw.name) : undefined,
+      picture: googlePicture(raw.picture),
       auth: raw.auth,
       projectId,
     };
