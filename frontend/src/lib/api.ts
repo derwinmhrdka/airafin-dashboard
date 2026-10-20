@@ -1,5 +1,5 @@
 import { env } from '$env/dynamic/public';
-import { notifyNotificationsChanged } from './notifications-events';
+import { notifyNotificationsChanged, notifySummaryChanged } from './notifications-events';
 import type {
   AppNotification,
   AuthEmailSetting,
@@ -26,6 +26,15 @@ const getCache = new Map<string, { at: number; data: unknown }>();
 
 function clearGetCache() {
   getCache.clear();
+}
+
+function affectsBalance(path: string): boolean {
+  return (
+    path.startsWith('/api/transactions') ||
+    path.startsWith('/api/budgets') ||
+    path.startsWith('/api/plan/checklist') ||
+    path.startsWith('/api/sync/sheet-to-db')
+  );
 }
 
 async function fetchJson<T>(
@@ -62,6 +71,7 @@ async function fetchJson<T>(
 
   if (method !== 'GET') {
     clearGetCache();
+    if (affectsBalance(path)) notifySummaryChanged();
   } else if (useCache) {
     getCache.set(path, { at: Date.now(), data });
   }

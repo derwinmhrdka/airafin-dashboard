@@ -209,7 +209,7 @@
             </button>
           {/each}
 
-          {#if isAdmin}
+          {#if isAdmin || projects.length === 0}
             <button
               type="button"
               disabled={busyId != null}

@@ -134,10 +134,15 @@ export async function listProjectMembers(projectId: number) {
     .orderBy(asc(projectMembers.email));
 }
 
+/** Password login sessions use `password:<pic>@local`, not an Admin → Users row. */
+function isPasswordLoginEmail(email: string): boolean {
+  return email.startsWith('password:') && email.endsWith('@local');
+}
+
 export async function addProjectMember(projectId: number, rawEmail: string) {
   const email = rawEmail.trim().toLowerCase();
   if (!email.includes('@')) throw new Error('Valid email is required');
-  if (!(await authEmailExists(email))) {
+  if (!isPasswordLoginEmail(email) && !(await authEmailExists(email))) {
     throw new Error('User must be registered first (Admin → Users)');
   }
   const project = await getProjectById(projectId);

@@ -211,7 +211,9 @@
     </header>
 
     {#if data.session?.projectId}
-      <TabNav />
+      {#if !$floatNavEnabled}
+        <TabNav />
+      {/if}
       <main
         class="flex-1 px-4 py-4 md:px-8 md:py-6 {$floatNavEnabled
           ? 'pb-[calc(6.75rem+env(safe-area-inset-bottom,0px))] md:pb-[calc(7.25rem+env(safe-area-inset-bottom,0px))]'

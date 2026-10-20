@@ -262,20 +262,26 @@
     />
   </label>
 
-  <label class="flex items-center justify-between gap-3 border border-zinc-200 px-3 py-3 dark:border-zinc-800">
-    <span>
-      <span class="block text-sm font-medium">Enable floating menu</span>
-      <span class="text-[11px] text-zinc-500">
-        Center ball opens Overview, Detail, Transfer, Plan, and Settings.
-      </span>
-    </span>
-    <input
-      type="checkbox"
-      class="h-4 w-4 shrink-0 accent-zinc-900 dark:accent-zinc-100"
-      checked={$floatNavEnabled}
-      onchange={(e) => setFloatNavEnabled(e.currentTarget.checked)}
-    />
-  </label>
+  <div class="flex items-center justify-between gap-3 border border-zinc-200 px-3 py-3 dark:border-zinc-800">
+    <span class="text-sm font-medium {$floatNavEnabled ? 'text-zinc-400' : ''}">Tab pane</span>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={$floatNavEnabled}
+      aria-label="Use floating menu"
+      class="relative h-6 w-11 shrink-0 rounded-full transition-colors {$floatNavEnabled
+        ? 'bg-zinc-900 dark:bg-zinc-100'
+        : 'bg-zinc-300 dark:bg-zinc-700'}"
+      onclick={() => setFloatNavEnabled(!$floatNavEnabled)}
+    >
+      <span
+        class="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform {$floatNavEnabled
+          ? 'translate-x-5 dark:bg-zinc-900'
+          : ''}"
+      ></span>
+    </button>
+    <span class="text-sm font-medium {$floatNavEnabled ? '' : 'text-zinc-400'}">Floating menu</span>
+  </div>
 
   <fieldset class="space-y-2 border border-zinc-200 p-3 dark:border-zinc-800">
     <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">Sync</legend>

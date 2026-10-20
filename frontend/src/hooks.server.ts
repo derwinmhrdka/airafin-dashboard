@@ -41,6 +41,8 @@ function isProjectDeletePath(path: string): boolean {
 function isAdminProjectMutation(path: string, method: string): boolean {
   if (method === 'GET' || method === 'HEAD') return false;
   if (!path.startsWith('/api/projects')) return false;
+  // Creating a workspace is allowed for any signed-in user. Edits and deletes stay admin-only.
+  if (method === 'POST' && path === '/api/projects') return false;
   return true;
 }
 
