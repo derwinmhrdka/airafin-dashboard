@@ -8,6 +8,8 @@
   import ProjectPicker from '$lib/components/ProjectPicker.svelte';
   import InfoUpdatePopup from '$lib/components/InfoUpdatePopup.svelte';
   import TabNav from '$lib/components/TabNav.svelte';
+  import FloatNav from '$lib/components/FloatNav.svelte';
+  import { floatNavEnabled } from '$lib/float-nav';
   import { getPics, getProjects, selectSessionProject } from '$lib/api';
   import { currentPeriod, parsePeriodToDate, periodFromUrl } from '$lib/period';
   import { setPicNames } from '$lib/pics';
@@ -210,9 +212,16 @@
 
     {#if data.session?.projectId}
       <TabNav />
-      <main class="flex-1 px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] md:px-8 md:py-6 md:pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
+      <main
+        class="flex-1 px-4 py-4 md:px-8 md:py-6 {$floatNavEnabled
+          ? 'pb-[calc(6.75rem+env(safe-area-inset-bottom,0px))] md:pb-[calc(7.25rem+env(safe-area-inset-bottom,0px))]'
+          : 'pb-[calc(1rem+env(safe-area-inset-bottom,0px))] md:pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]'}"
+      >
         {@render children()}
       </main>
+      {#if $floatNavEnabled}
+        <FloatNav />
+      {/if}
     {:else}
       <main class="flex-1"></main>
     {/if}

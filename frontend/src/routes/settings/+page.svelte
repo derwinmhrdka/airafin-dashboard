@@ -16,6 +16,7 @@
   import { withDeferredLoading } from '$lib/deferred-loading';
   import { setPicNames } from '$lib/pics';
   import { POCKET_COLORS } from '$lib/pocket-colors';
+  import { floatNavEnabled, setFloatNavEnabled } from '$lib/float-nav';
   import { periodFromUrl } from '$lib/period';
   import type { PicSetting, PocketSetting } from '$lib/types';
   import {
@@ -258,6 +259,21 @@
       checked={pushEnabled}
       disabled={!pushSupportedHere || !sessionPic || pushBusy || pushPermission() === 'denied'}
       onchange={handlePushToggle}
+    />
+  </label>
+
+  <label class="flex items-center justify-between gap-3 border border-zinc-200 px-3 py-3 dark:border-zinc-800">
+    <span>
+      <span class="block text-sm font-medium">Enable floating menu</span>
+      <span class="text-[11px] text-zinc-500">
+        Center ball opens Overview, Detail, Transfer, Plan, and Settings.
+      </span>
+    </span>
+    <input
+      type="checkbox"
+      class="h-4 w-4 shrink-0 accent-zinc-900 dark:accent-zinc-100"
+      checked={$floatNavEnabled}
+      onchange={(e) => setFloatNavEnabled(e.currentTarget.checked)}
     />
   </label>
 
