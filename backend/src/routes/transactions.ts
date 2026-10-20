@@ -66,6 +66,7 @@ function transactionListFilters(
     categoryId?: string;
     pic?: string;
     search?: string;
+    subCategory?: string;
   },
   projectId: number,
 ): SQL {
@@ -83,6 +84,13 @@ function transactionListFilters(
   const pic = query.pic?.trim();
   if (pic && isValidPic(pic)) {
     conditions.push(eq(transactions.pic, pic));
+  }
+
+  const subCategory = query.subCategory?.trim();
+  if (subCategory === '__main__') {
+    conditions.push(eq(transactions.subCategory, ''));
+  } else if (subCategory) {
+    conditions.push(eq(transactions.subCategory, subCategory));
   }
 
   const search = query.search?.trim();
@@ -126,15 +134,19 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
       categoryId?: string;
       pic?: string;
       search?: string;
+      subCategory?: string;
     };
   }>(
     '/api/transactions',
     async (request) => {
       const projectId = request.projectId!;
-      const { period, categoryId, pic, search } = request.query;
+      const { period, categoryId, pic, search, subCategory } = request.query;
       const limit = Math.min(Math.max(Number.parseInt(request.query.limit ?? '50', 10) || 50, 1), 200);
       const offset = Math.max(Number.parseInt(request.query.offset ?? '0', 10) || 0, 0);
-      const where = transactionListFilters({ period, categoryId, pic, search }, projectId);
+      const where = transactionListFilters(
+        { period, categoryId, pic, search, subCategory },
+        projectId,
+      );
       const periodOnly = period
         ? and(eq(transactions.projectId, projectId), eq(transactions.period, period))
         : eq(transactions.projectId, projectId);

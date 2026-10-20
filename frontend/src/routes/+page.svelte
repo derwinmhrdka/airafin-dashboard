@@ -2,7 +2,6 @@
   import { page } from '$app/state';
   import { categoryChartFill } from '$lib/chart-colors';
   import CategoryProgress from '$lib/components/CategoryProgress.svelte';
-  import HBarChart from '$lib/components/HBarChart.svelte';
   import PieChart from '$lib/components/PieChart.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
   import StatCard from '$lib/components/StatCard.svelte';
@@ -24,37 +23,13 @@
   let summary = $state<DashboardSummary | null>(peekOverviewPaint(period));
   let loading = $state(false);
   let error = $state('');
-  /** 'general' or categoryId string */
-  let planVsScope = $state('general');
+  /** Plan allocation chart: category split, or overall spent vs remaining */
+  let allocationView = $state<'categories' | 'all'>('categories');
   /** Category name filter from Plan Allocation pie */
   let allocationFilter = $state<string | null>(null);
 
-  const chartCategories = $derived(
-    summary?.categories.filter(categoryHasData) ?? [],
-  );
-
-  const planVsNumbers = $derived.by(() => {
-    if (!summary) return { plan: 0, spent: 0, title: 'General' };
-    if (planVsScope === 'general') {
-      return {
-        plan: summary.totalBudgetAllocated,
-        spent: summary.totalSpent,
-        title: 'General',
-      };
-    }
-    const cat = summary.categories.find((c) => String(c.categoryId) === planVsScope);
-    if (!cat) {
-      return {
-        plan: summary.totalBudgetAllocated,
-        spent: summary.totalSpent,
-        title: 'General',
-      };
-    }
-    return { plan: cat.allocated, spent: cat.spent, title: cat.categoryName };
-  });
-
   const planVsSlices = $derived(
-    planVsExpenseSlices(planVsNumbers.plan, planVsNumbers.spent),
+    planVsExpenseSlices(summary?.totalBudgetAllocated ?? 0, summary?.totalSpent ?? 0),
   );
 
   const allocationSlices = $derived(
@@ -108,6 +83,11 @@
     allocationFilter = label;
   }
 
+  function setAllocationView(view: 'categories' | 'all') {
+    allocationView = view;
+    if (view === 'all') allocationFilter = null;
+  }
+
   $effect(() => {
     void loadData(period);
   });
@@ -144,46 +124,52 @@
       </span>
     </div>
 
-    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-      <article class="border border-zinc-200 p-3 dark:border-zinc-800">
-        <div class="mb-3 space-y-2">
-          <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Spent vs Remaining</h2>
-          <label class="block space-y-1">
-            <span class="text-[10px] text-zinc-500">Category</span>
-            <select
-              bind:value={planVsScope}
-              class="w-full border border-zinc-200 bg-white px-2 py-1.5 text-xs dark:border-zinc-800 dark:bg-black"
-            >
-              <option value="general">All categories</option>
-              {#each chartCategories as cat (cat.categoryId)}
-                <option value={String(cat.categoryId)}>{cat.categoryName}</option>
-              {/each}
-            </select>
-          </label>
-          <p class="text-[10px] text-zinc-500">
-            {planVsNumbers.title}: Plan {formatCurrency(planVsNumbers.plan)} · Spent
-            {formatCurrency(planVsNumbers.spent)}
-          </p>
+    <article class="border border-zinc-200 p-3 dark:border-zinc-800">
+      <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Plan Allocation</h2>
+        <div
+          class="grid grid-cols-2 border border-zinc-200 dark:border-zinc-800"
+          role="group"
+          aria-label="Plan allocation view"
+        >
+          <button
+            type="button"
+            class="px-2.5 py-1 text-[11px] {allocationView === 'categories'
+              ? 'bg-black text-white dark:bg-white dark:text-black'
+              : 'text-zinc-500'}"
+            aria-pressed={allocationView === 'categories'}
+            onclick={() => setAllocationView('categories')}
+          >
+            By Categories
+          </button>
+          <button
+            type="button"
+            class="border-l border-zinc-200 px-2.5 py-1 text-[11px] dark:border-zinc-800 {allocationView === 'all'
+              ? 'bg-black text-white dark:bg-white dark:text-black'
+              : 'text-zinc-500'}"
+            aria-pressed={allocationView === 'all'}
+            onclick={() => setAllocationView('all')}
+          >
+            All
+          </button>
         </div>
-        <HBarChart slices={planVsSlices} emptyLabel="No plan data" />
-      </article>
-
-      <article class="border border-zinc-200 p-3 dark:border-zinc-800">
-        <div class="mb-3">
-          <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500">Plan Allocation</h2>
-          <p class="mt-1 text-[10px] text-zinc-500">
-            Share of plan per category ({formatCurrency(summary.totalBudgetAllocated)}). Tap a
-            segment to filter · tap again to reset.
-          </p>
-        </div>
+      </div>
+      {#if allocationView === 'categories'}
         <PieChart
           slices={allocationSlices}
           selected={allocationFilter}
           emptyLabel="No plan yet"
           onSelect={setAllocationFilter}
+          animateKey={allocationView}
         />
-      </article>
-    </div>
+      {:else}
+        <PieChart
+          slices={planVsSlices}
+          emptyLabel="No plan data"
+          animateKey={allocationView}
+        />
+      {/if}
+    </article>
 
     <div class="space-y-2 md:space-y-3">
       <div class="flex items-center justify-between gap-2">

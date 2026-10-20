@@ -367,6 +367,7 @@ export interface TransactionFilters {
   categoryId?: string;
   pic?: string;
   search?: string;
+  subCategory?: string;
 }
 
 export function getTransactions(
@@ -379,6 +380,7 @@ export function getTransactions(
   if (opts?.categoryId) params.set('categoryId', opts.categoryId);
   if (opts?.pic) params.set('pic', opts.pic);
   if (opts?.search?.trim()) params.set('search', opts.search.trim());
+  if (opts?.subCategory) params.set('subCategory', opts.subCategory);
   return fetchJson(`/api/transactions?${params}`);
 }
 

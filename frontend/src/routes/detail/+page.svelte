@@ -15,7 +15,7 @@
     updateTransaction,
   } from '$lib/api';
   import { withDeferredLoading } from '$lib/deferred-loading';
-  import { formatAmountInput, formatCurrency, formatDate, parseAmountInput } from '$lib/format';
+  import { formatAmountInput, formatCurrency, formatDate, parseAmountInput, toAmountNumber } from '$lib/format';
   import { MAIN_SUB_LABEL } from '$lib/plan-allocations';
   import { periodFromUrl } from '$lib/period';
   import { defaultPic, isKnownPic, picNames, type Pic } from '$lib/pics';
@@ -29,6 +29,8 @@
   let categoryPicById = $state<Record<number, Pic>>({});
   let subPicByKey = $state<Record<string, Pic>>({});
   let subcategoriesByCategory = $state<Record<number, string[]>>({});
+  let categoryPlan = $state<Record<number, number>>({});
+  let subPlan = $state<Record<string, number>>({});
   let subSisaByKey = $state<Record<string, number>>({});
   let transactions = $state<Transaction[]>([]);
   let total = $state(0);
@@ -43,6 +45,7 @@
   let success = $state('');
 
   let filterCategory = $state('');
+  let filterSub = $state('');
   let filterPic = $state('');
   let filterSearch = $state('');
   let debouncedSearch = $state('');
@@ -78,7 +81,7 @@
   }
 
   const hasActiveFilters = $derived(
-    Boolean(filterCategory || filterPic || filterSearch.trim() || debouncedSearch.trim()),
+    Boolean(filterCategory || filterSub || filterPic || filterSearch.trim() || debouncedSearch.trim()),
   );
 
   const showFilters = $derived(monthTotal > 0 || hasActiveFilters);
@@ -86,6 +89,7 @@
   function currentFilters() {
     return {
       categoryId: filterCategory || undefined,
+      subCategory: filterSub || undefined,
       pic: filterPic || undefined,
       search: debouncedSearch.trim() || undefined,
     };
@@ -93,12 +97,58 @@
 
   function clearFilters() {
     filterCategory = '';
+    filterSub = '';
     filterPic = '';
     filterSearch = '';
     debouncedSearch = '';
   }
 
   const subCategoryOptions = $derived(subcategoriesByCategory[categoryId] ?? []);
+
+  function subPlanOf(catId: number, name: string): number {
+    return subPlan[`${catId}|${name.trim().toLowerCase()}`] ?? 0;
+  }
+
+  function mainPlanOf(catId: number): number {
+    const total = categoryPlan[catId] ?? 0;
+    const used = (subcategoriesByCategory[catId] ?? []).reduce((sum, name) => {
+      const trimmed = name.trim();
+      if (!trimmed || trimmed === MAIN_SUB_LABEL) return sum;
+      return sum + subPlanOf(catId, trimmed);
+    }, 0);
+    return Math.max(0, total - used);
+  }
+
+  const addCategories = $derived(
+    categories.filter(
+      (cat) => (categoryPlan[cat.id] ?? 0) > 0 || (editingId != null && cat.id === categoryId),
+    ),
+  );
+
+  const addSubOptions = $derived(
+    (subcategoriesByCategory[categoryId] ?? []).filter((name) => {
+      const trimmed = name.trim();
+      if (!trimmed || trimmed === MAIN_SUB_LABEL) return false;
+      if (subPlanOf(categoryId, trimmed) > 0) return true;
+      return editingId != null && subCategory.trim() === trimmed;
+    }),
+  );
+
+  const showMainSubOption = $derived(
+    addSubOptions.length > 0 &&
+      (mainPlanOf(categoryId) > 0 || (editingId != null && !subCategory.trim())),
+  );
+
+  const filterSubOptions = $derived.by(() => {
+    const catId = Number(filterCategory);
+    const names =
+      catId > 0
+        ? (subcategoriesByCategory[catId] ?? [])
+        : Object.values(subcategoriesByCategory).flat();
+    return [...new Set(names.map((name) => name.trim()).filter((name) => name && name !== MAIN_SUB_LABEL))].sort(
+      (a, b) => a.localeCompare(b),
+    );
+  });
 
   const selectedSubRemaining = $derived.by(() => {
     if (subCategoryOptions.length === 0) return null;
@@ -144,7 +194,9 @@
 
   function resetInsertForm() {
     date = new Date().toISOString().slice(0, 10);
-    if (categories.length) categoryId = defaultCategoryId(categories);
+    const funded = categories.filter((cat) => (categoryPlan[cat.id] ?? 0) > 0);
+    const pool = funded.length ? funded : categories;
+    if (pool.length) categoryId = defaultCategoryId(pool);
     subCategory = '';
     detail = '';
     cost = '';
@@ -301,8 +353,23 @@
                 .map((s) => s.name),
             ]),
           );
+          categoryPlan = Object.fromEntries(
+            plan.budgets.map((b) => [b.categoryId, toAmountNumber(b.allocatedAmount)]),
+          );
+          subPlan = Object.fromEntries(
+            (plan.subcategories ?? []).map((s) => [
+              `${s.categoryId}|${s.name.trim().toLowerCase()}`,
+              toAmountNumber(s.allocatedAmount),
+            ]),
+          );
           applySummary(summary);
-          if (!categoryId && categories.length) categoryId = defaultCategoryId(categories);
+          if (editingId == null) {
+            const funded = categories.filter((cat) => (categoryPlan[cat.id] ?? 0) > 0);
+            const pool = funded.length ? funded : categories;
+            if (pool.length && !pool.some((cat) => cat.id === categoryId)) {
+              categoryId = defaultCategoryId(pool);
+            }
+          }
           pic = defaultPicForSelection(categoryId);
           await loadTransactions(activePeriod, true, { soft: true });
         } catch (e) {
@@ -354,6 +421,7 @@
 
   $effect(() => {
     filterCategory;
+    filterSub;
     filterPic;
     debouncedSearch;
     if (!filtersReady) {
@@ -364,15 +432,29 @@
   });
 
   $effect(() => {
+    if (editingId != null || addCategories.length === 0) return;
+    if (!addCategories.some((cat) => cat.id === categoryId)) {
+      categoryId = defaultCategoryId(addCategories);
+    }
+  });
+
+  $effect(() => {
     if (!categoryId) return;
-    if (subCategoryOptions.length === 0) {
+    if (addSubOptions.length === 0) {
       subCategory = '';
-    } else if (subCategory && !subCategoryOptions.includes(subCategory)) {
-      subCategory = '';
+    } else if (showMainSubOption) {
+      if (subCategory && !addSubOptions.includes(subCategory)) subCategory = '';
+    } else if (!addSubOptions.includes(subCategory)) {
+      subCategory = addSubOptions[0];
     }
     if (editingId == null && !skipPicAuto) {
       pic = defaultPicForSelection(categoryId, subCategory);
     }
+  });
+
+  $effect(() => {
+    if (!filterSub || filterSub === '__main__') return;
+    if (!filterSubOptions.includes(filterSub)) filterSub = '';
   });
 
   function startEdit(tx: Transaction) {
@@ -539,13 +621,13 @@
           skipPicAuto = false;
         }}
       >
-        {#each categories as cat}
+        {#each addCategories as cat}
           <option value={cat.id}>{cat.name}</option>
         {/each}
       </select>
     </label>
 
-    {#if subCategoryOptions.length > 0}
+    {#if addSubOptions.length > 0}
       <div class="space-y-1.5">
         <div class="flex items-center justify-between gap-2">
           <label for="detail-sub-category" class={labelClass}>Sub Category</label>
@@ -587,8 +669,10 @@
             skipPicAuto = false;
           }}
         >
-          <option value="">{MAIN_SUB_LABEL}</option>
-          {#each subCategoryOptions as name}
+          {#if showMainSubOption}
+            <option value="">{MAIN_SUB_LABEL}</option>
+          {/if}
+          {#each addSubOptions as name}
             <option value={name}>{name}</option>
           {/each}
         </select>
@@ -743,6 +827,17 @@
             {/each}
           </select>
         </div>
+        <select
+          bind:value={filterSub}
+          class="w-full border border-zinc-200 bg-white px-1.5 py-1.5 text-[11px] dark:border-zinc-800 dark:bg-black"
+          aria-label="Sub category"
+        >
+          <option value="">All sub categories</option>
+          <option value="__main__">{MAIN_SUB_LABEL}</option>
+          {#each filterSubOptions as name}
+            <option value={name}>{name}</option>
+          {/each}
+        </select>
         <p class="text-[10px] text-zinc-500">
           {transactions.length} loaded of {total}{hasActiveFilters ? ' matching' : ''}
           {#if hasActiveFilters && monthTotal > total}

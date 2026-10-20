@@ -41,8 +41,8 @@
     ringBase > 0 ? (Math.min(Math.max(spent, 0), ringBase) / ringBase) * RING_C : 0,
   );
   const remainLen = $derived(allocated > 0 && remaining > 0 ? (remaining / allocated) * RING_C : 0);
-  const remainPct = $derived(allocated > 0 ? Math.round((remaining / allocated) * 100) : 0);
-  const pctGlyphs = $derived(String(remainPct).split(''));
+  const spentPct = $derived(allocated > 0 ? Math.round((spent / allocated) * 100) : 0);
+  const pctGlyphs = $derived(String(spentPct).split(''));
 
   /** Bit order A B C D E F G. */
   const SEGMENTS = ['a', 'b', 'c', 'd', 'e', 'f', 'g'] as const;
@@ -135,13 +135,16 @@
       <rect x="3" y="14" width="7" height="7" rx="1" />
       <rect x="14" y="14" width="7" height="7" rx="1" />
     {:else if icon === 'detail'}
-      <path d="M8 6h13M8 12h13M8 18h13" />
-      <path d="M3 6h.01M3 12h.01M3 18h.01" />
+      <circle cx="6" cy="7" r="1.15" fill="currentColor" stroke="none" />
+      <circle cx="6" cy="12" r="1.15" fill="currentColor" stroke="none" />
+      <circle cx="6" cy="17" r="1.15" fill="currentColor" stroke="none" />
+      <path d="M10 7h8M10 12h8M10 17h8" />
     {:else if icon === 'transfer'}
-      <path d="M7 7h11l-3-3M17 17H6l3 3" />
+      <path d="M8 7H19M19 7l-3-3M19 7l-3 3" />
+      <path d="M16 17H5M5 17l3-3M5 17l3 3" />
     {:else if icon === 'plan'}
-      <rect x="3" y="5" width="18" height="16" rx="2" />
-      <path d="M3 10h18M8 3v4M16 3v4" />
+      <rect x="4" y="5" width="16" height="15" rx="2" />
+      <path d="M4 10h16M8 3.5v4M16 3.5v4" />
     {:else}
       <circle cx="12" cy="12" r="3" />
       <path
@@ -175,12 +178,13 @@
     class:open
     aria-expanded={open}
     aria-label={open
-      ? `${remainPct} percent remaining. Hide navigation`
+      ? `${spentPct} percent spent. Hide navigation`
       : `Show navigation`}
-    title={open ? `${remainPct}% remaining` : 'Show navigation'}
+    title={open ? `${spentPct}% spent` : 'Show navigation'}
     onclick={() => (open = !open)}
   >
-    <svg class="donut" viewBox="0 0 72 72" aria-hidden="true">
+    <span class="donut" aria-hidden="true">
+    <svg viewBox="0 0 72 72">
       <defs>
         <linearGradient id="float-remain" gradientUnits="userSpaceOnUse" x1="16" y1="8" x2="56" y2="64">
           <stop class="remain-hi" offset="0%" stop-color="#ffffff" />
@@ -219,6 +223,7 @@
         {/if}
       </g>
     </svg>
+    </span>
     <span class="face-icon" aria-hidden="true">
       {@render navIcon(currentIcon)}
     </span>
@@ -357,24 +362,6 @@
     border-radius: 50%;
     background: transparent;
     cursor: pointer;
-    animation: idle-float 7.5s ease-in-out infinite;
-  }
-
-  .orb::after {
-    content: '';
-    position: absolute;
-    z-index: 3;
-    inset: 5px;
-    border-radius: 50%;
-    pointer-events: none;
-    background: linear-gradient(
-      115deg,
-      transparent 38%,
-      rgba(255, 255, 255, 0.28) 50%,
-      transparent 62%
-    );
-    background-size: 240% 100%;
-    animation: idle-glint 7.5s ease-in-out infinite;
   }
 
   .orb:active {
@@ -388,6 +375,30 @@
     width: 84px;
     height: 84px;
     filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.28));
+  }
+
+  .donut svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .donut::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    pointer-events: none;
+    background: linear-gradient(
+      115deg,
+      transparent 38%,
+      rgba(255, 255, 255, 0.28) 50%,
+      transparent 62%
+    );
+    background-size: 240% 100%;
+    animation: idle-glint 7.5s ease-in-out infinite;
+    -webkit-mask: radial-gradient(circle, transparent 56%, #000 64%, #000 86%, transparent 92%);
+    mask: radial-gradient(circle, transparent 56%, #000 64%, #000 86%, transparent 92%);
   }
 
   .hole {
@@ -422,18 +433,29 @@
   .face-icon,
   .readout {
     position: absolute;
-    inset: 0;
+    left: 50%;
+    top: 50%;
     z-index: 2;
     display: flex;
     align-items: center;
     justify-content: center;
+    margin: 0;
+    padding: 0;
+    line-height: 0;
     pointer-events: none;
+    transform: translate(-50%, -50%);
     transition: opacity 0.35s ease;
   }
 
+  .face-icon .ico,
+  .readout svg {
+    display: block;
+    flex: none;
+  }
+
   .face-icon .ico {
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
   }
 
   .orb.open .face-icon {
@@ -480,16 +502,6 @@
     stroke: currentColor;
     stroke-width: 1.7;
     stroke-linecap: square;
-  }
-
-  @keyframes idle-float {
-    0%,
-    100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(-3px);
-    }
   }
 
   @keyframes idle-glint {
@@ -548,8 +560,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .orb,
-    .orb::after {
+    .donut::after {
       animation: none;
     }
 

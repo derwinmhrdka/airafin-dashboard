@@ -78,7 +78,3 @@
     </div>
   </label>
 </div>
-
-<p class="mt-2 text-[10px] text-zinc-500">
-  Viewing <span class="font-medium text-zinc-700 dark:text-zinc-300">{period}</span>
-</p>

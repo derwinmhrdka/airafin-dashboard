@@ -14,6 +14,8 @@
     /** When set with onSelect, slices become clickable filters. */
     selected?: string | null;
     onSelect?: (label: string | null) => void;
+    /** Change this to replay the donut draw. */
+    animateKey?: string | number;
   }
 
   let {
@@ -22,7 +24,10 @@
     emptyLabel = 'No data',
     selected = null,
     onSelect,
+    animateKey = 0,
   }: Props = $props();
+
+  let draw = $state(1);
 
   const interactive = $derived(typeof onSelect === 'function');
 
@@ -38,7 +43,29 @@
     pct: number;
   }
 
-  const arcs = $derived(buildArcs(activeSlices, total));
+  const arcs = $derived(buildArcs(activeSlices, total, draw));
+
+  $effect(() => {
+    void animateKey;
+    const reduce =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce || total <= 0) {
+      draw = 1;
+      return;
+    }
+    draw = 0;
+    const start = performance.now();
+    const duration = 640;
+    let frame = 0;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      draw = 1 - (1 - t) ** 3;
+      if (t < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  });
 
   function polar(angleDeg: number): { x: number; y: number } {
     const rad = ((angleDeg - 90) * Math.PI) / 180;
@@ -55,13 +82,16 @@
     return `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${large} 1 ${end.x} ${end.y} Z`;
   }
 
-  function buildArcs(items: PieSlice[], sum: number): ArcSlice[] {
+  function buildArcs(items: PieSlice[], sum: number, progress: number): ArcSlice[] {
     if (sum <= 0) return [];
+    let budget = Math.max(0, Math.min(1, progress)) * 360;
     let angle = 0;
     return items.map((slice) => {
       const pct = slice.value / sum;
-      const sweep = pct * 360;
-      const path = arcPath(angle, angle + sweep);
+      const full = pct * 360;
+      const sweep = Math.max(0, Math.min(full, budget));
+      budget -= full;
+      const path = sweep > 0.4 ? arcPath(angle, angle + sweep) : '';
       angle += sweep;
       return { ...slice, path, pct };
     });
@@ -99,6 +129,7 @@
         {#each arcs as arc (arc.label)}
           {@const isSelected = selected === arc.label}
           {@const dimmed = selected != null && !isSelected}
+          {#if arc.path}
           <path
             d={arc.path}
             fill={arc.color}
@@ -116,6 +147,7 @@
           >
             <title>{arc.label}: {formatCurrency(arc.value)}</title>
           </path>
+          {/if}
         {/each}
         <circle
           cx={cx}
