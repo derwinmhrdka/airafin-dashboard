@@ -84,7 +84,14 @@ if [[ -n "$RUNNING_ORIGIN" && "$RUNNING_ORIGIN" != https://* ]]; then
   exit 1
 fi
 
-echo "==> Checking public HTTPS (host nginx)..."
+# teknodika-nginx proxies to this container by name on teknodika_shared.
+# A rebuild creates a new container that is not on that network, so public HTTPS 502s.
+if docker network inspect teknodika_shared >/dev/null 2>&1; then
+  echo "==> Attaching frontend to teknodika_shared..."
+  docker network connect teknodika_shared airafin-dashboard-frontend-1 2>/dev/null || true
+fi
+
+echo "==> Checking public HTTPS..."
 if curl -fsS -o /dev/null "https://${DOMAIN}" 2>/dev/null; then
   echo "==> Deploy finished OK — https://${DOMAIN}"
 else
