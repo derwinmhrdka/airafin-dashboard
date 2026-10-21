@@ -26,6 +26,7 @@ function isPublicPath(path: string): boolean {
     path === '/sw.js' ||
     path === '/manifest.webmanifest' ||
     path === '/favicon.ico' ||
+    path === '/favicon.png' ||
     path === '/favicon.svg' ||
     path === '/robots.txt' ||
     path.startsWith('/icons/') ||

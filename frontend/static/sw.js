@@ -39,8 +39,8 @@ self.addEventListener('push', (event) => {
       body: data.body,
       tag: data.tag,
       renotify: true,
-      icon: '/icons/icon.svg',
-      badge: '/icons/icon.svg',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
       data: { url: data.url },
     }),
   );
