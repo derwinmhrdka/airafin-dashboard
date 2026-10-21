@@ -338,7 +338,7 @@
   }
 </script>
 
-<section class="mx-auto flex min-h-0 w-full flex-1 flex-col gap-3 overflow-hidden md:gap-4">
+<section class="mx-auto w-full space-y-4 md:space-y-6">
   {#if loading || !hydrated}
     <div class="h-48 animate-pulse border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900"></div>
   {:else}
@@ -418,12 +418,12 @@
       </div>
     {/if}
 
-    <form onsubmit={handleSubmit} class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden md:gap-4">
-      <fieldset class="flex shrink-0 flex-col gap-2 rounded-sm border border-zinc-200 p-3 dark:border-zinc-800">
+    <form onsubmit={handleSubmit} class="space-y-3 md:space-y-4">
+      <fieldset class="space-y-3 rounded-sm border border-zinc-200 p-3 dark:border-zinc-800">
         <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">
           Income — {period}
         </legend>
-        <div class="max-h-44 space-y-2 overflow-y-auto overscroll-contain">
+        <div class="space-y-2">
             {#each incomeRows as row (row.key)}
               <div class="flex items-end gap-1.5">
                 <label class="min-w-0 flex-1 space-y-1">
@@ -477,12 +477,12 @@
             </p>
       </fieldset>
 
-      <fieldset class="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden rounded-sm border border-zinc-200 p-3 dark:border-zinc-800">
+      <fieldset class="space-y-3 rounded-sm border border-zinc-200 p-3 dark:border-zinc-800">
         <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">
           Budget per Category
         </legend>
 
-        <div class="flex min-h-0 flex-1 flex-col gap-2 text-[11px] md:text-sm">
+        <div class="space-y-2 text-[11px] md:text-sm">
           <div
             class="grid grid-cols-[minmax(0,1fr)_4.5rem_2.5rem_3rem_2rem] items-center gap-x-1 border-b border-zinc-200 pb-2 text-[9px] font-medium uppercase tracking-wider text-zinc-500 md:text-[11px] dark:border-zinc-800"
           >
@@ -493,7 +493,6 @@
             <span class="text-center" title="Action">✎</span>
           </div>
 
-          <div class="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain">
           {#each categories as cat (cat.id)}
             <div class="space-y-1.5 border-l-2 border-zinc-300 pl-1 dark:border-zinc-700">
               <div class="grid grid-cols-[minmax(0,1fr)_4.5rem_2.5rem_3rem_2rem] items-center gap-x-1 rounded-sm bg-zinc-50/80 px-1 py-1 dark:bg-zinc-900/60">
@@ -584,7 +583,6 @@
               {/if}
             </div>
           {/each}
-          </div>
         </div>
 
         <div class="flex gap-2 pt-1">

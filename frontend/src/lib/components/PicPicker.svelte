@@ -6,10 +6,11 @@
     value: string;
     pics: readonly string[];
     together?: boolean;
+    all?: boolean;
     label?: string;
   }
 
-  let { value = $bindable(), pics, together = false, label = 'PIC' }: Props = $props();
+  let { value = $bindable(), pics, together = false, all = false, label = 'PIC' }: Props = $props();
 
   let open = $state(false);
   let menuStyle = $state('');
@@ -46,7 +47,7 @@
     aria-label={label}
     aria-haspopup="listbox"
     aria-expanded={open}
-    title={value === TOGETHER_PIC ? 'Together' : value}
+    title={value === TOGETHER_PIC ? 'Together' : value || 'All'}
     onclick={(event) => {
       const button = event.currentTarget as HTMLButtonElement;
       if (open) {
@@ -62,7 +63,7 @@
       }, 150);
     }}
   >
-    {#if value === TOGETHER_PIC}
+    {#if (all && !value) || value === TOGETHER_PIC}
       <span
         class="flex h-5 w-5 items-center justify-center rounded-full bg-zinc-900 text-[8px] font-semibold text-white dark:bg-white dark:text-black"
       >
@@ -80,6 +81,26 @@
       style={menuStyle}
       class="fixed z-40 min-w-36 overflow-hidden rounded-sm border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-950"
     >
+      {#if all}
+        <li role="option" aria-selected={!value}>
+          <button
+            type="button"
+            class="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs
+              {!value ? 'bg-zinc-100 dark:bg-zinc-900' : 'hover:bg-zinc-50 dark:hover:bg-zinc-900/70'}"
+            onmousedown={(event) => {
+              event.preventDefault();
+              choose('');
+            }}
+          >
+            <span
+              class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[8px] font-semibold text-white dark:bg-white dark:text-black"
+            >
+              All
+            </span>
+            <span>All</span>
+          </button>
+        </li>
+      {/if}
       {#each pics as pic (pic)}
         <li role="option" aria-selected={value === pic}>
           <button

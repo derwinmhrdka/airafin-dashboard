@@ -20,7 +20,6 @@
 
   const period = $derived(periodFromUrl(page.url.searchParams));
   const isAdminRoute = $derived(page.url.pathname.startsWith('/admin'));
-  const isPlan = $derived(page.url.pathname === '/plan');
   const needsProject = $derived(
     Boolean(data.session && data.session.projectId == null && !isAdminRoute),
   );
@@ -183,11 +182,7 @@
     />
   {/if}
 {:else}
-  <div
-    class="mx-auto flex w-full max-w-lg flex-col bg-white dark:bg-black md:max-w-none {isPlan
-      ? 'h-dvh overflow-hidden'
-      : 'min-h-dvh'}"
-  >
+  <div class="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-white dark:bg-black md:max-w-none">
     <header
       class="sticky top-0 z-20 overflow-visible border-b border-zinc-200 bg-white px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] dark:border-zinc-800 dark:bg-black md:px-8 md:pb-4 md:pt-[calc(1rem+env(safe-area-inset-top,0px))]"
     >
@@ -236,7 +231,7 @@
         <TabNav />
       {/if}
       <main
-        class="flex-1 px-4 py-4 md:px-8 md:py-6 {isPlan ? 'flex min-h-0 flex-col overflow-hidden' : ''} {$floatNavEnabled
+        class="flex-1 px-4 py-4 md:px-8 md:py-6 {$floatNavEnabled
           ? 'pb-[calc(6.75rem+env(safe-area-inset-bottom,0px))] md:pb-[calc(7.25rem+env(safe-area-inset-bottom,0px))]'
           : 'pb-[calc(1rem+env(safe-area-inset-bottom,0px))] md:pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]'}"
       >

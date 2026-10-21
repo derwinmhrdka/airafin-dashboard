@@ -3,6 +3,7 @@
   import AmountInput from '$lib/components/AmountInput.svelte';
   import DetailPreview from '$lib/components/DetailPreview.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
+  import PicPicker from '$lib/components/PicPicker.svelte';
   import { categoryStyle, defaultCategoryId } from '$lib/categories';
   import {
     createTransaction,
@@ -805,10 +806,10 @@
           enterkeyhint="search"
           class="w-full border border-zinc-200 bg-white px-2 py-1.5 text-xs dark:border-zinc-800 dark:bg-black"
         />
-        <div class="grid grid-cols-2 gap-2">
+        <div class="flex items-center gap-1">
           <select
             bind:value={filterCategory}
-            class="border border-zinc-200 bg-white px-1.5 py-1.5 text-[11px] dark:border-zinc-800 dark:bg-black"
+            class="min-w-0 flex-1 border border-zinc-200 bg-white px-1 py-1.5 text-[11px] dark:border-zinc-800 dark:bg-black"
             aria-label="Category"
           >
             <option value="">All categories</option>
@@ -817,27 +818,20 @@
             {/each}
           </select>
           <select
-            bind:value={filterPic}
-            class="border border-zinc-200 bg-white px-1.5 py-1.5 text-[11px] dark:border-zinc-800 dark:bg-black"
-            aria-label="Paid by"
+            bind:value={filterSub}
+            class="min-w-0 flex-1 border border-zinc-200 bg-white px-1 py-1.5 text-[11px] dark:border-zinc-800 dark:bg-black"
+            aria-label="Sub category"
           >
-            <option value="">All paid by</option>
-            {#each picList as p}
-              <option value={p}>{p}</option>
+            <option value="">All sub categories</option>
+            <option value="__main__">{MAIN_SUB_LABEL}</option>
+            {#each filterSubOptions as name}
+              <option value={name}>{name}</option>
             {/each}
           </select>
+          <span class="shrink-0">
+            <PicPicker bind:value={filterPic} pics={picList} all label="Paid by" />
+          </span>
         </div>
-        <select
-          bind:value={filterSub}
-          class="w-full border border-zinc-200 bg-white px-1.5 py-1.5 text-[11px] dark:border-zinc-800 dark:bg-black"
-          aria-label="Sub category"
-        >
-          <option value="">All sub categories</option>
-          <option value="__main__">{MAIN_SUB_LABEL}</option>
-          {#each filterSubOptions as name}
-            <option value={name}>{name}</option>
-          {/each}
-        </select>
         <p class="text-[10px] text-zinc-500">
           {transactions.length} loaded of {total}{hasActiveFilters ? ' matching' : ''}
           {#if hasActiveFilters && monthTotal > total}
