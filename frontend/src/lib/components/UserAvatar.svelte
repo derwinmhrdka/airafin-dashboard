@@ -1,6 +1,6 @@
 <script lang="ts">
-  import animalAvatar from 'animal-avatar-generator';
   import { avatarPref, type AvatarMode } from '$lib/avatar';
+  import { colorAvatar } from '$lib/color-avatar/render';
 
   interface Props {
     nickname: string;
@@ -17,12 +17,12 @@
   const resolvedSeed = $derived(
     (seed ?? $avatarPref.seed).trim() || nickname.trim() || 'airafin',
   );
-  const svg = $derived(animalAvatar(resolvedSeed, { size, round: true }));
+  const look = $derived(resolvedMode === 'color' ? colorAvatar(resolvedSeed, String(size)) : null);
 </script>
 
 <span
-  class="flex shrink-0 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-900"
-  style="width: {size}px; height: {size}px;"
+  class="flex shrink-0 overflow-hidden rounded-full {look ? '' : 'bg-zinc-100 dark:bg-zinc-900'}"
+  style="width: {size}px; height: {size}px;{look ? ` background: ${look.background};` : ''}"
 >
   {#if resolvedMode === 'google' && picture.trim()}
     <img src={picture} alt="" class="h-full w-full object-cover" referrerpolicy="no-referrer" />
@@ -38,7 +38,7 @@
       <path d="M12 58c2-12 10-18 20-18s18 6 20 18v6H12Z" class="fill-zinc-500 dark:fill-zinc-400" />
     </svg>
   {:else}
-    <span class="avatar-svg block h-full w-full">{@html svg}</span>
+    <span class="avatar-svg block h-full w-full">{@html look?.svg ?? ''}</span>
   {/if}
 </span>
 
