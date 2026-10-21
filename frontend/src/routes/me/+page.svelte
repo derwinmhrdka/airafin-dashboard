@@ -130,8 +130,8 @@
     closeAvatar();
   }
 
-  function choosePerson() {
-    setAvatarPref(nickname, { mode: 'person', seed: $avatarPref.seed || seeds[0] });
+  function chooseInitial() {
+    setAvatarPref(nickname, { mode: 'initial', seed: $avatarPref.seed || seeds[0] });
     closeAvatar();
   }
 
@@ -277,17 +277,6 @@
     <div class="grid grid-cols-4 gap-2">
       <button
         type="button"
-        class="flex aspect-square items-center justify-center overflow-hidden rounded-full border-2 {$avatarPref.mode === 'person'
-          ? 'border-black dark:border-white'
-          : 'border-transparent'}"
-        aria-label="Default avatar"
-        aria-pressed={$avatarPref.mode === 'person'}
-        onclick={choosePerson}
-      >
-        <UserAvatar {nickname} {picture} size={96} mode="person" />
-      </button>
-      <button
-        type="button"
         class="flex aspect-square items-center justify-center overflow-hidden rounded-full border-2 {$avatarPref.mode === 'google'
           ? 'border-black dark:border-white'
           : 'border-transparent'}"
@@ -296,6 +285,17 @@
         onclick={chooseGoogle}
       >
         <UserAvatar {nickname} {picture} size={96} mode="google" />
+      </button>
+      <button
+        type="button"
+        class="flex aspect-square items-center justify-center overflow-hidden rounded-full border-2 {$avatarPref.mode === 'initial'
+          ? 'border-black dark:border-white'
+          : 'border-transparent'}"
+        aria-label="Initial"
+        aria-pressed={$avatarPref.mode === 'initial'}
+        onclick={chooseInitial}
+      >
+        <UserAvatar {nickname} {picture} size={96} mode="initial" />
       </button>
       {#each seeds as seed (seed)}
         {@const selected = $avatarPref.mode === 'color' && $avatarPref.seed === seed}

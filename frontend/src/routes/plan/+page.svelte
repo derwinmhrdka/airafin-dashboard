@@ -9,6 +9,7 @@
   } from '$lib/api';
   import AmountInput from '$lib/components/AmountInput.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
+  import PicPicker from '$lib/components/PicPicker.svelte';
   import { withDeferredLoading } from '$lib/deferred-loading';
   import { formatAmountInput, formatCurrency, parseAmountInput } from '$lib/format';
   import {
@@ -26,7 +27,7 @@
     periodFromUrl,
     periodParts,
   } from '$lib/period';
-  import { defaultPic, isKnownPic, picInitial, picNames, type Pic } from '$lib/pics';
+  import { defaultPic, incomePicFromSource, isKnownPic, picNames, TOGETHER_PIC, type Pic } from '$lib/pics';
   import type { Category, PlanData } from '$lib/types';
 
   const DEFAULT_INCOMES = ['Gaji Derwin', 'Gaji Anggita'] as const;
@@ -44,6 +45,7 @@
     key: string;
     source: string;
     amount: string;
+    pic: string;
   }
 
   interface SubcategoryRow {
@@ -78,18 +80,25 @@
   const selectClass =
     'w-full appearance-none border border-zinc-200 bg-white py-2 pl-2.5 pr-7 text-xs font-medium dark:border-zinc-800 dark:bg-black';
 
+  function incomeOwner(source: string, stored?: string): string {
+    if (stored === TOGETHER_PIC) return TOGETHER_PIC;
+    if (stored && isKnownPic(stored, picList)) return stored;
+    return incomePicFromSource(source, picList) ?? defaultPic(picList);
+  }
+
   function defaultIncomeRows(): IncomeRow[] {
     return DEFAULT_INCOMES.map((source, i) => ({
       key: `default-${i}`,
       source,
       amount: '',
+      pic: incomeOwner(source),
     }));
   }
 
   function addIncomeRow() {
     incomeRows = [
       ...incomeRows,
-      { key: `extra-${Date.now()}`, source: '', amount: '' },
+      { key: `extra-${Date.now()}`, source: '', amount: '', pic: defaultPic(picList) },
     ];
   }
 
@@ -104,6 +113,7 @@
             key: `copied-${income.id ?? i}-${Date.now()}`,
             source: income.source,
             amount: formatAmountInput(income.amount),
+            pic: incomeOwner(income.source, income.pic),
           }))
         : defaultIncomeRows();
 
@@ -245,6 +255,7 @@
       .map((row) => ({
         source: row.source.trim(),
         amount: parseAmountInput(row.amount),
+        pic: row.pic === TOGETHER_PIC || isKnownPic(row.pic, picList) ? row.pic : defaultPic(picList),
       }))
       .filter((row) => row.source && row.amount > 0);
 
@@ -414,8 +425,8 @@
         </legend>
         <div class="space-y-2">
             {#each incomeRows as row (row.key)}
-              <div class="flex items-end gap-2">
-                <label class="min-w-0 flex-1 space-y-1">
+              <div class="flex flex-wrap items-end gap-2">
+                <label class="min-w-[8rem] flex-1 space-y-1">
                   <span class="text-[11px] text-zinc-500">Source</span>
                   <input
                     type="text"
@@ -424,6 +435,15 @@
                     class="w-full border border-zinc-200 bg-white px-2 py-2 text-sm dark:border-zinc-800 dark:bg-black"
                   />
                 </label>
+                <div class="shrink-0 space-y-1 pb-1">
+                  <span class="block text-[11px] text-zinc-500">PIC</span>
+                  <PicPicker
+                    bind:value={row.pic}
+                    pics={picList}
+                    together
+                    label="PIC for {row.source || 'income'}"
+                  />
+                </div>
                 <label class="w-32 shrink-0 space-y-1">
                   <span class="text-[11px] text-zinc-500">Amount</span>
                   <AmountInput bind:value={row.amount} class="text-right" />
@@ -464,7 +484,7 @@
 
         <div class="space-y-2 text-[11px] md:text-sm">
           <div
-            class="grid grid-cols-[minmax(0,1fr)_5.2rem_1.8rem_3.4rem_1rem] items-center gap-x-1 border-b border-zinc-200 pb-2 text-[9px] font-medium uppercase tracking-wider text-zinc-500 md:text-[11px] dark:border-zinc-800"
+            class="grid grid-cols-[minmax(0,1fr)_5.2rem_auto_3.4rem_1rem] items-center gap-x-1 border-b border-zinc-200 pb-2 text-[9px] font-medium uppercase tracking-wider text-zinc-500 md:text-[11px] dark:border-zinc-800"
           >
             <span class="text-center">Category</span>
             <span class="text-center">Budget</span>
@@ -475,7 +495,7 @@
 
           {#each categories as cat (cat.id)}
             <div class="space-y-1.5 border-l-2 border-zinc-300 pl-1 dark:border-zinc-700">
-              <div class="grid grid-cols-[minmax(0,1fr)_5.2rem_1.8rem_3.4rem_1rem] items-center gap-x-1 rounded-sm bg-zinc-50/80 px-1 py-1 dark:bg-zinc-900/60">
+              <div class="grid grid-cols-[minmax(0,1fr)_5.2rem_auto_3.4rem_1rem] items-center gap-x-1 rounded-sm bg-zinc-50/80 px-1 py-1 dark:bg-zinc-900/60">
                 <p class="min-w-0 truncate text-[10px] font-semibold sm:text-xs md:text-sm">{cat.name}</p>
                 <div class="min-w-0">
                   <AmountInput
@@ -484,15 +504,7 @@
                       class="w-full px-1 py-1 text-right text-[11px] md:text-sm"
                   />
                 </div>
-                <select
-                  bind:value={picInputs[cat.id]}
-                      class="h-7 w-full border border-zinc-200 bg-white px-0 text-center text-[8px] font-semibold md:h-8 md:text-[11px] dark:border-zinc-800 dark:bg-black"
-                  aria-label="PIC for {cat.name}"
-                >
-                  {#each picList as p}
-                    <option value={p}>{picInitial(p)}</option>
-                  {/each}
-                </select>
+                <PicPicker bind:value={picInputs[cat.id]} pics={picList} label="PIC for {cat.name}" />
                 <select
                   bind:value={pocketInputs[cat.id]}
                       class="h-7 w-full border border-zinc-200 bg-white px-0.5 text-[8px] md:h-8 md:px-1 md:text-[11px] dark:border-zinc-800 dark:bg-black"
@@ -506,7 +518,7 @@
               </div>
 
               {#each subcategoryInputs[cat.id] ?? [] as sub (sub.key)}
-                <div class="grid grid-cols-[minmax(0,1fr)_5.2rem_1.8rem_3.4rem_1rem] items-center gap-x-1">
+                <div class="grid grid-cols-[minmax(0,1fr)_5.2rem_auto_3.4rem_1rem] items-center gap-x-1">
                   <div class="min-w-0">
                     <input
                       type="text"
@@ -521,15 +533,7 @@
                     aria-label="Budget for sub category {sub.name || 'new'}"
                       class="w-full px-1 py-1 text-right text-[11px] md:text-sm"
                   />
-                  <select
-                    bind:value={sub.pic}
-                          class="h-7 w-full border border-zinc-200 bg-white px-0 text-center text-[8px] font-semibold md:h-8 md:text-[11px] dark:border-zinc-800 dark:bg-black"
-                    aria-label="PIC for sub category"
-                  >
-                    {#each picList as p}
-                      <option value={p}>{picInitial(p)}</option>
-                    {/each}
-                  </select>
+                  <PicPicker bind:value={sub.pic} pics={picList} label="PIC for sub category" />
                   <select
                     bind:value={sub.pocket}
                           class="h-7 w-full border border-zinc-200 bg-white px-0.5 text-[8px] md:h-8 md:px-1 md:text-[11px] dark:border-zinc-800 dark:bg-black"
@@ -564,10 +568,10 @@
                 {@const subs = subcategoryInputs[cat.id] ?? []}
                 {@const mainRemainder = mainCategoryRemainder(budgetInputs[cat.id] || '', subs)}
                 {@const overSub = subExceedsCategory(budgetInputs[cat.id] || '', subs)}
-                <div class="grid grid-cols-[minmax(0,1fr)_5.2rem_1.8rem_3.4rem_1rem] items-center gap-x-1 border-t border-dashed border-zinc-200 pt-1 text-zinc-500 dark:border-zinc-800">
+                <div class="grid grid-cols-[minmax(0,1fr)_5.2rem_auto_3.4rem_1rem] items-center gap-x-1 border-t border-dashed border-zinc-200 pt-1 text-zinc-500 dark:border-zinc-800">
                   <p class="text-xs italic md:text-sm">Main</p>
                   <span class="font-mono text-right text-xs tabular-nums md:text-sm">{formatCurrency(mainRemainder)}</span>
-                  <span class="text-center text-[9px] md:text-[11px]">{picInitial(picInputs[cat.id] ?? defaultPic(picList))}</span>
+                  <span class="flex justify-center"><PicBadge name={picInputs[cat.id] ?? defaultPic(picList)} /></span>
                   <span class="truncate text-center text-[9px] md:text-[11px]">{pocketInputs[cat.id] ?? DEFAULT_POCKET}</span>
                   <span></span>
                 </div>

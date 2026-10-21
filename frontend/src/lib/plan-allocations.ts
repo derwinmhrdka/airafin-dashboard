@@ -1,5 +1,5 @@
 import { parseAmountInput } from '$lib/format';
-import { defaultPic, incomePicFromSource, type Pic } from '$lib/pics';
+import { defaultPic, incomePicFromSource, TOGETHER_PIC, type Pic } from '$lib/pics';
 
 export const MAIN_SUB_LABEL = 'Main (default)';
 
@@ -32,9 +32,22 @@ export interface PicPlanRow {
   balancing: number;
 }
 
+/** Split a shared amount so the parts add back up to the rounded total. */
+export function splitEvenAmount(amount: number, count: number): number[] {
+  if (count <= 0) return [];
+  const total = Math.round(amount);
+  const base = Math.floor(total / count);
+  let rest = total - base * count;
+  return Array.from({ length: count }, () => {
+    const extra = rest > 0 ? 1 : 0;
+    rest -= extra;
+    return base + extra;
+  });
+}
+
 export function picPlanSummary(input: {
   pics: readonly string[];
-  incomeRows: readonly { source: string; amount: string }[];
+  incomeRows: readonly { source: string; amount: string; pic: string }[];
   categories: readonly { id: number }[];
   budgetInputs: Record<number, string>;
   picInputs: Record<number, Pic>;
@@ -45,10 +58,17 @@ export function picPlanSummary(input: {
   const planByPic: Record<string, number> = Object.fromEntries(names.map((p) => [p, 0]));
 
   for (const row of input.incomeRows) {
-    const owner = incomePicFromSource(row.source, names);
-    if (owner) {
-      incomeByPic[owner] = (incomeByPic[owner] ?? 0) + parseAmountInput(row.amount || '');
+    const amount = parseAmountInput(row.amount || '');
+    if (amount <= 0) continue;
+    if (row.pic === TOGETHER_PIC) {
+      const shares = splitEvenAmount(amount, names.length);
+      names.forEach((pic, index) => {
+        incomeByPic[pic] = (incomeByPic[pic] ?? 0) + (shares[index] ?? 0);
+      });
+      continue;
     }
+    const owner = names.includes(row.pic) ? row.pic : incomePicFromSource(row.source, names);
+    if (owner) incomeByPic[owner] = (incomeByPic[owner] ?? 0) + amount;
   }
 
   for (const cat of input.categories) {

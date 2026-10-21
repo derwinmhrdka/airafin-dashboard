@@ -9,6 +9,7 @@
     updateChecklistItem,
   } from '$lib/api';
   import AmountInput from '$lib/components/AmountInput.svelte';
+  import BankLogo from '$lib/components/BankLogo.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
   import TransferChecklistButton from '$lib/components/TransferChecklistButton.svelte';
   import TransferPendingDetails from '$lib/components/TransferPendingDetails.svelte';
@@ -45,7 +46,6 @@
       readonly { name: string; amount: string; pic: Pic; pocket: string }[]
     >;
     pocketOptions: string[];
-    pocketColors: Record<string, string>;
     items: PlanChecklistItem[];
     onChange: () => void | Promise<void>;
   }
@@ -55,7 +55,6 @@
     categories,
     subcategoryInputs,
     pocketOptions,
-    pocketColors,
     items,
     onChange,
   }: Props = $props();
@@ -96,7 +95,6 @@
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([pocket, rows]) => ({
         pocket,
-        color: pocketColors[pocket] ?? '#71717a',
         rows,
       }));
   });
@@ -164,10 +162,6 @@
 
   function otherPic(p: Pic): Pic {
     return pickOtherPic(p, picList);
-  }
-
-  function pocketDotColor(name: string): string {
-    return pocketColors[name?.trim().toUpperCase()] ?? '#71717a';
   }
 
   function toggleExpanded(key: string) {
@@ -416,10 +410,6 @@
     </span>
   </legend>
 
-  <p class="text-[10px] text-zinc-500">
-    Plan + Detail reimbursements (Paid by ≠ plan PIC). Check when transferred / paid.
-  </p>
-
   {#if error}
     <p class="text-xs text-red-600 dark:text-red-400">{error}</p>
   {/if}
@@ -558,12 +548,7 @@
               : 'border-zinc-200 bg-zinc-50 text-zinc-600 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300'}"
             aria-pressed={pocket === p}
           >
-            <span
-              class="h-2 w-2 shrink-0 rounded-full"
-              style="background-color: {pocketDotColor(p)}"
-              aria-hidden="true"
-            ></span>
-            {p}
+            <BankLogo name={p} height={14} />
           </button>
         {/each}
       </div>
@@ -647,8 +632,7 @@
                 </div>
                 <div class="mt-1 flex items-center gap-1.5 text-[10px]">
                   <span class="inline-flex items-center gap-1 rounded bg-zinc-100 px-1 py-0.5 font-semibold uppercase tracking-wide text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-                    <span class="h-1.5 w-1.5 rounded-full" style="background-color: {pocketDotColor(item.pocket)}" aria-hidden="true"></span>
-                    {item.pocket || '—'}
+                    <BankLogo name={item.pocket || '—'} height={12} />
                   </span>
                   <PicBadge name={item.senderPic} />
                   <span class="text-zinc-400">→</span>
@@ -704,8 +688,7 @@
                     </div>
                     <div class="mt-1 flex items-center gap-1.5 text-[10px]">
                       <span class="inline-flex items-center gap-1 rounded bg-zinc-100 px-1.5 py-0.5 font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-                        <span class="h-1.5 w-1.5 rounded-full" style="background-color: {pocketDotColor(item.pocket)}" aria-hidden="true"></span>
-                        {item.pocket || 'BCA'}
+                        <BankLogo name={item.pocket || 'BCA'} height={12} />
                       </span>
                       <span class="rounded bg-zinc-100 px-1.5 py-0.5 font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">Plan</span>
                     </div>
@@ -787,12 +770,7 @@
         {#each pocketNetGroups as group (group.pocket)}
           <div class="space-y-1.5">
             <div class="flex items-center gap-1.5">
-              <span
-                class="h-2.5 w-2.5 shrink-0 rounded-full"
-                style="background-color: {group.color}"
-                aria-hidden="true"
-              ></span>
-              <span class="text-[11px] font-semibold uppercase tracking-wide">{group.pocket}</span>
+              <BankLogo name={group.pocket} height={14} class="text-[11px] font-semibold uppercase tracking-wide" />
             </div>
             {#each group.rows as row (row.key)}
               {@const expandKey = `pocket:${row.key}`}

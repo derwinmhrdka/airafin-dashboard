@@ -37,7 +37,7 @@ export async function exchangeGoogleCode(input: {
   clientId: string;
   clientSecret: string;
   redirectUri: string;
-}): Promise<{ access_token: string }> {
+}): Promise<{ access_token: string; id_token?: string }> {
   const res = await fetch(GOOGLE_TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -55,7 +55,20 @@ export async function exchangeGoogleCode(input: {
     throw new Error(`Google token exchange failed (${res.status}): ${text.slice(0, 200)}`);
   }
 
-  return (await res.json()) as { access_token: string };
+  return (await res.json()) as { access_token: string; id_token?: string };
+}
+
+/** Picture claim from the Google ID token, used when userinfo omits it. */
+export function pictureFromIdToken(idToken: string | undefined): string | undefined {
+  if (!idToken) return undefined;
+  const payload = idToken.split('.')[1];
+  if (!payload) return undefined;
+  try {
+    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as { picture?: unknown };
+    return typeof data.picture === 'string' ? data.picture : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function fetchGoogleUserInfo(accessToken: string): Promise<{

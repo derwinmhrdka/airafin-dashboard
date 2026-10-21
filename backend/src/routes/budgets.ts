@@ -27,12 +27,13 @@ import {
   BALANCING_ITEM_NAME,
   computeBalancingTransfer,
 } from '../lib/checklist-balancing.js';
-import { defaultPic, isValidPic } from '../lib/pic.js';
+import { defaultPic, isValidPic, TOGETHER_PIC } from '../lib/pic.js';
 import { shiftPeriod } from '../lib/period.js';
 
 interface IncomeInput {
   source: string;
   amount: number;
+  pic?: string;
 }
 
 interface BudgetInput {
@@ -442,9 +443,18 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
           continue;
         }
 
+        const picRaw = income.pic?.trim() ?? '';
+        const pic =
+          picRaw.toLowerCase() === TOGETHER_PIC.toLowerCase()
+            ? TOGETHER_PIC
+            : isValidPic(picRaw)
+              ? picRaw
+              : '';
+
         await db.insert(incomes).values({
           projectId,
           source,
+          pic,
           amount: String(Math.round(income.amount)),
           period: trimmedPeriod,
         });
@@ -1281,12 +1291,13 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
             .values({
               projectId,
               source,
+              pic,
               amount: amountStr(amount),
               period: toPeriod,
             })
             .onConflictDoUpdate({
               target: [incomes.projectId, incomes.source, incomes.period],
-              set: { amount: amountStr(amount) },
+              set: { amount: amountStr(amount), pic },
             });
         }
 

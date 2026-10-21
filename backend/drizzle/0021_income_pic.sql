@@ -1,0 +1,1 @@
+ALTER TABLE "incomes" ADD COLUMN IF NOT EXISTS "pic" text NOT NULL DEFAULT '';

@@ -239,6 +239,7 @@ export async function copyPlanTemplate(input: {
       incomeRows.map((r) => ({
         projectId: input.toProjectId,
         source: r.source,
+        pic: r.pic,
         amount: r.amount,
         period: r.period,
       })),

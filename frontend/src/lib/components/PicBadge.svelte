@@ -1,41 +1,44 @@
+<script lang="ts" module>
+  let badgeSeq = 0;
+</script>
+
 <script lang="ts">
+  import { page } from '$app/state';
+  import { avatarPref, readAvatarPref, type AvatarMode } from '$lib/avatar';
+  import UserAvatar from '$lib/components/UserAvatar.svelte';
+
   interface Props {
     name: string;
   }
 
   let { name }: Props = $props();
 
-  const palettes = [
-    { bg: 'bg-sky-100 dark:bg-sky-900/40', text: 'text-sky-800 dark:text-sky-200' },
-    { bg: 'bg-violet-100 dark:bg-violet-900/40', text: 'text-violet-800 dark:text-violet-200' },
-    { bg: 'bg-amber-100 dark:bg-amber-900/40', text: 'text-amber-800 dark:text-amber-200' },
-    { bg: 'bg-emerald-100 dark:bg-emerald-900/40', text: 'text-emerald-800 dark:text-emerald-200' },
-    { bg: 'bg-rose-100 dark:bg-rose-900/40', text: 'text-rose-800 dark:text-rose-200' },
-    { bg: 'bg-teal-100 dark:bg-teal-900/40', text: 'text-teal-800 dark:text-teal-200' },
-  ] as const;
+  const scope = `b${++badgeSeq}`;
 
-  const named: Record<string, { initial: string; bg: string; text: string }> = {
-    Derwin: { initial: 'D', bg: palettes[0].bg, text: palettes[0].text },
-    Anggita: { initial: 'A', bg: palettes[1].bg, text: palettes[1].text },
-  };
+  let mode = $state<AvatarMode>('initial');
+  let seed = $state('');
+  let picture = $state('');
 
-  function paletteFor(label: string) {
-    let h = 0;
-    for (let i = 0; i < label.length; i += 1) h = (h * 31 + label.charCodeAt(i)) | 0;
-    return palettes[Math.abs(h) % palettes.length];
-  }
-
-  const style = $derived(
-    named[name] ?? {
-      initial: name.trim().charAt(0).toUpperCase() || '?',
-      ...paletteFor(name),
-    },
-  );
+  $effect(() => {
+    const label = name.trim();
+    const live = $avatarPref;
+    const session = page.data.session;
+    const sessionPic = typeof session?.pic === 'string' ? session.pic.trim() : '';
+    const mine = Boolean(sessionPic) && sessionPic.toLowerCase() === label.toLowerCase();
+    const chosen = mine ? live : readAvatarPref(label);
+    if (!chosen) {
+      mode = 'initial';
+      seed = label || 'airafin';
+      picture = '';
+      return;
+    }
+    mode = chosen.mode;
+    seed = chosen.seed.trim() || label || 'airafin';
+    picture =
+      mine && chosen.mode === 'google' && typeof session?.picture === 'string' ? session.picture : '';
+  });
 </script>
 
-<span
-  class="inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold {style.bg} {style.text}"
-  title={name}
->
-  {style.initial}
+<span class="inline-flex shrink-0" title={name}>
+  <UserAvatar nickname={name} {picture} size={20} {mode} {seed} {scope} />
 </span>

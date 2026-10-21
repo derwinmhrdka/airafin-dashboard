@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import {
   consumeOAuthState,
   googleOAuthConfigured,
+  googlePicture,
   resolvePicFromEmail,
   setSessionCookie,
 } from '$lib/server/auth';
@@ -11,6 +12,7 @@ import {
   fetchGoogleUserInfo,
   getGoogleClientConfig,
   googleCallbackRedirectUri,
+  pictureFromIdToken,
 } from '$lib/server/google-oauth';
 import { env } from '$env/dynamic/private';
 
@@ -58,6 +60,7 @@ export const GET: RequestHandler = async ({ cookies, url, request }) => {
       redirectUri,
     });
     profile = await fetchGoogleUserInfo(tokens.access_token);
+    if (!profile.picture) profile.picture = pictureFromIdToken(tokens.id_token);
   } catch (e) {
     if (isRedirect(e)) throw e;
     console.error('Google OAuth callback failed:', e);
@@ -79,7 +82,7 @@ export const GET: RequestHandler = async ({ cookies, url, request }) => {
       email: profile.email.toLowerCase(),
       pic,
       name: profile.name,
-      picture: profile.picture,
+      picture: googlePicture(profile.picture),
       auth: 'google',
       projectId: null,
     },

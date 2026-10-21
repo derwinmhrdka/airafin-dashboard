@@ -38,6 +38,8 @@ export const incomes = pgTable(
       .notNull()
       .references(() => projects.id, { onDelete: 'cascade' }),
     source: text('source').notNull(),
+    /** PIC name, or `Together` when the amount is shared across every PIC. */
+    pic: text('pic').notNull().default(''),
     amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
     period: text('period').notNull(),
   },

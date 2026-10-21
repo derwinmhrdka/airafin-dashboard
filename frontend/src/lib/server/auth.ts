@@ -19,13 +19,26 @@ export interface SessionUser {
   projectId: number | null;
 }
 
-function googlePicture(value: unknown): string | undefined {
+function isGooglePictureHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/\.$/, '');
+  return (
+    host === 'googleusercontent.com' ||
+    host.endsWith('.googleusercontent.com') ||
+    host === 'ggpht.com' ||
+    host.endsWith('.ggpht.com')
+  );
+}
+
+/** Keep a Google profile photo URL. Hosts include googleusercontent.com and ggpht.com. */
+export function googlePicture(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
   try {
-    const url = new URL(value);
+    const url = new URL(trimmed);
     if (url.protocol !== 'https:') return undefined;
-    if (!url.hostname.endsWith('googleusercontent.com')) return undefined;
-    return url.toString();
+    if (!isGooglePictureHost(url.hostname)) return undefined;
+    return trimmed.replace(/=s\d+-c\b/g, '=s256-c');
   } catch {
     return undefined;
   }

@@ -132,6 +132,8 @@ export interface PlanIncome {
   id: number;
   source: string;
   amount: string;
+  /** PIC name, `Together`, or empty on older rows. */
+  pic?: string;
   period: string;
 }
 

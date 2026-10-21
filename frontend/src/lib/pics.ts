@@ -2,6 +2,9 @@ import { get, writable } from 'svelte/store';
 
 export type Pic = string;
 
+/** Plan income that belongs to every PIC, split evenly for balancing. */
+export const TOGETHER_PIC = 'Together';
+
 export const FALLBACK_PICS = ['Derwin', 'Anggita'] as const;
 
 export const picNames = writable<string[]>([...FALLBACK_PICS]);

@@ -12,6 +12,9 @@ import {
 
 export type Pic = string;
 
+/** Plan income that belongs to every PIC, split evenly for balancing. */
+export const TOGETHER_PIC = 'Together';
+
 const FALLBACK_PICS = ['Derwin', 'Anggita'] as const;
 
 let cachedNames: string[] = [...FALLBACK_PICS];

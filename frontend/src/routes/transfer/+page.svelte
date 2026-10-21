@@ -35,7 +35,6 @@
   let categories = $state<Category[]>([]);
   let subcategoryInputs = $state<Record<number, SubcategoryRow[]>>({});
   let pocketOptions = $state<Pocket[]>([...DEFAULT_POCKETS]);
-  let pocketColors = $state<Record<string, string>>({});
   let checklistItems = $state<PlanChecklistItem[]>([]);
   let loading = $state(false);
   let hydrated = $state(false);
@@ -313,9 +312,6 @@
           categories = catRes.categories;
           pocketOptions = pocketRes.pockets.map((p) => p.name);
           if (pocketOptions.length === 0) pocketOptions = [...DEFAULT_POCKETS];
-          pocketColors = Object.fromEntries(
-            pocketRes.pockets.map((p) => [p.name.toUpperCase(), p.color || '#71717a']),
-          );
           applyPlanSubcategories(plan);
         } catch (e) {
           error = e instanceof Error ? e.message : 'Failed to load transfer data';
@@ -569,7 +565,6 @@
       {categories}
       {subcategoryInputs}
       {pocketOptions}
-      {pocketColors}
       items={checklistItems}
       onChange={reloadChecklist}
     />

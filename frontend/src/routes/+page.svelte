@@ -1,6 +1,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { categoryChartFill } from '$lib/chart-colors';
+  import BankLogo from '$lib/components/BankLogo.svelte';
   import CategoryProgress from '$lib/components/CategoryProgress.svelte';
   import PieChart from '$lib/components/PieChart.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
@@ -216,11 +217,8 @@
                   {@const subItems = pocket.items}
                   <div class="border border-zinc-200 p-2 dark:border-zinc-800">
                     <div class="mb-2 flex items-center justify-between gap-2">
-                      <span
-                        class="rounded px-2 py-0.5 text-xs font-medium text-white"
-                        style="background-color: {pocket.color}"
-                      >
-                        {pocket.pocket}
+                      <span class="inline-flex min-w-0 items-center gap-1.5 text-xs font-medium">
+                        <BankLogo name={pocket.pocket} class="truncate" />
                       </span>
                       <span class="font-mono text-xs tabular-nums text-zinc-500">{pct.toFixed(0)}%</span>
                     </div>

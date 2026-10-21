@@ -1,5 +1,5 @@
 import type { Budget, BudgetSubcategory, Income } from '../db/schema.js';
-import { defaultPic, isValidPic, listCachedPics, type Pic } from './pic.js';
+import { defaultPic, isValidPic, listCachedPics, TOGETHER_PIC, type Pic } from './pic.js';
 
 export const BALANCING_ITEM_NAME = 'Balancing';
 
@@ -37,9 +37,25 @@ export function computeBalancingTransfer(input: {
     planByPic[pic] = 0;
   }
 
+  const pics = listCachedPics();
   for (const row of input.incomes) {
-    const owner = incomePicFromSource(row.source);
-    if (owner) incomeByPic[owner] = (incomeByPic[owner] ?? 0) + parseAmount(row.amount);
+    const amount = parseAmount(row.amount);
+    if (amount <= 0) continue;
+    const pic = row.pic?.trim() ?? '';
+    if (pic === TOGETHER_PIC) {
+      const count = pics.length;
+      if (count === 0) continue;
+      const base = Math.floor(amount / count);
+      let rest = amount - base * count;
+      for (const name of pics) {
+        const extra = rest > 0 ? 1 : 0;
+        rest -= extra;
+        incomeByPic[name] = (incomeByPic[name] ?? 0) + base + extra;
+      }
+      continue;
+    }
+    const owner = isValidPic(pic) ? pic : incomePicFromSource(row.source);
+    if (owner) incomeByPic[owner] = (incomeByPic[owner] ?? 0) + amount;
   }
 
   const subsByCategory = new Map<number, BudgetSubcategory[]>();
@@ -61,8 +77,8 @@ export function computeBalancingTransfer(input: {
     }
   }
 
-  const pics = [...new Set([...Object.keys(incomeByPic), ...Object.keys(planByPic)])];
-  const balancing = pics.map((pic) => ({
+  const names = [...new Set([...Object.keys(incomeByPic), ...Object.keys(planByPic)])];
+  const balancing = names.map((pic) => ({
     pic,
     value: (incomeByPic[pic] ?? 0) - (planByPic[pic] ?? 0),
   }));
