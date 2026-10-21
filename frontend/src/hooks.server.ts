@@ -30,6 +30,7 @@ function isPublicPath(path: string): boolean {
     path === '/favicon.svg' ||
     path === '/robots.txt' ||
     path.startsWith('/icons/') ||
+    path.startsWith('/bank-logos/') ||
     path.startsWith('/_app/') ||
     path.startsWith('/fonts/')
   );

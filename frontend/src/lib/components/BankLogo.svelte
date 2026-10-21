@@ -1,11 +1,6 @@
 <script lang="ts">
   import { bankSlug } from '$lib/bank-logo';
 
-  const iconModules = import.meta.glob<string>('../../../node_modules/idn-finlogos/dist/icons/*.mjs', {
-    import: 'default',
-    exhaustive: true,
-  });
-
   /** Same frame for every bank mark. */
   const RATIO = 3;
 
@@ -19,31 +14,6 @@
 
   const slug = $derived(bankSlug(name));
   const label = $derived(name.trim());
-
-  let svg = $state('');
-
-  $effect(() => {
-    const current = slug;
-    svg = '';
-    if (!current) return;
-
-    const load = Object.entries(iconModules).find(([path]) => path.endsWith(`/${current}.mjs`))?.[1];
-    if (!load) return;
-
-    let alive = true;
-    load().then((raw) => {
-      if (!alive || typeof raw !== 'string' || !raw) return;
-      const prefix = `bl-${current}-`;
-      svg = raw
-        .replace(/\bid="([^"]+)"/g, (_match, id: string) => `id="${prefix}${id}"`)
-        .replace(/url\(#([^)]+)\)/g, (_match, id: string) => `url(#${prefix}${id})`);
-    });
-
-    return () => {
-      alive = false;
-    };
-  });
-
   const markWidth = $derived(Math.round(height * RATIO));
 </script>
 
@@ -54,11 +24,11 @@
     title={label}
     aria-label={label}
   >
-    {#if svg}
-      <span class="bank-logo-mark block h-full w-full">
-        {@html svg}
-      </span>
-    {/if}
+    <img
+      src="/bank-logos/{slug}.svg"
+      alt=""
+      class="block h-full w-full max-w-none object-contain"
+    />
   </span>
 {:else if label}
   <span
@@ -69,11 +39,3 @@
     <span class="truncate">{label}</span>
   </span>
 {/if}
-
-<style>
-  .bank-logo-mark :global(svg) {
-    display: block;
-    width: 100%;
-    height: 100%;
-  }
-</style>
