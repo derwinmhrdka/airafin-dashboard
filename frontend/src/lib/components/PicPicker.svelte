@@ -12,22 +12,50 @@
   let { value = $bindable(), pics, together = false, label = 'PIC' }: Props = $props();
 
   let open = $state(false);
+  let menuStyle = $state('');
+
+  function placeMenu(button: HTMLButtonElement) {
+    const rect = button.getBoundingClientRect();
+    const right = Math.max(8, window.innerWidth - rect.right);
+    menuStyle = `top:${rect.bottom + 4}px;right:${right}px;`;
+  }
 
   function choose(next: string) {
     value = next;
     open = false;
   }
+
+  $effect(() => {
+    if (!open) return;
+    const close = () => {
+      open = false;
+    };
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  });
 </script>
 
-<div class="relative flex justify-center {open ? 'z-30' : ''}">
+<div class="relative flex justify-center">
   <button
     type="button"
-    class="inline-flex items-center gap-0.5 rounded-full border border-zinc-200 bg-white py-0.5 pl-0.5 pr-1 dark:border-zinc-700 dark:bg-black"
+    class="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-zinc-200 bg-white py-0.5 pl-0.5 pr-1 dark:border-zinc-700 dark:bg-black"
     aria-label={label}
     aria-haspopup="listbox"
     aria-expanded={open}
     title={value === TOGETHER_PIC ? 'Together' : value}
-    onclick={() => (open = !open)}
+    onclick={(event) => {
+      const button = event.currentTarget as HTMLButtonElement;
+      if (open) {
+        open = false;
+        return;
+      }
+      placeMenu(button);
+      open = true;
+    }}
     onblur={() => {
       setTimeout(() => {
         open = false;
@@ -49,7 +77,8 @@
   {#if open}
     <ul
       role="listbox"
-      class="absolute left-1/2 top-full z-30 mt-1 min-w-36 -translate-x-1/2 overflow-hidden rounded-sm border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-950"
+      style={menuStyle}
+      class="fixed z-40 min-w-36 overflow-hidden rounded-sm border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-950"
     >
       {#each pics as pic (pic)}
         <li role="option" aria-selected={value === pic}>

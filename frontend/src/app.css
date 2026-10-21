@@ -7,7 +7,9 @@
 
 html {
   -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
+  max-width: 100%;
+  overflow-x: hidden;
+  touch-action: pan-y;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
@@ -15,7 +17,9 @@ html {
 body {
   @apply min-w-0 bg-white text-black antialiased dark:bg-black dark:text-white;
   font-family: var(--font-sans);
-  touch-action: manipulation;
+  max-width: 100%;
+  overflow-x: hidden;
+  touch-action: pan-y;
   overscroll-behavior: none;
   /* PWA / iOS standalone: keep content clear of notch & home indicator */
   padding-left: env(safe-area-inset-left, 0px);
@@ -24,6 +28,15 @@ body {
 
 .font-mono {
   font-family: var(--font-mono);
+}
+
+/* Keep iOS from zooming the page when a field is focused. */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
 }
 
 /* iOS/WebKit date inputs have a large intrinsic min-width — keep them aligned with other fields. */

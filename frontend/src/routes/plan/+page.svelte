@@ -338,11 +338,11 @@
   }
 </script>
 
-<section class="mx-auto w-full space-y-4 md:space-y-6">
+<section class="mx-auto flex min-h-0 w-full flex-1 flex-col gap-3 overflow-hidden md:gap-4">
   {#if loading || !hydrated}
     <div class="h-48 animate-pulse border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900"></div>
   {:else}
-    <div class="flex flex-wrap items-center justify-between gap-2">
+    <div class="flex shrink-0 flex-wrap items-center justify-between gap-2">
       <p class="text-[11px] uppercase tracking-wider text-zinc-500">Plan · {period}</p>
       <div class="flex flex-wrap gap-2">
         <button
@@ -356,7 +356,7 @@
     </div>
 
     {#if copyOpen}
-      <div class="space-y-3 rounded-sm border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
+      <div class="shrink-0 space-y-3 rounded-sm border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
         <p class="text-xs font-medium text-zinc-700 dark:text-zinc-300">
           Copy plan into <span class="font-mono">{period}</span> from
         </p>
@@ -418,15 +418,15 @@
       </div>
     {/if}
 
-    <form onsubmit={handleSubmit} class="space-y-3 md:space-y-4">
-      <fieldset class="space-y-3 rounded-sm border border-zinc-200 p-3 dark:border-zinc-800">
+    <form onsubmit={handleSubmit} class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden md:gap-4">
+      <fieldset class="flex shrink-0 flex-col gap-2 rounded-sm border border-zinc-200 p-3 dark:border-zinc-800">
         <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">
           Income — {period}
         </legend>
-        <div class="space-y-2">
+        <div class="max-h-44 space-y-2 overflow-y-auto overscroll-contain">
             {#each incomeRows as row (row.key)}
-              <div class="flex flex-wrap items-end gap-2">
-                <label class="min-w-[8rem] flex-1 space-y-1">
+              <div class="flex items-end gap-1.5">
+                <label class="min-w-0 flex-1 space-y-1">
                   <span class="text-[11px] text-zinc-500">Source</span>
                   <input
                     type="text"
@@ -444,7 +444,7 @@
                     label="PIC for {row.source || 'income'}"
                   />
                 </div>
-                <label class="w-32 shrink-0 space-y-1">
+                <label class="w-[6.5rem] shrink-0 space-y-1">
                   <span class="text-[11px] text-zinc-500">Amount</span>
                   <AmountInput bind:value={row.amount} class="text-right" />
                 </label>
@@ -460,6 +460,7 @@
                 {/if}
               </div>
             {/each}
+        </div>
 
             <button
               type="button"
@@ -474,17 +475,16 @@
               Total Income:
               <span class="font-mono text-black dark:text-white">{formatCurrency(totalIncome)}</span>
             </p>
-        </div>
       </fieldset>
 
-      <fieldset class="space-y-3 rounded-sm border border-zinc-200 p-3 dark:border-zinc-800">
+      <fieldset class="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden rounded-sm border border-zinc-200 p-3 dark:border-zinc-800">
         <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">
           Budget per Category
         </legend>
 
-        <div class="space-y-2 text-[11px] md:text-sm">
+        <div class="flex min-h-0 flex-1 flex-col gap-2 text-[11px] md:text-sm">
           <div
-            class="grid grid-cols-[minmax(0,1fr)_5.2rem_auto_3.4rem_1rem] items-center gap-x-1 border-b border-zinc-200 pb-2 text-[9px] font-medium uppercase tracking-wider text-zinc-500 md:text-[11px] dark:border-zinc-800"
+            class="grid grid-cols-[minmax(0,1fr)_4.5rem_2.5rem_3rem_2rem] items-center gap-x-1 border-b border-zinc-200 pb-2 text-[9px] font-medium uppercase tracking-wider text-zinc-500 md:text-[11px] dark:border-zinc-800"
           >
             <span class="text-center">Category</span>
             <span class="text-center">Budget</span>
@@ -493,9 +493,10 @@
             <span class="text-center" title="Action">✎</span>
           </div>
 
+          <div class="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain">
           {#each categories as cat (cat.id)}
             <div class="space-y-1.5 border-l-2 border-zinc-300 pl-1 dark:border-zinc-700">
-              <div class="grid grid-cols-[minmax(0,1fr)_5.2rem_auto_3.4rem_1rem] items-center gap-x-1 rounded-sm bg-zinc-50/80 px-1 py-1 dark:bg-zinc-900/60">
+              <div class="grid grid-cols-[minmax(0,1fr)_4.5rem_2.5rem_3rem_2rem] items-center gap-x-1 rounded-sm bg-zinc-50/80 px-1 py-1 dark:bg-zinc-900/60">
                 <p class="min-w-0 truncate text-[10px] font-semibold sm:text-xs md:text-sm">{cat.name}</p>
                 <div class="min-w-0">
                   <AmountInput
@@ -518,7 +519,7 @@
               </div>
 
               {#each subcategoryInputs[cat.id] ?? [] as sub (sub.key)}
-                <div class="grid grid-cols-[minmax(0,1fr)_5.2rem_auto_3.4rem_1rem] items-center gap-x-1">
+                <div class="grid grid-cols-[minmax(0,1fr)_4.5rem_2.5rem_3rem_2rem] items-center gap-x-1">
                   <div class="min-w-0">
                     <input
                       type="text"
@@ -568,7 +569,7 @@
                 {@const subs = subcategoryInputs[cat.id] ?? []}
                 {@const mainRemainder = mainCategoryRemainder(budgetInputs[cat.id] || '', subs)}
                 {@const overSub = subExceedsCategory(budgetInputs[cat.id] || '', subs)}
-                <div class="grid grid-cols-[minmax(0,1fr)_5.2rem_auto_3.4rem_1rem] items-center gap-x-1 border-t border-dashed border-zinc-200 pt-1 text-zinc-500 dark:border-zinc-800">
+                <div class="grid grid-cols-[minmax(0,1fr)_4.5rem_2.5rem_3rem_2rem] items-center gap-x-1 border-t border-dashed border-zinc-200 pt-1 text-zinc-500 dark:border-zinc-800">
                   <p class="text-xs italic md:text-sm">Main</p>
                   <span class="font-mono text-right text-xs tabular-nums md:text-sm">{formatCurrency(mainRemainder)}</span>
                   <span class="flex justify-center"><PicBadge name={picInputs[cat.id] ?? defaultPic(picList)} /></span>
@@ -583,6 +584,7 @@
               {/if}
             </div>
           {/each}
+          </div>
         </div>
 
         <div class="flex gap-2 pt-1">
@@ -608,7 +610,7 @@
         </p>
       </fieldset>
 
-      <fieldset class="space-y-3 rounded-sm border border-zinc-200 p-3 dark:border-zinc-800">
+      <fieldset class="shrink-0 space-y-3 rounded-sm border border-zinc-200 p-3 dark:border-zinc-800">
         <legend class="px-1 text-xs font-medium uppercase tracking-wider text-zinc-500">
           Per PIC
         </legend>
@@ -663,7 +665,7 @@
       <button
         type="submit"
         disabled={saving}
-        class="w-full border border-black bg-black py-2.5 text-sm font-medium text-white transition-opacity disabled:opacity-50 dark:border-white dark:bg-white dark:text-black"
+        class="w-full shrink-0 border border-black bg-black py-2.5 text-sm font-medium text-white transition-opacity disabled:opacity-50 dark:border-white dark:bg-white dark:text-black"
       >
         {saving ? 'Saving…' : 'Save Plan'}
       </button>
