@@ -43,7 +43,9 @@
   let saving = $state(false);
   let deletingId = $state<number | null>(null);
   let error = $state('');
-  let success = $state('');
+  let submitted = $state<{ detail: string; amount: number } | null>(null);
+  let submittedKey = $state(0);
+  let submittedTimer = 0;
 
   let filterCategory = $state('');
   let filterSub = $state('');
@@ -277,12 +279,6 @@
     }
   }
 
-  function sheetsMessage(sync?: { status: string; error?: string }): string {
-    if (sync?.status === 'synced') return ' (DB + spreadsheet)';
-    if (sync?.status === 'failed') return ' — spreadsheet sync failed';
-    return '';
-  }
-
   async function loadTransactions(
     activePeriod: string,
     reset = false,
@@ -470,7 +466,6 @@
       ? tx.pic
       : defaultPicForSelection(tx.categoryId, tx.subCategory ?? '');
     error = '';
-    success = '';
     clearSuggestions();
     queueMicrotask(() => {
       formEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -482,11 +477,47 @@
     resetInsertForm();
   }
 
+  function closeSubmitted() {
+    window.clearTimeout(submittedTimer);
+    submitted = null;
+  }
+
+  $effect(() => () => window.clearTimeout(submittedTimer));
+
+  function playSavedSound() {
+    const Ctx = window.AudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const now = ctx.currentTime;
+    for (const [index, freq] of [523.25, 659.25, 783.99].entries()) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const start = now + index * 0.07;
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.07, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.26);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.28);
+    }
+    window.setTimeout(() => void ctx.close(), 700);
+  }
+
+  function showSubmitted(item: string, amount: number) {
+    submittedKey += 1;
+    submitted = { detail: item.trim() || 'Item', amount };
+    playSavedSound();
+    window.clearTimeout(submittedTimer);
+    submittedTimer = window.setTimeout(closeSubmitted, 3000);
+  }
+
   async function handleSubmit(e: SubmitEvent) {
     e.preventDefault();
     saving = true;
     error = '';
-    success = '';
 
     const body = {
       date,
@@ -501,18 +532,18 @@
       if (editingId != null) {
         const id = editingId;
         const result = await updateTransaction(id, body);
-        success = `Transaction #${id} updated${sheetsMessage(result.sheetsSync)}`;
         if (result.sheetsSync?.status === 'failed') {
           error = result.sheetsSync.error ?? 'Spreadsheet sync failed';
         }
         editingId = null;
         resetInsertForm();
       } else {
+        const savedDetail = detail.trim();
         const result = await createTransaction({ ...body, period });
-        success = `Transaction saved${sheetsMessage(result.sheetsSync)}`;
         if (result.sheetsSync?.status === 'failed') {
           error = result.sheetsSync.error ?? 'Spreadsheet sync failed';
         }
+        showSubmitted(savedDetail, body.cost);
         detail = '';
         cost = '';
       }
@@ -530,7 +561,6 @@
 
     deletingId = id;
     error = '';
-    success = '';
 
     try {
       const result = await deleteTransaction(id);
@@ -538,7 +568,6 @@
         editingId = null;
         resetInsertForm();
       }
-      success = `Deleted "${detail}"${sheetsMessage(result.sheetsSync)}`;
       if (result.sheetsSync?.status === 'failed') {
         error = result.sheetsSync.error ?? 'Spreadsheet sync failed';
       }
@@ -768,9 +797,6 @@
     {#if error}
       <p class="text-xs text-red-600 dark:text-red-400">{error}</p>
     {/if}
-    {#if success}
-      <p class="text-xs text-emerald-600 dark:text-emerald-400">{success}</p>
-    {/if}
 
     <button
       type="submit"
@@ -956,3 +982,87 @@
     {/if}
   </div>
 </section>
+
+{#if submitted}
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+  <div
+    class="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4"
+    onclick={closeSubmitted}
+    role="presentation"
+  >
+    {#key submittedKey}
+      <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+      <div
+        class="submit-pop relative w-full max-w-[16rem] rounded-lg border border-zinc-200 bg-white px-5 pb-5 pt-4 text-center shadow-lg dark:border-zinc-700 dark:bg-zinc-950"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Transaction Saved!"
+        onclick={(event) => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          class="absolute right-2 top-2 flex h-7 w-7 items-center justify-center text-zinc-500"
+          aria-label="Close"
+          onclick={closeSubmitted}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
+          </svg>
+        </button>
+        <svg class="mx-auto mb-3 h-14 w-14" viewBox="0 0 52 52" aria-hidden="true">
+          <circle class="check-circle" cx="26" cy="26" r="23" />
+          <path class="check-mark" d="M15 27.5 22.5 35 38 18" />
+        </svg>
+        <p class="text-sm font-semibold tracking-tight">Transaction Saved!</p>
+        <p class="mt-1 truncate text-[11px] text-zinc-500">
+          {submitted.detail}
+          <span class="font-mono tabular-nums"> · {formatCurrency(submitted.amount)}</span>
+        </p>
+      </div>
+    {/key}
+  </div>
+{/if}
+
+<style>
+  .submit-pop {
+    animation: submit-pop-in 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .check-circle {
+    fill: none;
+    stroke: #16a34a;
+    stroke-width: 2.5;
+    stroke-dasharray: 160;
+    stroke-dashoffset: 160;
+    animation: check-draw 0.45s ease-out forwards;
+  }
+
+  .check-mark {
+    fill: none;
+    stroke: #16a34a;
+    stroke-width: 3.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 48;
+    stroke-dashoffset: 48;
+    animation: check-draw 0.32s 0.32s ease-out forwards;
+  }
+
+  @keyframes submit-pop-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes check-draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+</style>
