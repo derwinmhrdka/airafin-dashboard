@@ -126,7 +126,7 @@
   }
 
   function chooseGoogle() {
-    setAvatarPref(nickname, { mode: 'google', seed: $avatarPref.seed || seeds[0] });
+    setAvatarPref(nickname, { mode: 'google', seed: $avatarPref.seed || seeds[0] }, picture);
     closeAvatar();
   }
 

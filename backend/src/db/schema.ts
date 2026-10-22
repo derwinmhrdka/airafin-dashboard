@@ -166,6 +166,9 @@ export const projectMembers = pgTable(
 export const pics = pgTable('pics', {
   id: serial('id').primaryKey(),
   name: text('name').notNull().unique(),
+  avatarMode: text('avatar_mode').notNull().default(''),
+  avatarSeed: text('avatar_seed').notNull().default(''),
+  avatarPicture: text('avatar_picture').notNull().default(''),
 });
 
 /** In-app notifications per PIC (pay due / paid received). */

@@ -1,3 +1,7 @@
+<script lang="ts" module>
+  let logoSeq = 0;
+</script>
+
 <script lang="ts">
   import { bankSlug } from '$lib/bank-logo';
 
@@ -11,6 +15,8 @@
   }
 
   let { name, height = 18, class: className = '' }: Props = $props();
+
+  const scope = `bl${++logoSeq}`;
 
   const slug = $derived(bankSlug(name));
   const label = $derived(name.trim());
@@ -28,8 +34,9 @@
       .then((response) => (response.ok ? response.text() : ''))
       .then((raw) => {
         if (!alive || !raw.includes('<svg')) return;
-        const prefix = `bl-${current}-`;
+        const prefix = `${scope}-${current}-`;
         svg = raw
+          .replace(/\sclip-path="url\(#[^"]+\)"/g, '')
           .replace(/\bid="([^"]+)"/g, (_match, id: string) => `id="${prefix}${id}"`)
           .replace(/url\(#([^)]+)\)/g, (_match, id: string) => `url(#${prefix}${id})`);
       })
@@ -45,7 +52,7 @@
 
 {#if slug && svg}
   <span
-    class="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-sm bg-white p-px {className}"
+    class="inline-flex shrink-0 items-center justify-center rounded-sm bg-white p-px {className}"
     style="height: {height}px; width: {markWidth}px"
     title={label}
     aria-label={label}
@@ -69,5 +76,6 @@
     display: block;
     width: 100%;
     height: 100%;
+    overflow: visible;
   }
 </style>

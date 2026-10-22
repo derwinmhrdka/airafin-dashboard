@@ -218,7 +218,7 @@
                   <div class="border border-zinc-200 p-2 dark:border-zinc-800">
                     <div class="mb-2 flex items-center justify-between gap-2">
                       <span class="inline-flex min-w-0 items-center gap-1.5 text-xs font-medium">
-                        <BankLogo name={pocket.pocket} class="truncate" />
+                        <BankLogo name={pocket.pocket} />
                       </span>
                       <span class="font-mono text-xs tabular-nums text-zinc-500">{pct.toFixed(0)}%</span>
                     </div>

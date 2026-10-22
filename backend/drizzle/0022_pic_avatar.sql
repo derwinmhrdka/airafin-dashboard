@@ -1,0 +1,3 @@
+ALTER TABLE "pics" ADD COLUMN IF NOT EXISTS "avatar_mode" text NOT NULL DEFAULT '';
+ALTER TABLE "pics" ADD COLUMN IF NOT EXISTS "avatar_seed" text NOT NULL DEFAULT '';
+ALTER TABLE "pics" ADD COLUMN IF NOT EXISTS "avatar_picture" text NOT NULL DEFAULT '';

@@ -71,6 +71,49 @@ export async function createPic(rawName: string) {
   return { pic: created, created: true as const };
 }
 
+function googlePicture(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== 'https:') return '';
+    const host = url.hostname.toLowerCase().replace(/\.$/, '');
+    const allowed =
+      host === 'googleusercontent.com' ||
+      host.endsWith('.googleusercontent.com') ||
+      host === 'ggpht.com' ||
+      host.endsWith('.ggpht.com');
+    if (!allowed) return '';
+    return url.toString().slice(0, 2000);
+  } catch {
+    return '';
+  }
+}
+
+export async function savePicAvatar(
+  name: string,
+  input: { mode?: string; seed?: string; picture?: string },
+) {
+  const pic = await findPicByNameCi(name);
+  if (!pic) throw new Error('PIC not found');
+
+  const rawMode = input.mode?.trim().toLowerCase() ?? '';
+  const mode = rawMode === 'animal' ? 'color' : rawMode === 'person' ? 'initial' : rawMode;
+  if (mode !== 'google' && mode !== 'color' && mode !== 'initial') {
+    throw new Error('Invalid avatar');
+  }
+
+  const seed = (input.seed?.trim() || pic.name).slice(0, 80);
+  const picture = googlePicture(input.picture ?? '') || pic.avatarPicture;
+
+  const [updated] = await db
+    .update(pics)
+    .set({ avatarMode: mode, avatarSeed: seed, avatarPicture: picture })
+    .where(eq(pics.id, pic.id))
+    .returning();
+  return updated;
+}
+
 export async function findPicByNameCi(name: string) {
   const [row] = await db
     .select()

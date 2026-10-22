@@ -9,7 +9,7 @@
   import InfoUpdatePopup from '$lib/components/InfoUpdatePopup.svelte';
   import TabNav from '$lib/components/TabNav.svelte';
   import FloatNav from '$lib/components/FloatNav.svelte';
-  import { loadAvatarPref } from '$lib/avatar';
+  import { loadAvatarPref, syncAvatars } from '$lib/avatar';
   import { floatNavEnabled } from '$lib/float-nav';
   import { getPics, getProjects, selectSessionProject } from '$lib/api';
   import { currentPeriod, parsePeriodToDate, periodFromUrl } from '$lib/period';
@@ -27,7 +27,7 @@
   let projectName = $state<string | null>(null);
   let projectPhoto = $state<string | null>(null);
   let switchOpen = $state(false);
-  let picsLoaded = false;
+  let picsLoadedFor = '';
   let loadedProjectId: number | null = null;
 
   $effect(() => {
@@ -37,12 +37,18 @@
 
   $effect(() => {
     if (page.url.pathname === '/login') return;
-    if (picsLoaded) return;
-    picsLoaded = true;
+    const pic = typeof data.session?.pic === 'string' ? data.session.pic : '';
+    const picture = typeof data.session?.picture === 'string' ? data.session.picture : '';
+    const key = pic.trim().toLowerCase();
+    if (picsLoadedFor === key) return;
+    picsLoadedFor = key;
     void getPics()
-      .then((res) => setPicNames(res.pics.map((p) => p.name)))
+      .then((res) => {
+        setPicNames(res.pics.map((p) => p.name));
+        syncAvatars(res.pics, pic, picture);
+      })
       .catch(() => {
-        picsLoaded = false;
+        picsLoadedFor = '';
       });
   });
 

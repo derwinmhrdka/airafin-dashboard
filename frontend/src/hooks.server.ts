@@ -85,6 +85,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   if (
     path.startsWith('/api/settings/pics') &&
+    path !== '/api/settings/pics/avatar' &&
     event.request.method !== 'GET' &&
     !(await isAdminEmail(session?.email))
   ) {
@@ -157,6 +158,9 @@ export const handle: Handle = async ({ event, resolve }) => {
   }
   if (session?.email) {
     headers.set('X-User-Email', session.email);
+  }
+  if (session?.pic) {
+    headers.set('X-User-Pic', session.pic);
   }
 
   let body: string | undefined;

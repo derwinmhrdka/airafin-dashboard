@@ -4,7 +4,7 @@
 
 <script lang="ts">
   import { page } from '$app/state';
-  import { avatarPref, readAvatarPref, type AvatarMode } from '$lib/avatar';
+  import { avatarByPic, avatarPref, type AvatarMode } from '$lib/avatar';
   import UserAvatar from '$lib/components/UserAvatar.svelte';
 
   interface Props {
@@ -21,12 +21,14 @@
 
   $effect(() => {
     const label = name.trim();
+    const key = label.toLowerCase();
     const live = $avatarPref;
+    const shared = $avatarByPic[key];
     const session = page.data.session;
     const sessionPic = typeof session?.pic === 'string' ? session.pic.trim() : '';
-    const mine = Boolean(sessionPic) && sessionPic.toLowerCase() === label.toLowerCase();
-    const chosen = mine ? live : readAvatarPref(label);
-    if (!chosen) {
+    const mine = Boolean(sessionPic) && sessionPic.toLowerCase() === key;
+    const chosen = mine ? live : shared;
+    if (!chosen?.mode) {
       mode = 'initial';
       seed = label || 'airafin';
       picture = '';
@@ -34,8 +36,9 @@
     }
     mode = chosen.mode;
     seed = chosen.seed.trim() || label || 'airafin';
+    const sessionPicture = typeof session?.picture === 'string' ? session.picture : '';
     picture =
-      mine && chosen.mode === 'google' && typeof session?.picture === 'string' ? session.picture : '';
+      chosen.mode === 'google' ? (mine && sessionPicture ? sessionPicture : (shared?.picture ?? '')) : '';
   });
 </script>
 

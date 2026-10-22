@@ -12,6 +12,9 @@ export interface PocketSetting {
 export interface PicSetting {
   id: number;
   name: string;
+  avatarMode?: string;
+  avatarSeed?: string;
+  avatarPicture?: string;
 }
 
 export interface AuthEmailSetting {

@@ -147,6 +147,17 @@ export function getPics(): Promise<{ pics: PicSetting[] }> {
   return fetchJson('/api/settings/pics', undefined, { memoryCache: true });
 }
 
+export function saveMyAvatar(input: {
+  mode: string;
+  seed: string;
+  picture?: string;
+}): Promise<{ pic: PicSetting }> {
+  return fetchJson('/api/settings/pics/avatar', {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
 export function createPic(name: string): Promise<{ pic: PicSetting; created: boolean }> {
   return fetchJson('/api/settings/pics', {
     method: 'POST',

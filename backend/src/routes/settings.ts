@@ -9,7 +9,7 @@ import {
   resolveAuthEmail,
   setAuthEmailAdmin,
 } from '../lib/auth-emails.js';
-import { createPic, deletePic, isValidPic, listPics } from '../lib/pic.js';
+import { createPic, deletePic, isValidPic, listPics, savePicAvatar } from '../lib/pic.js';
 
 interface PocketBody {
   name?: string;
@@ -112,6 +112,27 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     const rows = await listPics();
     return { pics: rows };
   });
+
+  app.put<{ Body: { mode?: string; seed?: string; picture?: string } }>(
+    '/api/settings/pics/avatar',
+    async (request, reply) => {
+      const header = request.headers['x-user-pic'];
+      const name = (Array.isArray(header) ? header[0] : header)?.trim() ?? '';
+      if (!name) return reply.code(400).send({ error: 'PIC is required' });
+      try {
+        const pic = await savePicAvatar(name, {
+          mode: request.body?.mode,
+          seed: request.body?.seed,
+          picture: request.body?.picture,
+        });
+        return { pic };
+      } catch (e) {
+        const message = e instanceof Error ? e.message : 'Invalid avatar';
+        const status = message === 'PIC not found' ? 404 : 400;
+        return reply.code(status).send({ error: message });
+      }
+    },
+  );
 
   app.post<{ Body: { name?: string } }>('/api/settings/pics', async (request, reply) => {
     const name = request.body?.name ?? '';
