@@ -12,6 +12,9 @@ import type {
   Project,
   ReimbursementItem,
   Transaction,
+  TransferComment,
+  TransferTargetKind,
+  TransferThread,
   InfoUpdate,
   InfoUpdatePage,
   TransactionSuggestion,
@@ -558,6 +561,37 @@ export function createChecklistItem(body: {
     method: 'POST',
     body: JSON.stringify(body),
   });
+}
+
+export function getTransferThreads(period: string): Promise<{ threads: TransferThread[] }> {
+  return fetchJson(`/api/transfers/threads?period=${encodeURIComponent(period)}`);
+}
+
+export async function addTransferComment(input: {
+  targetKind: TransferTargetKind;
+  targetId: number;
+  parentId?: number | null;
+  body: string;
+}): Promise<{ comment: TransferComment }> {
+  const result = await fetchJson<{ comment: TransferComment }>('/api/transfers/comments', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  notifyNotificationsChanged();
+  return result;
+}
+
+export async function decideTransfer(input: {
+  targetKind: TransferTargetKind;
+  targetId: number;
+  decision: 'approved' | 'rejected';
+}): Promise<{ approval: 'approved' | 'rejected' }> {
+  const result = await fetchJson<{ approval: 'approved' | 'rejected' }>('/api/transfers/approval', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  notifyNotificationsChanged();
+  return result;
 }
 
 export function updateChecklistItem(

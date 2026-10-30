@@ -171,6 +171,44 @@ export const pics = pgTable('pics', {
   avatarPicture: text('avatar_picture').notNull().default(''),
 });
 
+/** Comments on one checklist or reimbursement transfer. */
+export const transferComments = pgTable(
+  'transfer_comments',
+  {
+    id: serial('id').primaryKey(),
+    projectId: integer('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    period: text('period').notNull(),
+    targetKind: text('target_kind').notNull(),
+    targetId: integer('target_id').notNull(),
+    parentId: integer('parent_id'),
+    pic: text('pic').notNull(),
+    body: text('body').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    index('transfer_comments_target_idx').on(table.projectId, table.targetKind, table.targetId),
+  ],
+);
+
+/** Receiver decision for a transfer. Missing row means still pending. */
+export const transferApprovals = pgTable(
+  'transfer_approvals',
+  {
+    id: serial('id').primaryKey(),
+    projectId: integer('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    targetKind: text('target_kind').notNull(),
+    targetId: integer('target_id').notNull(),
+    status: text('status').notNull().default('pending'),
+  },
+  (table) => [
+    uniqueIndex('transfer_approvals_target_idx').on(table.projectId, table.targetKind, table.targetId),
+  ],
+);
+
 /** In-app notifications per PIC (pay due / paid received). */
 export const notifications = pgTable(
   'notifications',

@@ -133,6 +133,10 @@ function notificationTitle(type: string, itemLabel: string): string {
   const label = itemLabel.trim() || 'Item';
   if (type === 'paid_received') return `${label} just paid!`;
   if (type === 'pay_due') return `${label} needs payment`;
+  if (type === 'transfer_comment') return `Comment on ${label}`;
+  if (type === 'transfer_reply') return `Reply on ${label}`;
+  if (type === 'transfer_approved') return `${label} approved`;
+  if (type === 'transfer_rejected') return `${label} rejected`;
   return label;
 }
 

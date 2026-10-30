@@ -160,6 +160,24 @@ export interface PlanSubcategory {
   period: string;
 }
 
+export type TransferTargetKind = 'checklist' | 'reimbursement';
+export type TransferApproval = 'pending' | 'approved' | 'rejected';
+
+export interface TransferComment {
+  id: number;
+  parentId: number | null;
+  pic: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface TransferThread {
+  targetKind: TransferTargetKind;
+  targetId: number;
+  approval: TransferApproval;
+  comments: TransferComment[];
+}
+
 export interface PlanChecklistItem {
   id: number;
   period: string;

@@ -15,6 +15,7 @@ import { pushRoutes } from './routes/push.js';
 import { settingsRoutes } from './routes/settings.js';
 import { syncRoutes } from './routes/sync.js';
 import { transactionRoutes } from './routes/transactions.js';
+import { transferThreadRoutes } from './routes/transfer-threads.js';
 import { ensureWebPushConfigured } from './lib/web-push.js';
 
 const app = Fastify({
@@ -80,6 +81,7 @@ await registerUploadRoutes(app);
 await app.register(projectRoutes);
 await app.register(categoryRoutes);
 await app.register(transactionRoutes);
+await app.register(transferThreadRoutes);
 await app.register(dashboardRoutes);
 await app.register(budgetRoutes);
 await app.register(syncRoutes);

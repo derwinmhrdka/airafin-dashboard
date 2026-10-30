@@ -1,17 +1,18 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import {
     createChecklistItem,
+    decideTransfer,
     deleteChecklistItem,
     getReimbursements,
-    markReimbursementPaid,
-    markReimbursementUnpaid,
+    getTransferThreads,
     syncNotifications,
-    updateChecklistItem,
   } from '$lib/api';
   import AmountInput from '$lib/components/AmountInput.svelte';
   import BankLogo from '$lib/components/BankLogo.svelte';
   import PicBadge from '$lib/components/PicBadge.svelte';
   import TransferChecklistButton from '$lib/components/TransferChecklistButton.svelte';
+  import TransferConversation from '$lib/components/TransferConversation.svelte';
   import TransferPendingDetails from '$lib/components/TransferPendingDetails.svelte';
   import { formatCurrency, parseAmountInput } from '$lib/format';
   import { groupTransferItems } from '$lib/reimbursements';
@@ -26,7 +27,14 @@
     type TransferPendingLine,
   } from '$lib/transfer-pending';
   import { defaultPic, otherPic as pickOtherPic, picNames, type Pic } from '$lib/pics';
-  import type { Category, PlanChecklistItem, ReimbursementItem } from '$lib/types';
+  import type {
+    Category,
+    PlanChecklistItem,
+    ReimbursementItem,
+    TransferApproval,
+    TransferComment,
+    TransferTargetKind,
+  } from '$lib/types';
 
   interface SubOption {
     key: string;
@@ -62,9 +70,16 @@
   let reimbursements = $state<ReimbursementItem[]>([]);
   let reimbLoading = $state(true);
   let error = $state('');
-  let payingId = $state<number | null>(null);
   let payingBulkKey = $state<string | null>(null);
   let expandedKey = $state<string | null>(null);
+  let openThread = $state<string | null>(null);
+  let threadMap = $state<
+    Record<string, { approval: TransferApproval; comments: TransferComment[] }>
+  >({});
+
+  const sessionPic = $derived(
+    typeof page.data.session?.pic === 'string' ? page.data.session.pic.trim() : '',
+  );
 
   let formOpen = $state(false);
   let itemQuery = $state('');
@@ -75,7 +90,6 @@
   const picList = $derived($picNames);
   let pocket = $state('');
   let saving = $state(false);
-  let togglingId = $state<number | null>(null);
   let formError = $state('');
 
   const pendingLines = $derived(collectPendingLines({ checklistItems: items, reimbursements }));
@@ -168,6 +182,14 @@
     expandedKey = expandedKey === key ? null : key;
   }
 
+  function toggleThread(key: string) {
+    openThread = openThread === key ? null : key;
+  }
+
+  function threadFor(kind: TransferTargetKind, id: number) {
+    return threadMap[`${kind}:${id}`] ?? { approval: 'pending' as TransferApproval, comments: [] };
+  }
+
   async function settleLines(toSettle: TransferPendingLine[]) {
     const checklistIds = new Set(
       toSettle.filter((l) => l.checklistId != null).map((l) => l.checklistId!),
@@ -175,16 +197,22 @@
 
     for (const line of toSettle) {
       if (line.reimbursementId != null) {
-        await markReimbursementPaid(line.reimbursementId);
-      }
-    }
-    for (const line of toSettle) {
-      if (line.checklistId != null) {
-        await updateChecklistItem(line.checklistId, true);
+        await decideTransfer({
+          targetKind: 'reimbursement',
+          targetId: line.reimbursementId,
+          decision: 'approved',
+        });
+      } else if (line.checklistId != null) {
+        await decideTransfer({
+          targetKind: 'checklist',
+          targetId: line.checklistId,
+          decision: 'approved',
+        });
       }
     }
 
     await loadReimbursements(period);
+    await loadThreads(period);
     if (checklistIds.size > 0) {
       await onChange();
     }
@@ -258,7 +286,29 @@
   }
 
   function isBulkPaying(): boolean {
-    return payingBulkKey != null || payingId != null;
+    return payingBulkKey != null;
+  }
+
+  async function loadThreads(activePeriod: string) {
+    try {
+      const res = await getTransferThreads(activePeriod);
+      const next: Record<string, { approval: TransferApproval; comments: TransferComment[] }> = {};
+      for (const thread of res.threads) {
+        next[`${thread.targetKind}:${thread.targetId}`] = {
+          approval: thread.approval,
+          comments: thread.comments,
+        };
+      }
+      threadMap = next;
+    } catch {
+      threadMap = {};
+    }
+  }
+
+  async function refreshTransfer(kind: TransferTargetKind) {
+    await loadThreads(period);
+    if (kind === 'reimbursement') await loadReimbursements(period);
+    await onChange();
   }
 
   async function loadReimbursements(activePeriod: string) {
@@ -277,6 +327,7 @@
 
   $effect(() => {
     void loadReimbursements(period);
+    void loadThreads(period);
   });
 
   function openForm() {
@@ -346,21 +397,6 @@
     }
   }
 
-  async function toggleDone(item: PlanChecklistItem) {
-    togglingId = item.id;
-    try {
-      await updateChecklistItem(item.id, !item.done);
-      await onChange();
-      try {
-        await syncNotifications(period);
-      } catch {
-        /* non-blocking */
-      }
-    } finally {
-      togglingId = null;
-    }
-  }
-
   async function removeItem(id: number) {
     try {
       await deleteChecklistItem(id);
@@ -370,27 +406,6 @@
     }
   }
 
-  async function toggleReimbursementPaid(item: ReimbursementItem) {
-    payingId = item.id;
-    error = '';
-    try {
-      if (item.settled) {
-        await markReimbursementUnpaid(item.id);
-      } else {
-        await markReimbursementPaid(item.id);
-      }
-      await loadReimbursements(period);
-      try {
-        await syncNotifications(period);
-      } catch {
-        /* non-blocking */
-      }
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to update reimbursement';
-    } finally {
-      payingId = null;
-    }
-  }
 </script>
 
 <fieldset class="space-y-3 rounded-sm border border-zinc-200 p-3 dark:border-zinc-800">
@@ -593,29 +608,40 @@
       {#if grouped.balancing.length > 0}
         <ul class="space-y-1.5">
           {#each grouped.balancing as item (item.id)}
+            {@const threadKey = `checklist:${item.id}`}
+            {@const thread = threadFor('checklist', item.id)}
             <li
-              class="flex items-center gap-2 rounded-sm border px-2 py-2 transition
+              class="rounded-sm border transition
                 {item.done
                 ? 'border-emerald-200 bg-emerald-50/80 opacity-75 dark:border-emerald-900 dark:bg-emerald-950/30'
                 : 'border-amber-200 bg-amber-50/60 dark:border-amber-900/60 dark:bg-amber-950/20'}"
             >
+              <div class="flex items-center gap-2 px-2 py-2">
               <button
                 type="button"
-                disabled={togglingId === item.id}
-                onclick={() => toggleDone(item)}
-                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition
+                class="flex h-7 w-5 shrink-0 items-center justify-center text-zinc-500"
+                aria-expanded={openThread === threadKey}
+                aria-label="Comments"
+                onclick={() => toggleThread(threadKey)}
+              >
+                <span
+                  class="block h-0 w-0 border-y-[5px] border-l-[7px] border-y-transparent border-l-current transition-transform {openThread === threadKey ? 'rotate-90' : ''}"
+                ></span>
+              </button>
+              <span
+                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2
                   {item.done
                   ? 'border-emerald-500 bg-emerald-500 text-white'
-                  : 'border-zinc-300 bg-zinc-100 text-transparent hover:border-zinc-400 dark:border-zinc-600 dark:bg-zinc-800'}"
-                aria-label={item.done ? 'Mark pending' : 'Mark done'}
+                  : 'border-zinc-300 bg-zinc-100 text-transparent dark:border-zinc-600 dark:bg-zinc-800'}"
+                aria-hidden="true"
               >
                 {#if item.done}
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
                     <path d="M20 6 9 17l-5-5" />
                   </svg>
                 {/if}
-              </button>
-              <div class="min-w-0 flex-1 {item.done ? 'pointer-events-none' : ''}">
+              </span>
+              <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2">
                   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true">
                     <path d="M12 3v18" />
@@ -640,6 +666,19 @@
                   <span class="rounded bg-amber-100 px-1 text-[9px] font-medium uppercase text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">Auto</span>
                 </div>
               </div>
+              </div>
+              {#if openThread === threadKey}
+                <TransferConversation
+                  targetKind="checklist"
+                  targetId={item.id}
+                  receiverPic={item.receiverPic}
+                  {sessionPic}
+                  approval={thread.approval}
+                  done={item.done}
+                  comments={thread.comments}
+                  onChanged={() => refreshTransfer('checklist')}
+                />
+              {/if}
             </li>
           {/each}
         </ul>
@@ -657,29 +696,40 @@
             {#each group.rows as row (row.kind === 'checklist' ? `c-${row.item.id}` : `r-${row.item.id}`)}
               {#if row.kind === 'checklist'}
                 {@const item = row.item}
+                {@const threadKey = `checklist:${item.id}`}
+                {@const thread = threadFor('checklist', item.id)}
                 <li
-                  class="flex items-center gap-2 rounded-sm border px-2 py-2 transition
+                  class="rounded-sm border transition
                     {item.done
                     ? 'border-emerald-200 bg-emerald-50/80 opacity-75 dark:border-emerald-900 dark:bg-emerald-950/30'
                     : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-black'}"
                 >
+                  <div class="flex items-center gap-2 px-2 py-2">
                   <button
                     type="button"
-                    disabled={togglingId === item.id}
-                    onclick={() => toggleDone(item)}
-                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition
+                    class="flex h-7 w-5 shrink-0 items-center justify-center text-zinc-500"
+                    aria-expanded={openThread === threadKey}
+                    aria-label="Comments"
+                    onclick={() => toggleThread(threadKey)}
+                  >
+                    <span
+                      class="block h-0 w-0 border-y-[5px] border-l-[7px] border-y-transparent border-l-current transition-transform {openThread === threadKey ? 'rotate-90' : ''}"
+                    ></span>
+                  </button>
+                  <span
+                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2
                       {item.done
                       ? 'border-emerald-500 bg-emerald-500 text-white'
-                      : 'border-zinc-300 bg-zinc-100 text-transparent hover:border-zinc-400 dark:border-zinc-600 dark:bg-zinc-800'}"
-                    aria-label={item.done ? 'Mark pending' : 'Mark done'}
+                      : 'border-zinc-300 bg-zinc-100 text-transparent dark:border-zinc-600 dark:bg-zinc-800'}"
+                    aria-hidden="true"
                   >
                     {#if item.done}
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
                         <path d="M20 6 9 17l-5-5" />
                       </svg>
                     {/if}
-                  </button>
-                  <div class="min-w-0 flex-1 {item.done ? 'pointer-events-none' : ''}">
+                  </span>
+                  <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-2">
                       <span class="truncate text-sm font-medium {item.done ? 'text-emerald-800 line-through dark:text-emerald-200' : ''}">
                         {item.subcategoryName}
@@ -706,32 +756,56 @@
                       </svg>
                     </button>
                   {/if}
+                  </div>
+                  {#if openThread === threadKey}
+                    <TransferConversation
+                      targetKind="checklist"
+                      targetId={item.id}
+                      receiverPic={item.receiverPic}
+                      {sessionPic}
+                      approval={thread.approval}
+                      done={item.done}
+                      comments={thread.comments}
+                      onChanged={() => refreshTransfer('checklist')}
+                    />
+                  {/if}
                 </li>
               {:else}
                 {@const item = row.item}
+                {@const threadKey = `reimbursement:${item.id}`}
+                {@const thread = threadFor('reimbursement', item.id)}
                 <li
-                  class="flex items-center gap-2 rounded-sm border px-2 py-2 transition
+                  class="rounded-sm border transition
                     {item.settled
                     ? 'border-emerald-200 bg-emerald-50/80 opacity-75 dark:border-emerald-900 dark:bg-emerald-950/30'
                     : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-black'}"
                 >
+                  <div class="flex items-center gap-2 px-2 py-2">
                   <button
                     type="button"
-                    disabled={isBulkPaying() || payingId === item.id}
-                    onclick={() => toggleReimbursementPaid(item)}
-                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition
+                    class="flex h-7 w-5 shrink-0 items-center justify-center text-zinc-500"
+                    aria-expanded={openThread === threadKey}
+                    aria-label="Comments"
+                    onclick={() => toggleThread(threadKey)}
+                  >
+                    <span
+                      class="block h-0 w-0 border-y-[5px] border-l-[7px] border-y-transparent border-l-current transition-transform {openThread === threadKey ? 'rotate-90' : ''}"
+                    ></span>
+                  </button>
+                  <span
+                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2
                       {item.settled
                       ? 'border-emerald-500 bg-emerald-500 text-white'
-                      : 'border-zinc-300 bg-zinc-100 text-transparent hover:border-zinc-400 dark:border-zinc-600 dark:bg-zinc-800'}"
-                    aria-label={item.settled ? 'Mark pending' : 'Mark paid'}
+                      : 'border-zinc-300 bg-zinc-100 text-transparent dark:border-zinc-600 dark:bg-zinc-800'}"
+                    aria-hidden="true"
                   >
                     {#if item.settled}
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
                         <path d="M20 6 9 17l-5-5" />
                       </svg>
                     {/if}
-                  </button>
-                  <div class="min-w-0 flex-1 {item.settled ? 'pointer-events-none' : ''}">
+                  </span>
+                  <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-2">
                       <span class="truncate text-sm font-medium {item.settled ? 'text-emerald-800 line-through dark:text-emerald-200' : ''}">
                         {item.detail}
@@ -752,6 +826,19 @@
                       {/if}
                     </div>
                   </div>
+                  </div>
+                  {#if openThread === threadKey}
+                    <TransferConversation
+                      targetKind="reimbursement"
+                      targetId={item.id}
+                      receiverPic={item.paidBy}
+                      {sessionPic}
+                      approval={thread.approval}
+                      done={item.settled}
+                      comments={thread.comments}
+                      onChanged={() => refreshTransfer('reimbursement')}
+                    />
+                  {/if}
                 </li>
               {/if}
             {/each}

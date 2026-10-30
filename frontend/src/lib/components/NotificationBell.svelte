@@ -163,6 +163,18 @@
     if (item.type === 'paid_received') {
       return `${label} just paid!`;
     }
+    if (item.type === 'transfer_comment') {
+      return `${item.fromPic} commented on ${label}`;
+    }
+    if (item.type === 'transfer_reply') {
+      return `${item.fromPic} replied on ${label}`;
+    }
+    if (item.type === 'transfer_approved') {
+      return `${label} approved`;
+    }
+    if (item.type === 'transfer_rejected') {
+      return `${label} rejected`;
+    }
     return 'Notification';
   }
 </script>
